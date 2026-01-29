@@ -1,0 +1,75 @@
+# OS-specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+.directory
+
+# Editor/IDE
+*.swp
+*.swo
+*.swn
+*~
+\#*\#
+.\#*
+.vscode/
+.idea/
+*.sublime-*
+.project
+.settings/
+
+# Build Artifacts
+*.log
+*.tmp
+.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+.tox/
+.nox/
+
+# Container/Docker Build Context
+.dockerignore
+docker-compose.override.yml
+
+# Secrets and credentials
+.env
+.env.local
+*.key
+*.pem
+secrets/
+credentials/
+.awscred
+.kube/config
+
+# Temporary/Working Directories
+tmp/
+temp/
+.scratch/
+*.bak
+
+# Test artifacts
+test-results/
+coverage/
+*.xml
+*.json.log
+
+# Application-specific (add as needed)
+#node_modules/  # If any app uses Node.js.
+#vendor/        # If any app uses Go.
