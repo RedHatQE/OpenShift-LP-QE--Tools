@@ -63,13 +63,13 @@ libs/bash/ci-operator/interop/common/PreAction--EnsureReqs.sh
 
     # Collect all jUnit XMLs, set TS Name if applicable, and merge them to one.
     yq eval-all -px -ox -I2 '
-        {
+        [.] | {
             "+p_xml": "version=\"1.0\" encoding=\"UTF-8\"",
             "testsuites": {"testsuite": [
-                .[] |
+                .[][] |
+                select(kind == "map") |
                 (.testsuite // .) |
-                ([] + .)[] |
-                select(kind == "map") | (
+                ([] + .)[] | (
                     select(strenv(LP_IO__ET_PPP__NEW_TS_NAME) != "") |
                     (."+@name" // "") as $oldName |
                     ."+@name" = (
