@@ -45,7 +45,7 @@ function ExitTrap--PostProcessPrep () {(
     eval "$(
         curl -fsSL \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/\
-libs/bash/ci-operator/interop/common/PreAction--EnsureReqs.sh
+libs/bash/ci-operator/common/PreAction--EnsureReqs.sh
     )"; PreAction--EnsureReqs yq
 
     while IFS= read -r -d '' resultFile; do
