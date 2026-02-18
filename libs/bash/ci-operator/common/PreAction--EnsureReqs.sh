@@ -50,4 +50,6 @@ function PreAction--EnsureReqs () {
         done 0< <(printf '%s\0' "${toolArr[@]}")
         [[ ":${PATH}:" != *":${binDir}:"* ]] && echo "${binDir}:" 1>&3
     )${PATH}"
+
+    return 0
 }

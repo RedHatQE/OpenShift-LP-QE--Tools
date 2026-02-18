@@ -38,6 +38,7 @@ function ExitTrap--PostProcessPrep () {(
 ################################################################################
     set -euxo pipefail; shopt -s inherit_errexit
     typeset mergedFN="${1:-jUnit.xml}"; (($#)) && shift
+
     typeset resultFile=''
     typeset -a xmlFiles=()
 
