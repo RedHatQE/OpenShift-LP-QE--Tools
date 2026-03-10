@@ -46,8 +46,8 @@ function ExitTrap--PostProcessPrep () {(
     eval "$(
         curl -fsSL \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/\
-libs/bash/ci-operator/common/PreAction--EnsureReqs.sh
-    )"; PreAction--EnsureReqs yq
+libs/bash/common/EnsureReqs.sh
+    )"; EnsureReqs yq
 
     while IFS= read -r -d '' resultFile; do
         grep -qE '<testsuites?\b' "${resultFile}" && xmlFiles+=("${resultFile}")
