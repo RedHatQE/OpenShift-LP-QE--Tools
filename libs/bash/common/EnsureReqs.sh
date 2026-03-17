@@ -1,14 +1,17 @@
 #!/bin/bash
-function PreAction--EnsureReqs () {
+function EnsureReqs () {
+    typeset __shOpt="$(shopt -po errexit nounset xtrace pipefail; shopt -p inherit_errexit)"
+    trap 'eval "${__shOpt}"; unset __shOpt; trap - RETURN' RETURN
+    set -euxo pipefail; shopt -s inherit_errexit
 ################################################################################
-#   Pre-Action Function that checks and installs the required tools.
+#   Check and install the required tools.
 #
 #   Usage:
 #       eval "$(
 #           curl -fsSL \
 #       https://<urlAuthToRawContent>/<urlPathToRawContents...>\
-#       <repoPaths...>/PreAction--EnsureReqs.sh
-#       )"; PreAction--EnsureReqs <tools...>
+#       <repoPaths...>/EnsureReqs.sh
+#       )"; EnsureReqs <tools...>
 #
 #   Supported tools:
 #     - jq
@@ -51,5 +54,5 @@ function PreAction--EnsureReqs () {
         [[ ":${PATH}:" != *":${binDir}:"* ]] && echo "${binDir}:" 1>&3
     )${PATH}"
 
-    return 0
+    true
 }
