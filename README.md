@@ -6,9 +6,11 @@ Repository for OpenShift Layered Product Quality Engineering Tooling.
 ```
 .
 ├── .AI_INIT.md                         # Main AI agent instructions.
-├── CLAUDE.md                           # Symlink to .AI_INIT.md for Claude Code.
-├── .continuerules                      # Symlink to .AI_INIT.md for Continue.dev.
-├── .cursorrules                        # Symlink to .AI_INIT.md for Cursor IDE.
+├── AGENTS.md                           # Symbolic link to .AI_INIT.md for generic AI Agents.
+├── CLAUDE.md                           # Symbolic link to .AI_INIT.md for Claude Code.
+├── GEMINI.md                           # Symbolic link to .AI_INIT.md for Gemini CLI.
+├── .continuerules                      # Symbolic link to .AI_INIT.md for Continue.dev.
+├── .cursorrules                        # Symbolic link to .AI_INIT.md for Cursor IDE.
 ├── .AI_README.md                       # Project overview and guidelines (auto-generated).
 ├── .AI_HISTORY.md                      # Repository change log (auto-generated).
 ├── README.md                           # This file.
@@ -51,7 +53,7 @@ Repository-level maintenance scripts for building, testing, linting, and releasi
 ## AI Agent Instructions
 This repository uses a unified AI agent instruction system:
 - The `.AI_INIT.md` contains the main instructions.
-- The AI Agent specific default files, e.g. `CLAUDE.md`, `.continuerules`, `.cursorrules`, are symlinks to `.AI_INIT.md`.
+- The AI Agent specific default files, e.g. `AGENTS.md`, `CLAUDE.md`, `.continuerules`, `.cursorrules`, etc., are symbolic links to `.AI_INIT.md`.
 - Each application can have its own `.AI_README.md` for app-specific context.
 - Change history is tracked in `.AI_HISTORY.md` files.
 
@@ -73,3 +75,4 @@ cd apps/<appName>
 - Update `.AI_HISTORY.md` for significant changes.
 - Ensure each application has proper documentation in its `README.md`.
 - Use shared libraries in `libs/` when code is reused across applications.
+- See [`CONTRIBUTING.md`](CONTRIBUTING.md) for contribution conventions and workflow details.
