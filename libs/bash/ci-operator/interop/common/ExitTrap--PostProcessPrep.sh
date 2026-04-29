@@ -9,8 +9,9 @@ function ExitTrap--PostProcessPrep () {(
 #   Workflow:
 #    1. Collect and merge all jUnit XML Test Results from the executed Test
 #       Cases.
-#    2. If the Env. Var. `LP_IO__ET_PPP__NEW_TS_NAME` is set to non-empty, then
-#       the Test Suite Name is set to it.
+#    2. The merged suite name uses `lp-ocp-compat--` plus
+#       `LP_IO__ET_PPP__NEW_TS_NAME` when set; if unset or empty, `lp-ocp-compat--%s`
+#       is used so the original suite name is substituted for `%s`.
 #    3. Archive the original jUnit XMLs into `${ARTIFACT_DIR}/`
 #    4. Put the merged jUnit XML into `${SHARED_DIR}/` for consumption of
 #       subsequent Step.
@@ -26,8 +27,8 @@ function ExitTrap--PostProcessPrep () {(
 #
 #   Required Env. Var. from Step Configuration:
 #       LP_IO__ET_PPP__NEW_TS_NAME
-#           The new Test Suite Name. Use `%s` as a placeholder for the
-#           original name (use `%%` for a literal `%`).
+#           Base for the new Test Suite Name; the script prefixes `lp-ocp-compat--`. 
+#           Use `%s` as a placeholder for the original name (use `%%` for a literal `%`).
 #           This can be used to set the Test Suite Name to a specific
 #           searchable pattern, say for Component Readiness input
 #           filtering.
@@ -41,6 +42,7 @@ function ExitTrap--PostProcessPrep () {(
 
     typeset resultFile=''
     typeset -a xmlFiles=()
+    typeset prefix=''
 
     # Ensure requirements are met.
     eval "$(
@@ -62,6 +64,13 @@ libs/bash/common/EnsureReqs.sh
         return
     }
 
+    if [[ -z ${LP_IO__ET_PPP__NEW_TS_NAME_BASE} ]]; then
+        prefix='lp-ocp-compat--%s'
+    else
+        prefix="lp-ocp-compat--${LP_IO__ET_PPP__NEW_TS_NAME_BASE}"
+    fi
+    export prefix
+
     # Collect all jUnit XMLs, set TS Name if applicable, and merge them to one.
     yq eval-all -px -ox -I2 '
         [.] | {
@@ -71,10 +80,10 @@ libs/bash/common/EnsureReqs.sh
                 select(kind == "map") |
                 (.testsuite // .) |
                 ([] + .)[] | (
-                    select(strenv(LP_IO__ET_PPP__NEW_TS_NAME) != "") |
+                    select(strenv(prefix) != "") |
                     (."+@name" // "") as $oldName |
                     ."+@name" = (
-                        strenv(LP_IO__ET_PPP__NEW_TS_NAME) |
+                        strenv(prefix) |
                         sub("(^|[^%])((%%)*)%s", "${1}${2}\($oldName)") |
                         sub("%%", "%")
                     )
