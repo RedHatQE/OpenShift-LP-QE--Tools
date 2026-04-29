@@ -68,6 +68,7 @@ libs/bash/common/EnsureReqs.sh
     if [[ -z ${LP_IO__ET_PPP__NEW_TS_NAME_BASE} ]]; then
         prefix='lp-ocp-compat--%s'
     else
+        # If LP_IO__ET_PPP__NEW_TS_NAME_BASE is set, let the user decide if override original suite name or not (e.g. with `%s`).
         prefix="lp-ocp-compat--${LP_IO__ET_PPP__NEW_TS_NAME_BASE}"
     fi
     export prefix
