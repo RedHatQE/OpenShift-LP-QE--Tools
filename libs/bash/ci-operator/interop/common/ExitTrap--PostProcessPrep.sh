@@ -42,6 +42,7 @@ function ExitTrap--PostProcessPrep () {(
 
     typeset resultFile=''
     typeset -a xmlFiles=()
+    typeset LP_IO__ET_PPP__NEW_TS_NAME_BASE="${LP_IO__ET_PPP__NEW_TS_NAME:-}"
     typeset prefix=''
 
     # Ensure requirements are met.
