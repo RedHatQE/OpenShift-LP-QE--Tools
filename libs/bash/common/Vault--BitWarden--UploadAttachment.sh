@@ -48,12 +48,12 @@ function Vault--BitWarden--UploadAttachment () {
 
         bw sync
         bwItemID="$(bw get item "${bwObjName}" | jq -r '.id')" || {
-            echo "You may NOT have access to BitWarden Note \`${bwObjName}\`." 1>&2
+            echo "You may NOT have access to BitWarden Object \`${bwObjName}\`." 1>&2
             exit 1
         }
         while IFS='' read -r e; do
             bw delete --itemid "${bwItemID}" attachment "${e}" || {
-                echo "You do NOT have R/W access to BitWarden Note \`${bwObjName}\`." 1>&2
+                echo "You do NOT have R/W access to BitWarden Object \`${bwObjName}\`." 1>&2
                 exit 1
             }
         done 0< <(
