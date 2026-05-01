@@ -34,7 +34,7 @@ function BuildCustomScriptsFromYAML () {
 #                              |  <description>: |-
 #                              |    <shellScriptBlock>
 ################################################################################
-    typeset yamlVar="${1}"; (($#)) && shift $#
+    typeset yamlVar="${1:?}"; (($#)) && shift
 
     # Ensure requirements are met.
     eval "$(
