@@ -2,7 +2,7 @@
 function Vault--BitWarden--UploadAttachment () {
     typeset __shOpt="$(shopt -po errexit nounset xtrace pipefail; shopt -p inherit_errexit)"
     trap 'eval "${__shOpt}"; unset __shOpt; trap - RETURN' RETURN
-    set -euo pipefail +x; shopt -s inherit_errexit
+    set -euo pipefail; shopt -s inherit_errexit
 ################################################################################
 #   Upload file as attachment to BitWarden.
 #
@@ -31,36 +31,39 @@ function Vault--BitWarden--UploadAttachment () {
 
     typeset bwItemID='' e=''
 
-    export BW_SESSION="$(
-        eval "$(jq -r '"export BW_CLIENTID=\(
-            .client_id | @sh
-        ); export BW_CLIENTSECRET=\(
-            .client_secret | @sh
-        ); export BW_PASSWORD=\(
-            .master_password | @sh
-        )"' "${bwCrdPath}")"
-        bw login 1> /dev/null
-        bw unlock --passwordenv BW_PASSWORD --raw
-    )"
+    ( set +x
+        trap 'bw logout 1> /dev/null 2>&1 || true' EXIT
 
-    bw sync
-    bwItemID="$(bw get item "${bwObjName}" | jq -r '.id')" || {
-        echo "You may NOT have access to BitWarden Note \`${bwObjName}\`." 1>&2
-        return 1
-    }
-    while IFS='' read -r e; do
-        bw delete --itemid "${bwItemID}" attachment "${e}" || {
-            echo "You do NOT have R/W access to BitWarden Note \`${bwObjName}\`." 1>&2
-            return 1
+        export BW_SESSION="$(
+            eval "$(jq -r '"export BW_CLIENTID=\(
+                .client_id | @sh
+            ); export BW_CLIENTSECRET=\(
+                .client_secret | @sh
+            ); export BW_PASSWORD=\(
+                .master_password | @sh
+            )"' "${bwCrdPath}")"
+            bw login 1> /dev/null
+            bw unlock --passwordenv BW_PASSWORD --raw
+        )"
+
+        bw sync
+        bwItemID="$(bw get item "${bwObjName}" | jq -r '.id')" || {
+            echo "You may NOT have access to BitWarden Note \`${bwObjName}\`." 1>&2
+            exit 1
         }
-    done 0< <(
-        bw get item "${bwObjName}" |
-        jq -r --arg fn "${bwAttFilePath##*/}" '
-            (.attachments // [])[] | select(.fileName == $fn) | .id
-        '
-    )
-    bw create --file "${bwAttFilePath}" --itemid "${bwItemID}" attachment 1> /dev/null
-    bw logout 1> /dev/null 2>&1 || true
+        while IFS='' read -r e; do
+            bw delete --itemid "${bwItemID}" attachment "${e}" || {
+                echo "You do NOT have R/W access to BitWarden Note \`${bwObjName}\`." 1>&2
+                exit 1
+            }
+        done 0< <(
+            bw get item "${bwObjName}" |
+            jq -r --arg fn "${bwAttFilePath##*/}" '
+                (.attachments // [])[] | select(.fileName == $fn) | .id
+            '
+        )
+        bw create --file "${bwAttFilePath}" --itemid "${bwItemID}" attachment 1> /dev/null
+    true )
 
     true
 }
