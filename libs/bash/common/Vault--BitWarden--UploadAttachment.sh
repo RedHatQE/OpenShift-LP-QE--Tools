@@ -2,7 +2,7 @@
 function Vault--BitWarden--UploadAttachment () {
     typeset __shOpt="$(shopt -po errexit nounset xtrace pipefail; shopt -p inherit_errexit)"
     trap 'eval "${__shOpt}"; unset __shOpt; trap - RETURN' RETURN
-    set -euo pipefail; shopt -s inherit_errexit
+    set -euxo pipefail; shopt -s inherit_errexit
 ################################################################################
 #   Upload file as attachment to BitWarden.
 #
@@ -42,7 +42,7 @@ function Vault--BitWarden--UploadAttachment () {
             ); export BW_PASSWORD=\(
                 .master_password | @sh
             )"' "${bwCrdPath}")"
-            bw login 1> /dev/null
+            bw login --apikey 1> /dev/null
             bw unlock --passwordenv BW_PASSWORD --raw
         )"
 
