@@ -50,6 +50,10 @@ function EnsureReqs () {
                 }
                 ;;
               (chisel)
+                # Chisel Secure Tunnel (https://github.com/jpillora/chisel).
+                #   Provide a HTTP-over-WebSocket reverse tunnel, to expose
+                #   local HTTP Server, in an ingress-less host, to a
+                #   client-reachable EndPoint.
                 chisel --version || {
                     wget -qO - 'https://i.jpillora.com/chisel' | env -C "${binDir}" bash
                     "${binDir}/chisel" --version
