@@ -16,6 +16,7 @@ function EnsureReqs () {
 #   Supported tools:
 #     - jq
 #     - yq
+#     - chisel
 ################################################################################
     typeset -a toolArr=("$@"); (($#)) && shift $#
 
@@ -46,6 +47,16 @@ function EnsureReqs () {
                         )" &&
                     chmod a+x "${binDir}/yq"
                     "${binDir}/yq" --version
+                }
+                ;;
+              (chisel)
+                # Chisel Secure Tunnel (https://github.com/jpillora/chisel).
+                #   Provide a HTTP-over-WebSocket reverse tunnel, to expose
+                #   local HTTP Server, in an ingress-less host, to a
+                #   client-reachable EndPoint.
+                chisel --version || {
+                    wget -qO - 'https://i.jpillora.com/chisel' | env -C "${binDir}" bash
+                    "${binDir}/chisel" --version
                 }
                 ;;
               (*)   : "Unsupported tool: ${toolName}";;
