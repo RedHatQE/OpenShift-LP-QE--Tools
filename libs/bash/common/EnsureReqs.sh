@@ -16,6 +16,7 @@ function EnsureReqs () {
 #   Supported tools:
 #     - jq
 #     - yq
+#     - chisel
 ################################################################################
     typeset -a toolArr=("$@"); (($#)) && shift $#
 
@@ -46,6 +47,12 @@ function EnsureReqs () {
                         )" &&
                     chmod a+x "${binDir}/yq"
                     "${binDir}/yq" --version
+                }
+                ;;
+              (chisel)
+                chisel --version || {
+                    wget -qO - 'https://i.jpillora.com/chisel' | env -C "${binDir}" bash
+                    "${binDir}/chisel" --version
                 }
                 ;;
               (*)   : "Unsupported tool: ${toolName}";;
