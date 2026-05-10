@@ -27,9 +27,9 @@ function EnsureReqs () {
         while IFS= read -rd '' toolName; do
             case ${toolName} in
               (jq)
-                ${toolName} --version || {
-                    wget -qO "${binDir}/${toolName}" \
-                        "https://github.com/jqlang/${toolName}/releases/latest/download/${toolName}-$(
+                jq --version || {
+                    curl -fsSL -o "${binDir}/jq" \
+                        "https://github.com/jqlang/jq/releases/latest/download/jq-$(
                             uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/'
                         )-$(
                             uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'
@@ -39,9 +39,9 @@ function EnsureReqs () {
                 }
                 ;;
               (yq)
-                ${toolName} --version || {
-                    wget -qO "${binDir}/${toolName}" \
-                        "https://github.com/mikefarah/${toolName}/releases/latest/download/${toolName}_$(
+                yq --version || {
+                    curl -fsSL -o "${binDir}/yq" \
+                        "https://github.com/mikefarah/yq/releases/latest/download/yq_$(
                             uname -s | tr '[:upper:]' '[:lower:]'
                         )_$(
                             uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'
@@ -55,18 +55,10 @@ function EnsureReqs () {
                 #   Provide a HTTP-over-WebSocket reverse tunnel, to expose
                 #   local HTTP Server, in an ingress-less host, to a
                 #   client-reachable EndPoint.
-                ${toolName} --version || {
-                    wget -qO - "$(
-                        EnsureReqs jq
-                        wget -qO - "https://api.github.com/repos/jpillora/${toolName}/releases/latest" |
-                        jq -r \
-                            --arg name "${toolName}" \
-                            --arg os "$(uname -s | tr '[:upper:]' '[:lower:]')" \
-                            --arg cpu "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
-                            '(.tag_name | ltrimstr("v")) as $tag | .assets[] | select(.name == "\($name)_\($tag)_\($os)_\($cpu).gz").browser_download_url'
-                    )" | gunzip -c > "${binDir}/${toolName}"
-                    chmod a+x "${binDir}/${toolName}"
-                    "${binDir}/${toolName}" --version
+                chisel --version || {
+                    curl -fsSL 'https://i.jpillora.com/chisel' \
+                        | env -C "${binDir}" bash
+                    "${binDir}/chisel" --version
                 }
                 ;;
               (bw)
