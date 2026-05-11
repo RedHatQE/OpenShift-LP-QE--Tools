@@ -17,6 +17,7 @@ function EnsureReqs () {
 #     - jq
 #     - yq
 #     - chisel
+#     - bw
 ################################################################################
     typeset -a toolArr=("$@"); (($#)) && shift $#
 
@@ -67,6 +68,15 @@ function EnsureReqs () {
                     chmod a+x "${binDir}/${toolName}"
                     "${binDir}/${toolName}" --version
                 }
+                ;;
+              (bw)
+                ${toolName} --version || (
+                    typeset dlFile=/tmp/bw-cli--$$
+                    wget -qO "${dlFile}.zip" 'https://bitwarden.com/download/?app=cli&platform=linux'
+                    unzip "${dlFile}.zip" -d "${binDir}"
+                    rm -rf "${dlFile}.zip"
+                    "${binDir}/${toolName}" --version
+                )
                 ;;
               (*)   : "Unsupported tool: ${toolName}";;
             esac
