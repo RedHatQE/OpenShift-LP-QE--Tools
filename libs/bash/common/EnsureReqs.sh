@@ -20,33 +20,33 @@ function EnsureReqs () {
 ################################################################################
     typeset -a toolArr=("$@"); (($#)) && shift $#
 
-    export PATH="$(exec 3>&1 1>&2
+    PATH="$(exec 3>&1 1>&2
         typeset binDir="/tmp/bin" toolName=
         mkdir -p "${binDir}"
         while IFS= read -rd '' toolName; do
             case ${toolName} in
               (jq)
-                jq --version || {
-                    wget -qO "${binDir}/jq" \
-                        "https://github.com/jqlang/jq/releases/latest/download/jq-$(
+                ${toolName} --version || {
+                    wget -qO "${binDir}/${toolName}" \
+                        "https://github.com/jqlang/${toolName}/releases/latest/download/${toolName}-$(
                             uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/'
                         )-$(
                             uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'
                         )" &&
-                    chmod a+x "${binDir}/jq"
-                    "${binDir}/jq" --version
+                    chmod a+x "${binDir}/${toolName}"
+                    "${binDir}/${toolName}" --version
                 }
                 ;;
               (yq)
-                yq --version || {
-                    wget -qO "${binDir}/yq" \
-                        "https://github.com/mikefarah/yq/releases/latest/download/yq_$(
+                ${toolName} --version || {
+                    wget -qO "${binDir}/${toolName}" \
+                        "https://github.com/mikefarah/${toolName}/releases/latest/download/${toolName}_$(
                             uname -s | tr '[:upper:]' '[:lower:]'
                         )_$(
                             uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'
                         )" &&
-                    chmod a+x "${binDir}/yq"
-                    "${binDir}/yq" --version
+                    chmod a+x "${binDir}/${toolName}"
+                    "${binDir}/${toolName}" --version
                 }
                 ;;
               (chisel)
@@ -54,15 +54,25 @@ function EnsureReqs () {
                 #   Provide a HTTP-over-WebSocket reverse tunnel, to expose
                 #   local HTTP Server, in an ingress-less host, to a
                 #   client-reachable EndPoint.
-                chisel --version || {
-                    wget -qO - 'https://i.jpillora.com/chisel' | env -C "${binDir}" bash
-                    "${binDir}/chisel" --version
+                ${toolName} --version || {
+                    wget -qO - "$(
+                        EnsureReqs jq
+                        wget -qO - "https://api.github.com/repos/jpillora/${toolName}/releases/latest" |
+                        jq -r \
+                            --arg name "${toolName}" \
+                            --arg os "$(uname -s | tr '[:upper:]' '[:lower:]')" \
+                            --arg cpu "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
+                            '(.tag_name | ltrimstr("v")) as $tag | .assets[] | select(.name == "\($name)_\($tag)_\($os)_\($cpu).gz").browser_download_url'
+                    )" | gunzip -c > "${binDir}/${toolName}"
+                    chmod a+x "${binDir}/${toolName}"
+                    "${binDir}/${toolName}" --version
                 }
                 ;;
               (*)   : "Unsupported tool: ${toolName}";;
             esac
         done 0< <(printf '%s\0' "${toolArr[@]}")
         [[ ":${PATH}:" != *":${binDir}:"* ]] && echo "${binDir}:" 1>&3
+        true
     )${PATH}"
 
     true
