@@ -45,7 +45,8 @@ function ExitTrap--PostProcessPrep () {(
     # Ensure requirements are met.
     eval "$(
         curl -fsSL \
-https://raw.githubusercontent.com/oharan2/OpenShift-LP-QE--Tools/refs/heads/wget/libs/bash/common/EnsureReqs.sh
+https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/\
+libs/bash/common/EnsureReqs.sh
     )"; EnsureReqs yq
 
     while IFS= read -r -d '' resultFile; do

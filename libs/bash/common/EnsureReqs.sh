@@ -8,7 +8,9 @@ function EnsureReqs () {
 #
 #   Usage:
 #       eval "$(
-#           curl -fsSL \
+#           typeset -a _fURL=()
+#           type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+#           "${_fURL[@]}" \
 #       https://<urlAuthToRawContent>/<urlPathToRawContents...>\
 #       <repoPaths...>/EnsureReqs.sh
 #       )"; EnsureReqs <tools...>
@@ -21,15 +23,18 @@ function EnsureReqs () {
 ################################################################################
     typeset -a toolArr=("$@"); (($#)) && shift $#
 
+    typeset -a _fURL=()
+
+    type -t wget 1>/dev/null && _fURL=(wget -qO) || _fURL=(curl -fsSLo)
     PATH="$(exec 3>&1 1>&2
         typeset binDir="/tmp/bin" toolName=
         mkdir -p "${binDir}"
         while IFS= read -rd '' toolName; do
             case ${toolName} in
               (jq)
-                jq --version || {
-                    curl -fsSL -o "${binDir}/jq" \
-                        "https://github.com/jqlang/jq/releases/latest/download/jq-$(
+                ${toolName} --version || {
+                    "${_fURL[@]}" "${binDir}/${toolName}" \
+                        "https://github.com/jqlang/${toolName}/releases/latest/download/${toolName}-$(
                             uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/'
                         )-$(
                             uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'
@@ -39,9 +44,9 @@ function EnsureReqs () {
                 }
                 ;;
               (yq)
-                yq --version || {
-                    curl -fsSL -o "${binDir}/yq" \
-                        "https://github.com/mikefarah/yq/releases/latest/download/yq_$(
+                ${toolName} --version || {
+                    "${_fURL[@]}" "${binDir}/${toolName}" \
+                        "https://github.com/mikefarah/${toolName}/releases/latest/download/${toolName}_$(
                             uname -s | tr '[:upper:]' '[:lower:]'
                         )_$(
                             uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'
@@ -55,16 +60,26 @@ function EnsureReqs () {
                 #   Provide a HTTP-over-WebSocket reverse tunnel, to expose
                 #   local HTTP Server, in an ingress-less host, to a
                 #   client-reachable EndPoint.
-                chisel --version || {
-                    curl -fsSL 'https://i.jpillora.com/chisel' \
-                        | env -C "${binDir}" bash
-                    "${binDir}/chisel" --version
+                ${toolName} --version || {
+                    "${_fURL[@]}" - "$(
+                        EnsureReqs jq
+                        "${_fURL[@]}" - "https://api.github.com/repos/jpillora/${toolName}/releases/latest" |
+                        jq -r \
+                            --arg name "${toolName}" \
+                            --arg os "$(uname -s | tr '[:upper:]' '[:lower:]')" \
+                            --arg cpu "$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" \
+                            '(.tag_name | ltrimstr("v")) as $tag | .assets[] | select(.name == "\($name)_\($tag)_\($os)_\($cpu).gz").browser_download_url'
+                    )" | gunzip -c > "${binDir}/${toolName}"
+                    chmod a+x "${binDir}/${toolName}"
+                    "${binDir}/${toolName}" --version
                 }
                 ;;
               (bw)
                 ${toolName} --version || (
                     typeset dlFile=/tmp/bw-cli--$$
-                    wget -qO "${dlFile}.zip" 'https://bitwarden.com/download/?app=cli&platform=linux'
+                    "${_fURL[@]}" "${dlFile}.zip" "https://bitwarden.com/download/?app=cli&platform=$(
+                        uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/'
+                    )"
                     unzip "${dlFile}.zip" -d "${binDir}"
                     rm -rf "${dlFile}.zip"
                     "${binDir}/${toolName}" --version
