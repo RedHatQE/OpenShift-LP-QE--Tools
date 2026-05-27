@@ -8,7 +8,9 @@ function Vault--BitWarden--UploadAttachment () {
 #
 #   Usage:
 #       eval "$(
-#           curl -fsSL \
+#           typeset -a _fURL=()
+#           type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+#           "${_fURL[@]}" \
 #       https://<urlAuthToRawContent>/<urlPathToRawContents...>\
 #       <repoPaths...>/Vault--BitWarden--UploadAttachment.sh
 #       )"; Vault--BitWarden--UploadAttachment \

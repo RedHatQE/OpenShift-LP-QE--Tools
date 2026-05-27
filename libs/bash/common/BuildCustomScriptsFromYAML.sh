@@ -16,7 +16,9 @@ function BuildCustomScriptsFromYAML () {
 #
 #   Usage:
 #       eval "$(
-#           curl -fsSL \
+#           typeset -a _fURL=()
+#           type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+#           "${_fURL[@]}" \
 #       https://<urlAuthToRawContent>/<urlPathToRawContents...>\
 #       <repoPaths...>/BuildCustomScriptsFromYAML.sh
 #       )"; eval "$(BuildCustomScriptsFromYAML YAML_VAR_NAME)"
@@ -38,7 +40,9 @@ function BuildCustomScriptsFromYAML () {
 
     # Ensure requirements are met.
     eval "$(
-        curl -fsSL \
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/\
 libs/bash/common/EnsureReqs.sh
     )"; EnsureReqs yq

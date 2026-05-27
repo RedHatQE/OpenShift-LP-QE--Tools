@@ -17,11 +17,13 @@ function ExitTrap--PostProcessPrep () {(
 #
 #   Usage:
 #       eval "$(
-#           curl -fsSL \
+#           typeset -a _fURL=()
+#           type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+#           "${_fURL[@]}" \
 #       https://<urlAuthToRawContent>/<urlPathToRawContents...>\
 #       <repoPaths...>/ExitTrap--PostProcessPrep.sh
 #       )"; trap '
-#           ExitTrap--PostProcessPrep junit--<unique-merge-filename>.xml
+#           ExitTrap--PostProcessPrep jUnit--<unique-merge-filename>.xml
 #       ' EXIT
 #
 #   Required Env. Var. from Step Configuration:
@@ -44,7 +46,9 @@ function ExitTrap--PostProcessPrep () {(
 
     # Ensure requirements are met.
     eval "$(
-        curl -fsSL \
+        typeset -a _fURL=()
+        type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+        "${_fURL[@]}" \
 https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/\
 libs/bash/common/EnsureReqs.sh
     )"; EnsureReqs yq
@@ -69,13 +73,8 @@ libs/bash/common/EnsureReqs.sh
             "testsuites": {"testsuite": [
                 .[][] |
                 select(kind == "map") |
-                (.testsuite // .) |
-                ([] + .)[] |
-                select(kind == "map") |
-                select((."+@name" // .name) != null or (.testcase // null) != null) |
-                del(.testsuite | select(
-                    . == null or . == "null" or (kind == "map" and length == 0)
-                )) | (
+                ((select(has("testsuite")) | .testsuite) // .) |
+                (([] + .)[] | (
                     select(strenv(LP_IO__ET_PPP__NEW_TS_NAME) != "") |
                     (."+@name" // "") as $oldName |
                     ."+@name" = (
@@ -83,7 +82,7 @@ libs/bash/common/EnsureReqs.sh
                         sub("(^|[^%])((%%)*)%s", "${1}${2}\($oldName)") |
                         sub("%%", "%")
                     )
-                )//. |
+                ) // .) |
                 ([] + (.testcase // [])) as $tc |
                 ."+@tests" = ($tc | length | tostring) |
                 ."+@failures" = ([$tc[] | select(.failure)] | length | tostring) |
