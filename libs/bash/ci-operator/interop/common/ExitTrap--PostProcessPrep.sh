@@ -70,7 +70,12 @@ libs/bash/common/EnsureReqs.sh
                 .[][] |
                 select(kind == "map") |
                 (.testsuite // .) |
-                ([] + .)[] | (
+                ([] + .)[] |
+                select(kind == "map") |
+                select((."+@name" // .name) != null or (.testcase // null) != null) |
+                del(.testsuite | select(
+                    . == null or . == "null" or (kind == "map" and length == 0)
+                )) | (
                     select(strenv(LP_IO__ET_PPP__NEW_TS_NAME) != "") |
                     (."+@name" // "") as $oldName |
                     ."+@name" = (
