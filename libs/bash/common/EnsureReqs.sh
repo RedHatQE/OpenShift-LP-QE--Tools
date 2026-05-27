@@ -8,7 +8,9 @@ function EnsureReqs () {
 #
 #   Usage:
 #       eval "$(
-#           curl -fsSL \
+#           typeset -a _fURL=()
+#           type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+#           "${_fURL[@]}" \
 #       https://<urlAuthToRawContent>/<urlPathToRawContents...>\
 #       <repoPaths...>/EnsureReqs.sh
 #       )"; EnsureReqs <tools...>
@@ -21,6 +23,9 @@ function EnsureReqs () {
 ################################################################################
     typeset -a toolArr=("$@"); (($#)) && shift $#
 
+    typeset -a _fURL=()
+
+    type -t wget 1>/dev/null && _fURL=(wget -qO) || _fURL=(curl -fsSLo)
     PATH="$(exec 3>&1 1>&2
         typeset binDir="/tmp/bin" toolName=
         mkdir -p "${binDir}"
@@ -28,7 +33,7 @@ function EnsureReqs () {
             case ${toolName} in
               (jq)
                 ${toolName} --version || {
-                    wget -qO "${binDir}/${toolName}" \
+                    "${_fURL[@]}" "${binDir}/${toolName}" \
                         "https://github.com/jqlang/${toolName}/releases/latest/download/${toolName}-$(
                             uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/'
                         )-$(
@@ -40,7 +45,7 @@ function EnsureReqs () {
                 ;;
               (yq)
                 ${toolName} --version || {
-                    wget -qO "${binDir}/${toolName}" \
+                    "${_fURL[@]}" "${binDir}/${toolName}" \
                         "https://github.com/mikefarah/${toolName}/releases/latest/download/${toolName}_$(
                             uname -s | tr '[:upper:]' '[:lower:]'
                         )_$(
@@ -56,9 +61,9 @@ function EnsureReqs () {
                 #   local HTTP Server, in an ingress-less host, to a
                 #   client-reachable EndPoint.
                 ${toolName} --version || {
-                    wget -qO - "$(
+                    "${_fURL[@]}" - "$(
                         EnsureReqs jq
-                        wget -qO - "https://api.github.com/repos/jpillora/${toolName}/releases/latest" |
+                        "${_fURL[@]}" - "https://api.github.com/repos/jpillora/${toolName}/releases/latest" |
                         jq -r \
                             --arg name "${toolName}" \
                             --arg os "$(uname -s | tr '[:upper:]' '[:lower:]')" \
@@ -72,7 +77,9 @@ function EnsureReqs () {
               (bw)
                 ${toolName} --version || (
                     typeset dlFile=/tmp/bw-cli--$$
-                    wget -qO "${dlFile}.zip" 'https://bitwarden.com/download/?app=cli&platform=linux'
+                    "${_fURL[@]}" "${dlFile}.zip" "https://bitwarden.com/download/?app=cli&platform=$(
+                        uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/'
+                    )"
                     unzip "${dlFile}.zip" -d "${binDir}"
                     rm -rf "${dlFile}.zip"
                     "${binDir}/${toolName}" --version
