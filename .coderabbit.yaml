@@ -6,7 +6,6 @@ tone_instructions: >
 reviews:
   profile: assertive
   high_level_summary: true
-  collapse_walkthrough: false
   review_status: true
   auto_review:
     enabled: true

@@ -1,10 +1,10 @@
 #!/bin/bash
-function Vault--BitWarden--UploadAttachment () {
+function Vault--BitWarden--UpdateCustomField () {
     typeset __shOpt="$(shopt -po errexit nounset xtrace pipefail; shopt -p inherit_errexit)"
     trap 'eval "${__shOpt}"; unset __shOpt; trap - RETURN' RETURN
     set -euxo pipefail; shopt -s inherit_errexit
 ################################################################################
-#   Upload file as attachment to a BitWarden Object.
+#   Create or update a custom field of a BitWarden Object.
 #
 #   Usage:
 #       eval "$(
@@ -12,9 +12,9 @@ function Vault--BitWarden--UploadAttachment () {
 #           type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
 #           "${_fURL[@]}" \
 #       https://<urlAuthToRawContent>/<urlPathToRawContents...>\
-#       <repoPaths...>/Vault--BitWarden--UploadAttachment.sh
-#       )"; Vault--BitWarden--UploadAttachment \
-#           BW_OBJ_NAME BW_CRD_PATH BW_FILE_ATT
+#       <repoPaths...>/Vault--BitWarden--UpdateCustomField.sh
+#       )"; Vault--BitWarden--UpdateCustomField \
+#           BW_OBJ_NAME BW_CRD_PATH BW_FLD_NAME BW_FLD_PATH
 #
 #   Args:
 #       BW_OBJ_NAME Name of the BitWarden Object (Login, Note, etc.).
@@ -25,13 +25,16 @@ function Vault--BitWarden--UploadAttachment () {
 #                       "client_secret":"...",
 #                       "master_password":"..."
 #                     }
-#       BW_FILE_ATT Path to file to be uploaded.
+#       BW_FLD_NAME Name of the custom field to create or update.
+#       BW_FLD_PATH Path to a file containing the custom field value.
+#                   Supports process substitution (e.g., <(...)).
 ################################################################################
     typeset bwObjName="${1:?}"; (($#)) && shift
     typeset bwCrdPath="${1:?}"; (($#)) && shift
-    typeset bwAttFilePath="${1:?}"; (($#)) && shift
+    typeset bwFldName="${1:?}"; (($#)) && shift
+    typeset bwFldPath="${1:?}"; (($#)) && shift
 
-    typeset bwItemID='' e=''
+    typeset bwData='' bwItemID=''
 
     ( set +x
         trap 'bw logout 1> /dev/null 2>&1 || true' EXIT
@@ -49,22 +52,20 @@ function Vault--BitWarden--UploadAttachment () {
         )"
 
         bw sync
-        bwItemID="$(bw get item "${bwObjName}" | jq -cr '.id')" || {
+        bwData="$(bw get item "${bwObjName}")" || {
             echo "You may NOT have access to BitWarden Object \`${bwObjName}\`." 1>&2
             exit 1
         }
-        while IFS='' read -r e; do
-            bw delete --itemid "${bwItemID}" attachment "${e}" || {
-                echo "You do NOT have R/W access to BitWarden Object \`${bwObjName}\`." 1>&2
-                exit 1
-            }
-        done 0< <(
-            bw get item "${bwObjName}" |
-            jq -r --arg fn "${bwAttFilePath##*/}" '
-                (.attachments // [])[] | select(.fileName == $fn) | .id
-            '
-        )
-        bw create --file "${bwAttFilePath}" --itemid "${bwItemID}" attachment 1> /dev/null
+        bwItemID="$(jq -cr '.id' 0<<<"${bwData}")"
+        bwData="$(jq -r \
+            --arg sfN "${bwFldName}" \
+            --rawfile sfV "${bwFldPath}" \
+            '.fields|=(
+                map(select(.name != $sfN)) +
+                [{name: $sfN, value: $sfV, type: 1}]
+            )' \
+        0<<<"${bwData}")"
+        bw encode 0<<<"${bwData}" | bw edit item "${bwItemID}" 1> /dev/null
     true )
 
     true
