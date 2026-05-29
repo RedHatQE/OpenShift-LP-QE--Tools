@@ -60,10 +60,10 @@ function Vault--BitWarden--UpdateCustomField () {
         bwData="$(jq -r \
             --arg sfN "${bwFldName}" \
             --rawfile sfV "${bwFldPath}" \
-            '.fields|=(
+            '.fields|=((. // []) | (
                 map(select(.name != $sfN)) +
                 [{name: $sfN, value: $sfV, type: 1}]
-            )' \
+            ))' \
         0<<<"${bwData}")"
         bw encode 0<<<"${bwData}" | bw edit item "${bwItemID}" 1> /dev/null
     true )
