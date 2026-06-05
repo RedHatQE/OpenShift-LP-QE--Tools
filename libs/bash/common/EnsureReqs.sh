@@ -18,8 +18,9 @@ function EnsureReqs () {
 #   Supported tools:
 #     - jq
 #     - yq
-#     - chisel
+#     - uv
 #     - bw
+#     - chisel
 ################################################################################
     typeset -a toolArr=("$@"); (($#)) && shift $#
 
@@ -55,6 +56,30 @@ function EnsureReqs () {
                     "${binDir}/${toolName}" --version
                 }
                 ;;
+              (uv)
+                ${toolName} --version || (
+                    typeset uvDir="${binDir}/pkg--${toolName}"
+                    {
+                        "${_fURL[@]}" - 'https://astral.sh/uv/install.sh' |
+                        UV_INSTALL_DIR="${uvDir}" \
+                            NO_MODIFY_PATH=1 \
+                            sh -s -- --quiet
+                    }
+                    ln -s "${uvDir}/"uv{,x} "${binDir}/"
+                    "${binDir}/${toolName}" --version
+                )
+                ;;
+              (bw)
+                ${toolName} --version || (
+                    typeset dlFile=/tmp/bw-cli--$$
+                    "${_fURL[@]}" "${dlFile}.zip" "https://bitwarden.com/download/?app=cli&platform=$(
+                        uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/'
+                    )"
+                    unzip "${dlFile}.zip" -d "${binDir}"
+                    rm -f "${dlFile}.zip"
+                    "${binDir}/${toolName}" --version
+                )
+                ;;
               (chisel)
                 # Chisel Secure Tunnel (https://github.com/jpillora/chisel).
                 #   Provide a HTTP-over-WebSocket reverse tunnel, to expose
@@ -73,17 +98,6 @@ function EnsureReqs () {
                     chmod a+x "${binDir}/${toolName}"
                     "${binDir}/${toolName}" --version
                 }
-                ;;
-              (bw)
-                ${toolName} --version || (
-                    typeset dlFile=/tmp/bw-cli--$$
-                    "${_fURL[@]}" "${dlFile}.zip" "https://bitwarden.com/download/?app=cli&platform=$(
-                        uname -s | tr '[:upper:]' '[:lower:]' | sed 's/darwin/macos/'
-                    )"
-                    unzip "${dlFile}.zip" -d "${binDir}"
-                    rm -rf "${dlFile}.zip"
-                    "${binDir}/${toolName}" --version
-                )
                 ;;
               (*)   : "Unsupported tool: ${toolName}";;
             esac
