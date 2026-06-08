@@ -10,7 +10,7 @@
 #       https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/TestReport--JUnit.sh
 #       )"
 #       TestReport--JUnit--AddTS  "my-suite"
-#       TestReport--JUnit--AddTC  "my-suite" "my-test-case" [-f "failure msg"]
+#       TestReport--JUnit--AddTC  "my-suite" "my-test-case" 12 [-f "failure msg"]
 #       TestReport--JUnit--Write  "junit_output.xml"
 #
 #   Functions:
@@ -26,6 +26,9 @@
 #     - The generated XML has <testsuites> as the root node (JUnit plural form).
 #     - TestSuite and testsuites counts (tests, failures, errors, time) are
 #       computed automatically at write time.
+#     - TestReport--JUnit--Write resets accumulated state after writing so that
+#       subsequent calls start with a clean slate.
+#     - Failure and error messages must not contain embedded newlines.
 #     - uv is installed on-demand via EnsureReqs if not already in PATH,
 #       making this library usable in any container image.
 ################################################################################
@@ -37,12 +40,11 @@ eval "$(
         "https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh"
 )"; EnsureReqs uv
 
-# Internal field separator — ASCII Unit Separator (0x1F), safe in names.
-typeset -gr  __TestReport__JUnit__Sep=$'\x1F'
-# Accumulates "tsName<sep>tcName<sep>type<sep>msg" per testcase (insertion order).
+# Internal field separator — ASCII Unit Separator (0x1F), safe in all names and messages.
+# -r (readonly) removed — readonly breaks re-sourcing the library a second time.
+typeset -g  __TestReport__JUnit__Sep=$'\x1F'
+# Accumulates "tsName<sep>tcName<sep>type<sep>msg<sep>time" per testcase (insertion order).
 typeset -ga  __TestReport__JUnit__TcList=()
-# Tracks which suite names have been registered (associative set).
-typeset -gA  __TestReport__JUnit__Suites=()
 
 function TestReport--JUnit--AddTS () {
     typeset __shOpt="$(shopt -po errexit nounset xtrace pipefail; shopt -p inherit_errexit)"
@@ -56,10 +58,13 @@ function TestReport--JUnit--AddTS () {
 #
 #   Args:
 #       TS_NAME  Name of the test suite (maps to <testsuite name="...">).
+#
+#   Note: Suites are discovered automatically from AddTC calls at Write time.
+#   Calling AddTS is optional but documents intent and validates the name.
 ################################################################################
     typeset tsName="${1:?TestReport--JUnit--AddTS: TS_NAME is required}"; (($#)) && shift
 
-    __TestReport__JUnit__Suites["${tsName}"]=1
+    : "Suite registered: ${tsName}"
 
     true
 }
@@ -75,8 +80,7 @@ function TestReport--JUnit--AddTC () {
 #       TestReport--JUnit--AddTC TS_NAME TC_NAME SECONDS [-e ERROR_STR] [-f FAILURE_STR]
 #
 #   Args:
-#       TS_NAME     Name of the parent test suite (auto-registered if not added
-#                   via TestReport--JUnit--AddTS first).
+#       TS_NAME     Name of the parent test suite.
 #       TC_NAME     Name of the test case (maps to <testcase name="...">).
 #       SECONDS     Duration of the test case in seconds (integer or decimal).
 #                   Sets the time= attribute on <testcase>. The suite and
@@ -119,9 +123,6 @@ function TestReport--JUnit--AddTC () {
         esac
     done
 
-    # Auto-register the suite if caller skipped TestReport--JUnit--AddTS.
-    __TestReport__JUnit__Suites["${tsName}"]=1
-
     typeset sep="${__TestReport__JUnit__Sep}"
     __TestReport__JUnit__TcList+=("${tsName}${sep}${tcName}${sep}${tcType}${sep}${tcMsg}${sep}${tcTime}")
 
@@ -130,11 +131,13 @@ function TestReport--JUnit--AddTC () {
 
 function TestReport--JUnit--Write () {
     typeset __shOpt="$(shopt -po errexit nounset xtrace pipefail; shopt -p inherit_errexit)"
-    typeset tmpData="$(mktemp)"
+    typeset tmpData
+    tmpData="$(mktemp)"
     trap 'rm -f "${tmpData}"; eval "${__shOpt}"; unset __shOpt tmpData; trap - RETURN' RETURN
     set -euxo pipefail; shopt -s inherit_errexit
 ################################################################################
 #   Generate the JUnit XML file from accumulated AddTS / AddTC calls.
+#   Resets accumulated state after writing so subsequent calls start clean.
 #
 #   Usage:
 #       TestReport--JUnit--Write OUT_FILE
@@ -144,22 +147,21 @@ function TestReport--JUnit--Write () {
 #                   Parent directory must exist.
 #
 #   Produces a <testsuites> root node containing one <testsuite> per TS_NAME,
-#   with correct tests / failures / errors counts on both levels.
+#   with correct tests / failures / errors / time counts on both levels.
 ################################################################################
     typeset outFile="${1:?TestReport--JUnit--Write: OUT_FILE is required}"; (($#)) && shift
 
-    # Serialise accumulated testcase data to a TSV temp file.
-    # Format per line: tsName <TAB> tcName <TAB> type <TAB> msg <TAB> time
-    typeset entry tsName tcName tcType tcMsg tcTime
-    typeset sep="${__TestReport__JUnit__Sep}"
-    for entry in "${__TestReport__JUnit__TcList[@]:-}"; do
-        IFS="${sep}" read -r tsName tcName tcType tcMsg tcTime <<< "${entry}"
-        printf '%s\t%s\t%s\t%s\t%s\n' \
-            "${tsName}" "${tcName}" "${tcType}" "${tcMsg}" "${tcTime}"
-    done > "${tmpData}"
+    # Write accumulated 0x1F-delimited entries directly to temp file.
+    # Each entry already uses 0x1F as field separator — no re-serialisation needed.
+    # Handle empty list explicitly to avoid the phantom entry from "${array[@]:-}".
+    if (( ${#__TestReport__JUnit__TcList[@]} == 0 )); then
+        : > "${tmpData}"
+    else
+        printf '%s\n' "${__TestReport__JUnit__TcList[@]}" > "${tmpData}"
+    fi
 
-    uv run --with junitparser python3 - "${tmpData}" "${outFile}" <<'PYEOF'
-"""Generate a JUnit XML report from TSV input using junitparser."""
+    uv run --with 'junitparser>=3,<4' python3 - "${tmpData}" "${outFile}" <<'PYEOF'
+"""Generate a JUnit XML report from 0x1F-delimited input using junitparser."""
 import sys
 from junitparser import JUnitXml, TestSuite, TestCase, Failure, Error
 
@@ -169,15 +171,17 @@ suites = {}   # Ordered dict (Python 3.7+): suite name -> TestSuite
 
 with open(data_file) as fh:
     for raw in fh:
-        line = raw.rstrip('\n')
+        line = raw.rstrip('\r\n')   # strip both \r and \n for cross-platform safety.
         if not line:
             continue
-        parts = line.split('\t', 4)
-        ts_name = parts[0]
-        tc_name = parts[1] if len(parts) > 1 else ''
-        tc_type = parts[2] if len(parts) > 2 else ''
-        tc_msg  = parts[3] if len(parts) > 3 else ''
-        tc_time = parts[4] if len(parts) > 4 else '0'
+        #validate field count before unpacking to produce a clear error on corruption.
+        parts = line.split('\x1f', 4)
+        if len(parts) != 5:
+            sys.stderr.write(
+                f"Malformed entry (expected 5 fields, got {len(parts)}): {line!r}\n"
+            )
+            sys.exit(1)
+        ts_name, tc_name, tc_type, tc_msg, tc_time = parts
 
         if ts_name not in suites:
             suites[ts_name] = TestSuite(ts_name)
@@ -202,6 +206,9 @@ for suite in suites.values():
 xml.update_statistics()
 xml.write(out_file, pretty=True)
 PYEOF
+
+    # Reset state so a second Write() call starts with a clean slate.
+    __TestReport__JUnit__TcList=()
 
     true
 }
