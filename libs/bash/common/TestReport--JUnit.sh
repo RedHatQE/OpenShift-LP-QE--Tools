@@ -88,6 +88,10 @@ function TestReport--JUnit--AddTC () {
     typeset tsName="${1:?TestReport--JUnit--AddTC: TS_NAME is required}"; (($#)) && shift
     typeset tcName="${1:?TestReport--JUnit--AddTC: TC_NAME is required}"; (($#)) && shift
     typeset tcTime="${1:?TestReport--JUnit--AddTC: SECONDS is required}"; (($#)) && shift
+    [[ "${tcTime}" =~ ^[0-9]+(\.[0-9]+)?$ ]] || {
+        echo "TestReport--JUnit--AddTC: SECONDS must be numeric (got '${tcTime}')." >&2
+        return 1
+    }
 
     typeset tcType="" tcMsg=""
     while (($#)); do
@@ -108,7 +112,10 @@ function TestReport--JUnit--AddTC () {
                 tcType="error"
                 tcMsg="${2:?TestReport--JUnit--AddTC: -e requires a message}"; shift 2
                 ;;
-            (*) shift ;;
+            (*)
+                echo "TestReport--JUnit--AddTC: Unrecognized option '${1}'." >&2
+                return 1
+                ;;
         esac
     done
 
@@ -152,6 +159,7 @@ function TestReport--JUnit--Write () {
     done > "${tmpData}"
 
     uv run --with junitparser python3 - "${tmpData}" "${outFile}" <<'PYEOF'
+"""Generate a JUnit XML report from TSV input using junitparser."""
 import sys
 from junitparser import JUnitXml, TestSuite, TestCase, Failure, Error
 
@@ -175,7 +183,11 @@ with open(data_file) as fh:
             suites[ts_name] = TestSuite(ts_name)
 
         tc = TestCase(tc_name)
-        tc.time = float(tc_time) if tc_time else 0.0
+        try:
+            tc.time = float(tc_time) if tc_time else 0.0
+        except ValueError:
+            sys.stderr.write(f"Invalid time value '{tc_time}' for testcase '{tc_name}'\n")
+            sys.exit(1)
         if tc_type == 'failure':
             tc.result = [Failure(tc_msg)]
         elif tc_type == 'error':
