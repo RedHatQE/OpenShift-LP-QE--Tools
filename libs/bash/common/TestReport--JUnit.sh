@@ -7,8 +7,7 @@ eval "$(
 )"; EnsureReqs uv
 
 function TestReport--JUnit--AddTC () {
-    typeset __shOpt
-    __shOpt="$(shopt -po errexit nounset xtrace pipefail; shopt -p inherit_errexit)"
+    typeset __shOpt="$(shopt -po errexit nounset xtrace pipefail; shopt -p inherit_errexit)"
     trap 'eval "${__shOpt}"; unset __shOpt; trap - RETURN' RETURN
     set -euxo pipefail; shopt -s inherit_errexit
 ################################################################################
@@ -46,37 +45,31 @@ function TestReport--JUnit--AddTC () {
 #       after every call.
 #     - uv is installed on-demand via EnsureReqs if not already in PATH.
 ################################################################################
-    typeset junitFile="${1:?TestReport--JUnit--AddTC: JUNIT_FILE is required}";    (($#)) && shift
-    typeset reportName="${1:?TestReport--JUnit--AddTC: REPORT_NAME is required}";  (($#)) && shift
-    typeset tsName="${1:?TestReport--JUnit--AddTC: TS_NAME is required}";          (($#)) && shift
-    typeset tcName="${1:?TestReport--JUnit--AddTC: TC_NAME is required}";          (($#)) && shift
-    typeset tcExecTime="${1:?TestReport--JUnit--AddTC: TC_EXEC_TIME is required}"; (($#)) && shift
-    [[ "${tcExecTime}" =~ ^[0-9]+(\.[0-9]+)?$ ]] || {
-        echo "TestReport--JUnit--AddTC: TC_EXEC_TIME must be numeric (got '${tcExecTime}')." >&2
-        return 1
-    }
+    typeset junitFile="${1:?TestReport--JUnit--AddTC: JUNIT_FILE is required as non-empty string.}"; (($#)) && shift
+    typeset rptName="${1?TestReport--JUnit--AddTC: REPORT_NAME is required.}"; (($#)) && shift
+    typeset tsName="${1?TestReport--JUnit--AddTC: TS_NAME is required.}"; (($#)) && shift
+    typeset tcName="${1:?TestReport--JUnit--AddTC: TC_NAME is required as non-empty string.}"; (($#)) && shift
+    typeset tcExecTime="${1:?TestReport--JUnit--AddTC: TC_EXEC_TIME is required as numeric.}"; (($#)) && shift
+    typeset tcRes="${1:-}"; (($#)) && shift
+    typeset tcMsg="${1:-}"; (($#)) && shift
 
-    typeset tcResult="" tcMsg=""
-    while (($#)); do
-        case "${1}" in
-            (-f|-e)
-                [[ -z "${tcResult}" ]] || {
-                    echo "TestReport--JUnit--AddTC: -f and -e are mutually exclusive." >&2
-                    return 1
-                }
-                if [[ "${1}" == "-f" ]]; then tcResult="failure"; else tcResult="error"; fi
-                tcMsg="${2:?TestReport--JUnit--AddTC: ${1} requires a message}"; shift 2
-                ;;
-            (*)
-                echo "TestReport--JUnit--AddTC: Unrecognized option '${1}'." >&2
-                return 1
-                ;;
-        esac
-    done
+    [[ "${tcExecTime}" =~ ^[0-9]+(\.[0-9]+)?$ ]]
+    case "${tcRes}" in
+        (-f)  tcRes=failure;;&
+        (-e)  tcRes=error;;&
+        (-e|-f)
+            [ -n "${tcMsg}" ]
+            ;;
+        ('')  tcRes= ;;
+        (*)
+            : "TestReport--JUnit--AddTC: Unrecognized option: ${tcRes}"
+            return 1
+            ;;
+    esac
 
     typeset __pyRC=0
     uv run --with 'junitparser>=3,<4' python3 - \
-        "${junitFile}" "${reportName}" "${tsName}" "${tcName}" "${tcExecTime}" "${tcResult}" "${tcMsg}" <<'PYEOF' || __pyRC=$?
+        "${junitFile}" "${rptName}" "${tsName}" "${tcName}" "${tcExecTime}" "${tcRes}" "${tcMsg}" <<'PYEOF' || __pyRC=$?
 """Append one testcase to a JUnit XML file, creating the file and suite if needed."""
 
 import os
