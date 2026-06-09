@@ -89,7 +89,9 @@ function TestReport--JUnit--AddTC () {
     uv run --with 'junitparser>=3,<4' python3 - \
         "${outFile}" "${tsName}" "${tcName}" "${tcTime}" "${tcResult}" "${tcMsg}" <<'PYEOF'
 """Append one testcase to a JUnit XML file, creating the file and suite if needed."""
+import os
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 from junitparser import JUnitXml, TestSuite, TestCase, Failure, Error
 
@@ -99,14 +101,14 @@ if len(sys.argv) != 7:
 out_file, ts_name, tc_name, tc_time, tc_result, tc_msg = sys.argv[1:7]
 
 try:
-    xml = JUnitXml.fromfile(out_file)
+    report = JUnitXml.fromfile(out_file)
 except (FileNotFoundError, ET.ParseError):
-    xml = JUnitXml()
+    report = JUnitXml()
 
-suite = next((s for s in xml if s.name == ts_name), None)
+suite = next((s for s in report if s.name == ts_name), None)
 if suite is None:
     suite = TestSuite(ts_name)
-    xml.add_testsuite(suite)
+    report.add_testsuite(suite)
 
 tc = TestCase(tc_name)
 try:
@@ -121,8 +123,19 @@ elif tc_result == 'error':
 
 suite.add_testcase(tc)
 suite.update_statistics()
-xml.update_statistics()
-xml.write(out_file, pretty=True)
+report.update_statistics()
+fd, tmp_out = tempfile.mkstemp(
+    prefix=".junit-", suffix=".xml", dir=os.path.dirname(out_file) or "."
+)
+os.close(fd)
+try:
+    report.write(tmp_out, pretty=True)
+    os.replace(tmp_out, out_file)
+finally:
+    try:
+        os.unlink(tmp_out)
+    except FileNotFoundError:
+        pass
 PYEOF
 
     true
