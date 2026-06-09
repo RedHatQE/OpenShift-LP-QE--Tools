@@ -46,8 +46,8 @@ function TestReport--JUnit--AddTC () {
 #       after every call.
 #     - uv is installed on-demand via EnsureReqs if not already in PATH.
 ################################################################################
-    # shellcheck disable=SC2155
-    typeset __shOpt="$(shopt -po errexit nounset xtrace pipefail; shopt -p inherit_errexit)"
+    typeset __shOpt
+    __shOpt="$(shopt -po errexit nounset xtrace pipefail; shopt -p inherit_errexit)"
     trap 'eval "${__shOpt}"; unset __shOpt; trap - RETURN' RETURN
     set -euxo pipefail; shopt -s inherit_errexit
 
@@ -90,6 +90,7 @@ function TestReport--JUnit--AddTC () {
         "${outFile}" "${tsName}" "${tcName}" "${tcTime}" "${tcResult}" "${tcMsg}" <<'PYEOF'
 """Append one testcase to a JUnit XML file, creating the file and suite if needed."""
 import sys
+import xml.etree.ElementTree as ET
 from junitparser import JUnitXml, TestSuite, TestCase, Failure, Error
 
 if len(sys.argv) != 7:
@@ -99,7 +100,7 @@ out_file, ts_name, tc_name, tc_time, tc_result, tc_msg = sys.argv[1:7]
 
 try:
     xml = JUnitXml.fromfile(out_file)
-except Exception:
+except (FileNotFoundError, ET.ParseError):
     xml = JUnitXml()
 
 suite = next((s for s in xml if s.name == ts_name), None)
@@ -108,7 +109,11 @@ if suite is None:
     xml.add_testsuite(suite)
 
 tc = TestCase(tc_name)
-tc.time = float(tc_time)
+try:
+    tc.time = float(tc_time)
+except ValueError:
+    sys.stderr.write(f"Invalid time value '{tc_time}' for testcase '{tc_name}' in suite '{ts_name}'\n")
+    sys.exit(1)
 if tc_result == 'failure':
     tc.result = [Failure(tc_msg)]
 elif tc_result == 'error':
