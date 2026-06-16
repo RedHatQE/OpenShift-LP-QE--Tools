@@ -22,10 +22,9 @@ set -x
 # Test URL (the one we tested before)
 typeset testURL='https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-stolostron-policy-collection-main-ocp4.22-interop-opp-aws/2066255424226594816'
 
-echo 'Testing prow-analyzer...'
-echo "MCP URL: ${mcpURL}"
-echo "Token: ${SHIP_HELP_MCP_TOKEN:0:20}... (${tokenLength} chars)"
-echo ''
+: 'Testing prow-analyzer...'
+: "MCP URL: ${mcpURL}"
+: "Token: ${SHIP_HELP_MCP_TOKEN:0:20}... (${tokenLength} chars)"
 
 time ./prow-analyzer--cli analyze "${testURL}"
 

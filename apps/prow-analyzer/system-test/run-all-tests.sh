@@ -10,23 +10,19 @@ export SHIP_HELP_MCP_TOKEN="$(tr -d '\n' < /tmp/ship-help-token.txt)"
 typeset tokenLength="${#SHIP_HELP_MCP_TOKEN}"
 set -x
 
-echo '╔════════════════════════════════════════════════════════════════╗'
-echo '║           PROW ANALYZER - COMPREHENSIVE TEST SUITE             ║'
-echo '╚════════════════════════════════════════════════════════════════╝'
-echo ''
-echo "MCP URL: ${mcpURL}"
-echo "Token length: ${tokenLength} chars"
-echo ''
+: '╔════════════════════════════════════════════════════════════════╗'
+: '║           PROW ANALYZER - COMPREHENSIVE TEST SUITE             ║'
+: '╚════════════════════════════════════════════════════════════════╝'
+: "MCP URL: ${mcpURL}"
+: "Token length: ${tokenLength} chars"
 
 # Test 1: Valid Prow URL - Full Analysis
-echo '════════════════════════════════════════════════════════════════'
-echo 'TEST 1: Valid Prow URL - Verify ship-help MCP Integration'
-echo '════════════════════════════════════════════════════════════════'
+: '════════════════════════════════════════════════════════════════'
+: 'TEST 1: Valid Prow URL - Verify ship-help MCP Integration'
+: '════════════════════════════════════════════════════════════════'
 typeset testURL='https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-stolostron-policy-collection-main-ocp4.22-interop-opp-aws/2066255424226594816'
-echo "URL: ${testURL}"
-echo ''
-echo '⏱️  Starting analysis (expect ~2 minutes)...'
-echo ''
+: "URL: ${testURL}"
+: '⏱️  Starting analysis (expect ~2 minutes)...'
 
 typeset -i startTime endTime duration exitCode
 startTime=$(date +%s)
@@ -34,33 +30,29 @@ startTime=$(date +%s)
 endTime=$(date +%s)
 duration=$((endTime - startTime))
 
-echo "✅ Exit Code: ${exitCode:-0}"
-echo "⏱️  Duration: ${duration}s"
-echo ''
-echo '📊 Output Preview (first 40 lines):'
+: "✅ Exit Code: ${exitCode:-0}"
+: "⏱️  Duration: ${duration}s"
+: '📊 Output Preview (first 40 lines):'
 head -40 /tmp/test1-output.txt
-echo ''
-echo '... (output truncated, full output in /tmp/test1-output.txt)'
-echo ''
+: '... (output truncated, full output in /tmp/test1-output.txt)'
 
 # Verify ship-help was called
 if grep -qi 'analysis completed' /tmp/test1-output.txt; then
-    echo '✅ PASS: Analysis completed successfully'
+    : '✅ PASS: Analysis completed successfully'
 else
-    echo '❌ FAIL: Analysis did not complete'
+    : '❌ FAIL: Analysis did not complete'
 fi
 
 if grep -qi 'root cause\|jira\|recommendation' /tmp/test1-output.txt; then
-    echo '✅ PASS: Ship-help MCP returned structured analysis'
+    : '✅ PASS: Ship-help MCP returned structured analysis'
 else
-    echo '❌ FAIL: No structured analysis found'
+    : '❌ FAIL: No structured analysis found'
 fi
-echo ''
 
 # Test 2: URL Extraction
-echo '════════════════════════════════════════════════════════════════'
-echo 'TEST 2: URL Extraction from Different Formats'
-echo '════════════════════════════════════════════════════════════════'
+: '════════════════════════════════════════════════════════════════'
+: 'TEST 2: URL Extraction from Different Formats'
+: '════════════════════════════════════════════════════════════════'
 
 cat > /tmp/test-url-extraction.go <<'GOEOF'
 package main
@@ -126,71 +118,61 @@ cd /tmp && /usr/local/go/bin/go run test-url-extraction.go
 cd ~/prow-analyzer
 
 # Test 3: Error Handling - Invalid URL
-echo '════════════════════════════════════════════════════════════════'
-echo 'TEST 3: Error Handling - Invalid URL'
-echo '════════════════════════════════════════════════════════════════'
+: '════════════════════════════════════════════════════════════════'
+: 'TEST 3: Error Handling - Invalid URL'
+: '════════════════════════════════════════════════════════════════'
 typeset invalidURL='https://invalid-url.com/not-prow'
-echo "URL: ${invalidURL}"
-echo ''
+: "URL: ${invalidURL}"
 
 typeset -i test3ExitCode=0
 ./prow-analyzer--cli analyze "${invalidURL}" > /tmp/test3-output.txt 2>&1 || test3ExitCode=$?
 
-echo "Exit Code: ${test3ExitCode} (expected non-zero)"
+: "Exit Code: ${test3ExitCode} (expected non-zero)"
 if ((test3ExitCode != 0)); then
-    echo '✅ PASS: Correctly failed on invalid URL'
+    : '✅ PASS: Correctly failed on invalid URL'
 else
-    echo '❌ FAIL: Should have failed on invalid URL'
+    : '❌ FAIL: Should have failed on invalid URL'
 fi
-echo 'Error output:'
+: 'Error output:'
 cat /tmp/test3-output.txt
-echo ''
 
 # Test 4: Help/Usage
-echo '════════════════════════════════════════════════════════════════'
-echo 'TEST 4: CLI Help & Usage'
-echo '════════════════════════════════════════════════════════════════'
+: '════════════════════════════════════════════════════════════════'
+: 'TEST 4: CLI Help & Usage'
+: '════════════════════════════════════════════════════════════════'
 ./prow-analyzer--cli --help > /tmp/test4-output.txt 2>&1 || true
 if grep -qi 'usage\|flag' /tmp/test4-output.txt; then
-    echo '✅ PASS: Help output displayed'
+    : '✅ PASS: Help output displayed'
 else
-    echo '❌ FAIL: Help output missing'
+    : '❌ FAIL: Help output missing'
 fi
 cat /tmp/test4-output.txt
-echo ''
 
 # Test 5: Binary Info
-echo '════════════════════════════════════════════════════════════════'
-echo 'TEST 5: Binary Information'
-echo '════════════════════════════════════════════════════════════════'
-echo 'CLI Binary:'
+: '════════════════════════════════════════════════════════════════'
+: 'TEST 5: Binary Information'
+: '════════════════════════════════════════════════════════════════'
+: 'CLI Binary:'
 ls -lh ./prow-analyzer--cli
-echo ''
-echo 'Slack Bot Binary:'
+: 'Slack Bot Binary:'
 ls -lh ./prow-analyzer--bot
-echo ''
 file ./prow-analyzer--cli
-echo ''
 
 # Summary
-echo '════════════════════════════════════════════════════════════════'
-echo '                       TEST SUMMARY'
-echo '════════════════════════════════════════════════════════════════'
-echo ''
-echo "✅ Test 1: Valid Prow URL Analysis (${duration}s)"
-echo '✅ Test 2: URL Extraction'
-echo '✅ Test 3: Error Handling'
-echo '✅ Test 4: Help Output'
-echo '✅ Test 5: Binary Info'
-echo ''
-echo '📁 Full outputs saved in:'
-echo '   - /tmp/test1-output.txt (full analysis)'
-echo '   - /tmp/test3-output.txt (error handling)'
-echo '   - /tmp/test4-output.txt (help output)'
-echo ''
-echo '🔍 Verify ship-help MCP integration:'
-echo "   cat /tmp/test1-output.txt | grep -A 5 'Root Cause\|Jira\|Recommendation'"
-echo ''
-echo '════════════════════════════════════════════════════════════════'
+: '════════════════════════════════════════════════════════════════'
+: '                       TEST SUMMARY'
+: '════════════════════════════════════════════════════════════════'
+: "✅ Test 1: Valid Prow URL Analysis (${duration}s)"
+: '✅ Test 2: URL Extraction'
+: '✅ Test 3: Error Handling'
+: '✅ Test 4: Help Output'
+: '✅ Test 5: Binary Info'
+: '📁 Full outputs saved in:'
+: '   - /tmp/test1-output.txt (full analysis)'
+: '   - /tmp/test3-output.txt (error handling)'
+: '   - /tmp/test4-output.txt (help output)'
+: '🔍 Verify ship-help MCP integration:'
+: "   cat /tmp/test1-output.txt | grep -A 5 'Root Cause\|Jira\|Recommendation'"
+: '════════════════════════════════════════════════════════════════'
 
 true
