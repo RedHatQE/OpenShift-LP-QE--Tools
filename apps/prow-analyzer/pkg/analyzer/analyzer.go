@@ -182,6 +182,11 @@ func ExtractProwURL(text string) string {
 			url := text[urlStart:urlEnd]
 			url = strings.TrimRight(url, ")>]}.,;:")
 
+			// Handle Slack link format: <URL|label> - remove |label part
+			if pipeIdx := strings.Index(url, "|"); pipeIdx != -1 {
+				url = url[:pipeIdx]
+			}
+
 			return url
 		}
 	}
