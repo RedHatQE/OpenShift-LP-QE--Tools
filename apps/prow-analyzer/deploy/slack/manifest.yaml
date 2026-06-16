@@ -1,0 +1,24 @@
+display_information:
+  name: Prow Analyzer
+  description: Automated Prow CI failure analysis using ship-help MCP
+  background_color: "#2c2d30"
+features:
+  bot_user:
+    display_name: Prow Analyzer
+    always_online: true
+oauth_config:
+  scopes:
+    bot:
+      - channels:history
+      - chat:write
+      - app_mentions:read
+settings:
+  event_subscriptions:
+    bot_events:
+      - message.channels
+      - app_mention
+  interactivity:
+    is_enabled: false
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false

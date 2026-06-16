@@ -1,0 +1,30 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+    
+    - name: Build CLI
+      working-directory: ./apps/prow-analyzer
+      run: go build -v ./cmd/prow-analyzer--cli
+
+    - name: Build Bot
+      working-directory: ./apps/prow-analyzer
+      run: go build -v ./cmd/prow-analyzer--bot
+
+    - name: Test
+      working-directory: ./apps/prow-analyzer
+      run: go test -v ./...
