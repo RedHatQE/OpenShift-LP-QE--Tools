@@ -35,7 +35,7 @@ jobs:
       working-directory: ./apps/prow-analyzer
       run: |
         COVERAGE=$(go tool cover -func=coverage.out | grep 'total:' | awk '{print $3}' | sed 's/%//')
-        THRESHOLD=94.0
+        THRESHOLD=94.5
         if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
           echo "❌ Coverage $COVERAGE% below threshold $THRESHOLD%"
           exit 1
