@@ -12,8 +12,7 @@ function TestReport--JUnit--AddTC () {
     set -euxo pipefail; shopt -s inherit_errexit
 ################################################################################
 #   Append one JUnit testcase to JUNIT_FILE, creating the file and suite on
-#   first reference.  JUNIT_FILE is always in valid, parseable XML state after
-#   each call.
+#   first reference.
 #
 #   Usage:
 #       eval "$(
@@ -23,7 +22,7 @@ function TestReport--JUnit--AddTC () {
 #       https://<urlAuthToRawContent>/<urlPathToRawContents...>\
 #       <repoPaths...>/TestReport--JUnit.sh
 #       )"; TestReport--JUnit--AddTC JUNIT_FILE REPORT_NAME TS_NAME TC_NAME \
-#           TC_EXEC_TIME [-f FAILURE_MSG | -e ERROR_MSG]
+#           TC_EXEC_TIME [-f MSG | -e MSG]
 #
 #   Args:
 #       JUNIT_FILE      Path to write (or update) the JUnit XML report.
@@ -31,7 +30,6 @@ function TestReport--JUnit--AddTC () {
 #       REPORT_NAME     Name of the report root (<testsuites name="...">).
 #                       Must match across all AddTC calls for the same JUNIT_FILE.
 #       TS_NAME         Name of the test suite (<testsuite name="...">).
-#                       Created automatically on first reference.
 #       TC_NAME         Name of the test case (<testcase name="...">).
 #       TC_EXEC_TIME    Duration in seconds (integer or decimal).
 #       -f MSG          Mark the testcase as failed with the given message.
@@ -67,7 +65,7 @@ function TestReport--JUnit--AddTC () {
             ;;
     esac
 
-    typeset __pyRC=0
+    typeset -i __pyRC=0
     uv run --with 'junitparser>=3,<4' python3 - \
         "${junitFile}" "${rptName}" "${tsName}" "${tcName}" "${tcExecTime}" "${tcRes}" "${tcMsg}" <<'PYEOF' || __pyRC=$?
 """Append one testcase to a JUnit XML file, creating the file and suite if needed."""
@@ -75,7 +73,6 @@ function TestReport--JUnit--AddTC () {
 import os
 import sys
 import tempfile
-import xml.etree.ElementTree as ET
 from junitparser import JUnitXml, TestSuite, TestCase, Failure, Error
 
 if len(sys.argv) != 8:
@@ -84,20 +81,22 @@ if len(sys.argv) != 8:
         " TC_EXEC_TIME [-f MSG | -e MSG]\n"
     )
     sys.exit(1)
-junitFile, reportName, tsName, tcName, tcExecTime, tcResult, tcMsg = sys.argv[1:8]
+junitFile, rptName, tsName, tcName, tcExecTime, tcRes, tcMsg = sys.argv[1:8]
 
 try:
     report = JUnitXml.fromfile(junitFile)
-    if report.name and report.name != reportName:
-        sys.stderr.write(
-            f"TestReport--JUnit--AddTC: REPORT_NAME mismatch:"
-            f" file has '{report.name}', got '{reportName}'\n"
-        )
-        sys.exit(1)
-    report.name = reportName
-except (FileNotFoundError, ET.ParseError):
+except OSError:
+    if os.path.exists(junitFile):
+        raise
     report = JUnitXml()
-    report.name = reportName
+
+if report.name and report.name != rptName:
+    sys.stderr.write(
+        f"TestReport--JUnit--AddTC: REPORT_NAME mismatch:"
+        f" file has '{report.name}', got '{rptName}'\n"
+    )
+    sys.exit(1)
+report.name = rptName
 
 suite = next((s for s in report if s.name == tsName), None)
 if suite is None:
@@ -113,13 +112,13 @@ except ValueError:
         f" in suite '{tsName}'\n"
     )
     sys.exit(1)
-if tcResult == "failure":
+
+if tcRes == "failure":
     tc.result = [Failure(tcMsg)]
-elif tcResult == "error":
+elif tcRes == "error":
     tc.result = [Error(tcMsg)]
 
 suite.add_testcase(tc)
-suite.update_statistics()
 report.update_statistics()
 fd, tmpOut = tempfile.mkstemp(
     prefix=".junit-", suffix=".xml", dir=os.path.dirname(junitFile) or "."
