@@ -588,4 +588,31 @@ func TestErrorInjection(t *testing.T) {
 			t.Errorf("Expected 'create init request' error, got: %v", err)
 		}
 	})
+
+	t.Run("io.ReadAll error in AnalyzeFailure", func(t *testing.T) {
+		mockClient := &mockHTTPClient{
+			doFunc: func(req *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: 200,
+					Body:       &errorReader{}, // Body that fails on Read
+					Header:     make(http.Header),
+				}, nil
+			},
+		}
+
+		analyzer := &Analyzer{
+			mcpURL:      "http://test.com",
+			token:       "token",
+			client:      mockClient,
+			template:    "template",
+			sessionID:   "already-initialized",
+			jsonMarshal: json.Marshal,
+			newRequest:  http.NewRequestWithContext,
+		}
+
+		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
+		if err == nil || !strings.Contains(err.Error(), "read response") {
+			t.Errorf("Expected 'read response' error, got: %v", err)
+		}
+	})
 }
