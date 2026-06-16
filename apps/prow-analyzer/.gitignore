@@ -32,3 +32,4 @@ go.work
 # Temporary files
 /tmp/
 *.tmp
+coverage.html
