@@ -1,9 +1,11 @@
 #!/bin/bash
+set -euxo pipefail; shopt -s inherit_errexit
+
 # Test URL extraction logic (what Slack bot uses to detect Prow URLs)
 
 cd ~/prow-analyzer
 
-cat > /tmp/test-url-extract.go << 'GOEOF'
+cat > /tmp/test-url-extract.go <<'GOEOF'
 package main
 
 import (
@@ -68,5 +70,7 @@ func main() {
 }
 GOEOF
 
-export PATH=$PATH:/usr/local/go/bin
+export PATH="${PATH}:/usr/local/go/bin"
 cd ~/prow-analyzer && go run /tmp/test-url-extract.go
+
+true
