@@ -3,6 +3,7 @@ package analyzer
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -29,8 +30,19 @@ func TestNewAnalyzer(t *testing.T) {
 	if analyzer.client == nil {
 		t.Error("Expected client to be initialized")
 	}
-	if analyzer.client.Timeout != 240*time.Second {
-		t.Errorf("Expected timeout 240s, got %v", analyzer.client.Timeout)
+	// Verify client is *http.Client with correct timeout
+	httpClient, ok := analyzer.client.(*http.Client)
+	if !ok {
+		t.Error("Expected client to be *http.Client")
+	} else if httpClient.Timeout != 240*time.Second {
+		t.Errorf("Expected timeout 240s, got %v", httpClient.Timeout)
+	}
+	// Verify injected functions
+	if analyzer.jsonMarshal == nil {
+		t.Error("Expected jsonMarshal to be initialized")
+	}
+	if analyzer.newRequest == nil {
+		t.Error("Expected newRequest to be initialized")
 	}
 }
 
@@ -480,6 +492,100 @@ func TestAnalyzeFailure_Errors(t *testing.T) {
 
 		if err == nil || !strings.Contains(err.Error(), "no session ID") {
 			t.Errorf("Expected session ID error, got: %v", err)
+		}
+	})
+}
+
+// TestErrorInjection tests unreachable error paths using dependency injection
+func TestErrorInjection(t *testing.T) {
+	t.Run("json.Marshal error in AnalyzeFailure", func(t *testing.T) {
+		// Mock client that succeeds for initialize
+		mockClient := &mockHTTPClient{
+			doFunc: func(req *http.Request) (*http.Response, error) {
+				resp := &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(strings.NewReader(`{"jsonrpc":"2.0","id":0}`)),
+					Header:     make(http.Header),
+				}
+				resp.Header.Set("Mcp-Session-Id", "test-session")
+				return resp, nil
+			},
+		}
+
+		analyzer := &Analyzer{
+			mcpURL:      "http://test.com",
+			token:       "token",
+			client:      mockClient,
+			template:    "template",
+			sessionID:   "already-initialized", // Pre-initialize to skip initializeSession
+			jsonMarshal: mockJSONMarshalError,  // Inject failing marshaler
+			newRequest:  http.NewRequestWithContext,
+		}
+
+		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
+		if err == nil || !strings.Contains(err.Error(), "marshal request") {
+			t.Errorf("Expected 'marshal request' error, got: %v", err)
+		}
+	})
+
+	t.Run("http.NewRequestWithContext error in AnalyzeFailure", func(t *testing.T) {
+		mockClient := &mockHTTPClient{
+			doFunc: func(req *http.Request) (*http.Response, error) {
+				resp := &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(strings.NewReader(`{"jsonrpc":"2.0","id":0}`)),
+					Header:     make(http.Header),
+				}
+				resp.Header.Set("Mcp-Session-Id", "test-session")
+				return resp, nil
+			},
+		}
+
+		analyzer := &Analyzer{
+			mcpURL:      "http://test.com",
+			token:       "token",
+			client:      mockClient,
+			template:    "template",
+			sessionID:   "already-initialized", // Pre-initialize to skip initializeSession
+			jsonMarshal: json.Marshal,
+			newRequest:  mockNewRequestError, // Inject failing request builder
+		}
+
+		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
+		if err == nil || !strings.Contains(err.Error(), "create request") {
+			t.Errorf("Expected 'create request' error, got: %v", err)
+		}
+	})
+
+	t.Run("json.Marshal error in initializeSession", func(t *testing.T) {
+		analyzer := &Analyzer{
+			mcpURL:      "http://test.com",
+			token:       "token",
+			client:      &mockHTTPClient{},
+			template:    "template",
+			jsonMarshal: mockJSONMarshalError, // Inject failing marshaler
+			newRequest:  http.NewRequestWithContext,
+		}
+
+		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
+		if err == nil || !strings.Contains(err.Error(), "marshal init request") {
+			t.Errorf("Expected 'marshal init request' error, got: %v", err)
+		}
+	})
+
+	t.Run("http.NewRequestWithContext error in initializeSession", func(t *testing.T) {
+		analyzer := &Analyzer{
+			mcpURL:      "http://test.com",
+			token:       "token",
+			client:      &mockHTTPClient{},
+			template:    "template",
+			jsonMarshal: json.Marshal,
+			newRequest:  mockNewRequestError, // Inject failing request builder
+		}
+
+		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
+		if err == nil || !strings.Contains(err.Error(), "create init request") {
+			t.Errorf("Expected 'create init request' error, got: %v", err)
 		}
 	})
 }

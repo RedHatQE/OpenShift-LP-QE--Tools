@@ -12,13 +12,20 @@ import (
 	"time"
 )
 
+// HTTPDoer interface allows mocking of HTTP client
+type HTTPDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 // Analyzer provides test failure analysis using ship-help MCP
 type Analyzer struct {
-	mcpURL    string
-	token     string
-	client    *http.Client
-	template  string
-	sessionID string // MCP session ID
+	mcpURL      string
+	token       string
+	client      HTTPDoer
+	template    string
+	sessionID   string // MCP session ID
+	jsonMarshal func(v interface{}) ([]byte, error)
+	newRequest  func(ctx context.Context, method, url string, body io.Reader) (*http.Request, error)
 }
 
 // NewAnalyzer creates a new Analyzer instance
@@ -30,6 +37,8 @@ func NewAnalyzer(mcpURL, token, promptTemplate string) *Analyzer {
 		client: &http.Client{
 			Timeout: 240 * time.Second, // Ship-help analysis can take 3-4 minutes
 		},
+		jsonMarshal: json.Marshal,
+		newRequest:  http.NewRequestWithContext,
 	}
 }
 
@@ -98,12 +107,12 @@ func (a *Analyzer) AnalyzeFailure(ctx context.Context, jobURL string) (*Analysis
 		},
 	}
 
-	jsonData, err := json.Marshal(reqBody)
+	jsonData, err := a.jsonMarshal(reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", a.mcpURL, bytes.NewBuffer(jsonData))
+	req, err := a.newRequest(ctx, "POST", a.mcpURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -235,12 +244,12 @@ func (a *Analyzer) initializeSession(ctx context.Context) error {
 		},
 	}
 
-	jsonData, err := json.Marshal(reqBody)
+	jsonData, err := a.jsonMarshal(reqBody)
 	if err != nil {
 		return fmt.Errorf("marshal init request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", a.mcpURL, bytes.NewBuffer(jsonData))
+	req, err := a.newRequest(ctx, "POST", a.mcpURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("create init request: %w", err)
 	}
