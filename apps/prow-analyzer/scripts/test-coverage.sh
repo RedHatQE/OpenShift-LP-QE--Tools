@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
-typeset coverageThreshold=98.0
+typeset coverageThreshold=100.0
 typeset coverageFile='coverage.out'
 typeset coverageHTML='coverage.html'
 

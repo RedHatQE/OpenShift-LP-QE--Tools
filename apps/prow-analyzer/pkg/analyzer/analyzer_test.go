@@ -3,6 +3,7 @@ package analyzer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -613,6 +614,29 @@ func TestErrorInjection(t *testing.T) {
 		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
 		if err == nil || !strings.Contains(err.Error(), "read response") {
 			t.Errorf("Expected 'read response' error, got: %v", err)
+		}
+	})
+
+	t.Run("client.Do error in AnalyzeFailure", func(t *testing.T) {
+		mockClient := &mockHTTPClient{
+			doFunc: func(req *http.Request) (*http.Response, error) {
+				return nil, errors.New("mock client.Do error")
+			},
+		}
+
+		analyzer := &Analyzer{
+			mcpURL:      "http://test.com",
+			token:       "token",
+			client:      mockClient,
+			template:    "template",
+			sessionID:   "already-initialized",
+			jsonMarshal: json.Marshal,
+			newRequest:  http.NewRequestWithContext,
+		}
+
+		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
+		if err == nil || !strings.Contains(err.Error(), "send request") {
+			t.Errorf("Expected 'send request' error, got: %v", err)
 		}
 	})
 }
