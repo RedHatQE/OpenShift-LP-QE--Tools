@@ -15,7 +15,9 @@ set -x
 typeset testURL1='https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-openshift-release-master-ci-4.18-e2e-aws-ovn-upgrade/1934670912345678912'
 
 : "URL: ${testURL1}"
-time ./prow-analyzer--cli analyze "${testURL1}" 2>&1 | head -30
+./prow-analyzer--cli analyze "${testURL1}" > /tmp/test-output.txt 2>&1
+: 'Output preview (first 30 lines):'
+head -30 /tmp/test-output.txt
 : '---'
 
 # Test 2: Invalid URL (should fail gracefully)

@@ -67,7 +67,8 @@ duration=$((endTime - startTime))
 : '═══════════════════════════════════════════════════════'
 : '📨 Simulated Slack Thread Reply:'
 : '═══════════════════════════════════════════════════════'
-echo "${analysis}" | head -40
+echo "${analysis}" > /tmp/slack-reply.txt
+head -40 /tmp/slack-reply.txt
 : '... (truncated)'
 : '═══════════════════════════════════════════════════════'
 : 'Bot Workflow Complete!'
