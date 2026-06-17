@@ -56,7 +56,7 @@ fi
 : 'TEST 2: URL Extraction from Different Formats'
 : '════════════════════════════════════════════════════════════════'
 
-cat > /tmp/test-url-extraction.go <<'GOEOF'
+cat > system-test/test-url-extraction.go <<'GOEOF'
 package main
 
 import (
@@ -120,7 +120,8 @@ func main() {
 }
 GOEOF
 
-cd /tmp && go run test-url-extraction.go
+go run system-test/test-url-extraction.go
+rm -f system-test/test-url-extraction.go
 cd "$(dirname "$0")/.."
 
 # Test 3: Error Handling - Invalid URL
