@@ -50,6 +50,8 @@ Automated Prow CI failure analysis using Red Hat's ship-help MCP (AI helpdesk).
 ```bash
 cd apps/prow-analyzer
 go build ./cmd/prow-analyzer--cli
+export SHIP_HELP_MCP_URL="https://<your-mcp-endpoint>"
+export SHIP_HELP_MCP_TOKEN="<your-token>"
 ./prow-analyzer--cli analyze <prow-url>
 ```
 
