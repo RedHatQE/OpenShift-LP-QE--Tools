@@ -5,7 +5,12 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 cd "$(dirname "$0")/.."
 
-cat > /tmp/test-url-extract.go <<'GOEOF'
+# Create temporary file and ensure cleanup
+typeset tmpFile
+tmpFile=$(mktemp -t test-url-extract.XXXXXX.go)
+trap 'rm -f "$tmpFile"' EXIT
+
+cat > "$tmpFile" <<'GOEOF'
 package main
 
 import (
@@ -76,4 +81,4 @@ func main() {
 }
 GOEOF
 
-go run /tmp/test-url-extract.go
+go run "$tmpFile"
