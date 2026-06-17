@@ -28,6 +28,8 @@ export SHIP_HELP_MCP_TOKEN="<your-token>"
 ./prow-analyzer--cli analyze <prow-url>
 ```
 
+**Note:** Analysis takes 2-4 minutes as ship-help searches across 9+ data sources (Jira, GitHub, Firewatch, build logs, etc.).
+
 Example:
 
 ```bash
