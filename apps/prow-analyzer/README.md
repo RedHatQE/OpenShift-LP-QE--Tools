@@ -73,13 +73,14 @@ go build ./cmd/prow-analyzer--bot
 ### OpenShift Deployment
 
 ```bash
-# Build and push image
-podman build -t quay.io/oramraz/prow-analyzer-bot:latest .
-podman push quay.io/oramraz/prow-analyzer-bot:latest
+# Build and push container image
+cd ../../image/container/prow-analyzer
+make build IMAGE_TAG=v1.0.0
+make push IMAGE_TAG=v1.0.0
 
-# Update secrets in deploy/openshift/deployment.yaml
+# Update secrets in apps/prow-analyzer/deploy/openshift/deployment.yaml
 # Then deploy:
-oc apply -f deploy/openshift/deployment.yaml
+oc apply -f ../../apps/prow-analyzer/deploy/openshift/deployment.yaml
 ```
 
 ## Configuration
