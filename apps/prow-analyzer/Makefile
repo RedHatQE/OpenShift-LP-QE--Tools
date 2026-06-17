@@ -1,6 +1,6 @@
 # Local development Makefile for Go binaries
 # For container builds, see image/container/prow-analyzer/Makefile
-.PHONY: test test-coverage build build-cli build-bot clean
+.PHONY: test test-coverage build build-cli build-bot clean help
 
 # Build both binaries
 build: build-cli build-bot
