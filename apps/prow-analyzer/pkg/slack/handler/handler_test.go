@@ -276,6 +276,7 @@ func TestAnalyzeAndRespond_WithMockServer(t *testing.T) {
 		client:            slackClient,
 		analyzer:          anal,
 		monitoredChannels: map[string]bool{"C123": true},
+		semaphore:         make(chan struct{}, 5),
 	}
 
 	event := &slackevents.MessageEvent{
@@ -330,6 +331,7 @@ func TestAnalyzeAndRespond_PostError(t *testing.T) {
 		client:            slackClient,
 		analyzer:          anal,
 		monitoredChannels: map[string]bool{"C123": true},
+		semaphore:         make(chan struct{}, 5),
 	}
 
 	event := &slackevents.MessageEvent{
