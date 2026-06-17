@@ -1,7 +1,7 @@
 #!/bin/bash
 eval "$(
     typeset -a _fURL=()
-    type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
         https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/common/EnsureReqs.sh
 )"; EnsureReqs uv
@@ -17,7 +17,7 @@ function TestReport--JUnit--AddTC () {
 #   Usage:
 #       eval "$(
 #           typeset -a _fURL=()
-#           type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+#           type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
 #           "${_fURL[@]}" \
 #       https://<urlAuthToRawContent>/<urlPathToRawContents...>\
 #       <repoPaths...>/TestReport--JUnit.sh
@@ -120,9 +120,9 @@ elif tcRes == "error":
 
 suite.add_testcase(tc)
 report.update_statistics()
-fd, tmpOut = tempfile.mkstemp(
-    prefix=".junit-", suffix=".xml", dir=os.path.dirname(junitFile) or "."
-)
+junitDir = os.path.dirname(junitFile) or "."
+os.makedirs(junitDir, exist_ok=True)
+fd, tmpOut = tempfile.mkstemp(prefix=".junit-", suffix=".xml", dir=junitDir)
 os.close(fd)
 try:
     report.write(tmpOut, pretty=True)
