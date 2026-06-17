@@ -19,8 +19,7 @@ typeset slackMessage='Hey team, check this failure: https://prow.ci.openshift.or
 
 # Step 1: URL Extraction (what the bot does)
 : 'Step 1: Bot extracts Prow URL from message...'
-cd ~/prow-analyzer
-export PATH="${PATH}:/usr/local/go/bin"
+cd "$(dirname "$0")/.."
 
 cat > /tmp/extract-url.go << 'GOEOF'
 package main
