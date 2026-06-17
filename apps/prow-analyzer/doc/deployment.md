@@ -101,7 +101,8 @@ Same as Option 2, but:
 ## Getting Channel IDs
 
 **Method 1: Slack URL**
-```
+
+```text
 https://app.slack.com/client/T09NY5SBT/C12345678
                                       ^^^^^^^^^
                                       Channel ID

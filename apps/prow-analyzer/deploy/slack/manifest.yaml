@@ -11,12 +11,10 @@ oauth_config:
     bot:
       - channels:history
       - chat:write
-      - app_mentions:read
 settings:
   event_subscriptions:
     bot_events:
       - message.channels
-      - app_mention
   interactivity:
     is_enabled: false
   org_deploy_enabled: false

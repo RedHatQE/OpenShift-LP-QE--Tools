@@ -43,8 +43,17 @@ spec:
     spec:
       containers:
       - name: bot
-        image: quay.io/oramraz/prow-analyzer-bot:latest
+        image: quay.io/oramraz/prow-analyzer-bot:v1.0.0
         command: ["/usr/bin/prow-analyzer-bot"]
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
         env:
         - name: SHIP_HELP_MCP_URL
           valueFrom:

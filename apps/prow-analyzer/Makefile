@@ -31,5 +31,5 @@ help:
 	@echo "  build-cli       - Build CLI binary only"
 	@echo "  build-bot       - Build Bot binary only"
 	@echo "  test            - Run unit tests with race detector"
-	@echo "  test-coverage   - Run tests with coverage (enforces 94% threshold)"
+	@echo "  test-coverage   - Run tests with coverage (enforces 100% threshold)"
 	@echo "  clean           - Remove build artifacts and coverage reports"

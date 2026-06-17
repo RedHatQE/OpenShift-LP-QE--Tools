@@ -39,7 +39,6 @@ func main() {
 }
 GOEOF
 
-go run /tmp/extract-url.go "${slackMessage}"
 typeset extractedURL
 extractedURL=$(go run /tmp/extract-url.go "${slackMessage}" 2>/dev/null | grep -oP 'https://[^\s]+')
 

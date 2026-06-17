@@ -25,7 +25,12 @@ typeset testURL2='https://prow.ci.openshift.org/invalid'
 : "URL: ${testURL2}"
 typeset -i exitCode=0
 ./prow-analyzer--cli analyze "${testURL2}" 2>&1 || exitCode=$?
-: "Exit code: ${exitCode} (expected failure)"
+: "Exit code: ${exitCode} (expected non-zero for invalid URL)"
+if ((exitCode == 0)); then
+    : '❌ FAIL: Command should have failed on invalid URL'
+    exit 1
+fi
+: '✅ PASS: Invalid URL rejected correctly'
 : '---'
 
 : '=== All Tests Complete ==='

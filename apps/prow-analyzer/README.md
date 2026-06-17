@@ -59,7 +59,18 @@ The bot monitors configured Slack channels and automatically analyzes any Prow U
 git clone https://github.com/oramraz/prow-analyzer.git
 cd prow-analyzer
 go mod download
+
+# Build CLI
 go build ./cmd/prow-analyzer--cli
+
+# Configure environment (required)
+export SHIP_HELP_MCP_URL="https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp"
+export SHIP_HELP_MCP_TOKEN="your-token-here"
+
+# Run CLI
+./prow-analyzer--cli analyze "https://prow.ci.openshift.org/view/gs/..."
+
+# Build Bot (optional)
 go build ./cmd/prow-analyzer--bot
 ```
 
@@ -128,7 +139,7 @@ oc apply -f deploy/openshift/deployment.yaml
 
 ### MCP Protocol Flow
 
-```
+```text
 1. Initialize session → Get session ID
 2. Call ask_persona with Prow URL
 3. Parse SSE response stream
@@ -137,7 +148,7 @@ oc apply -f deploy/openshift/deployment.yaml
 
 ## Example Output
 
-```
+```text
 🔍 Prow Analyzer Analysis
 
 **Root Cause:**

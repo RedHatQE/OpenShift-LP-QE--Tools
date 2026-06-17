@@ -26,6 +26,8 @@ type Analyzer struct {
 	template    string
 	sessionID   string // MCP session ID
 	sessionMu   sync.Mutex
+	initOnce    sync.Once
+	initErr     error
 	jsonMarshal func(v interface{}) ([]byte, error)
 	newRequest  func(ctx context.Context, method, url string, body io.Reader) (*http.Request, error)
 }
@@ -86,15 +88,12 @@ type AnalysisResult struct {
 func (a *Analyzer) AnalyzeFailure(ctx context.Context, jobURL string) (*AnalysisResult, error) {
 	startTime := time.Now()
 
-	// Initialize MCP session if needed
-	a.sessionMu.Lock()
-	needsInit := a.sessionID == ""
-	a.sessionMu.Unlock()
-
-	if needsInit {
-		if err := a.initializeSession(ctx); err != nil {
-			return nil, fmt.Errorf("initialize session: %w", err)
-		}
+	// Initialize MCP session once (thread-safe)
+	a.initOnce.Do(func() {
+		a.initErr = a.initializeSession(ctx)
+	})
+	if a.initErr != nil {
+		return nil, fmt.Errorf("initialize session: %w", a.initErr)
 	}
 
 	// Build prompt using the configured template

@@ -3,13 +3,14 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 # Test URL extraction logic (what Slack bot uses to detect Prow URLs)
 
-cd ~/prow-analyzer
+cd "$(dirname "$0")/.."
 
 cat > /tmp/test-url-extract.go <<'GOEOF'
 package main
 
 import (
 	"fmt"
+	"os"
 	"github.com/oramraz/prow-analyzer/pkg/analyzer"
 )
 
@@ -63,14 +64,16 @@ func main() {
 		}
 		fmt.Println()
 	}
-	
+
 	fmt.Printf("═══════════════════════════════════════════════════════\n")
 	fmt.Printf("Result: %d/%d URLs extracted successfully\n", passed, len(testCases)-1) // -1 because one test has no URL
 	fmt.Printf("═══════════════════════════════════════════════════════\n")
+
+	expected := len(testCases) - 1 // One test case has no URL
+	if passed != expected {
+		os.Exit(1)
+	}
 }
 GOEOF
 
-export PATH="${PATH}:/usr/local/go/bin"
-cd ~/prow-analyzer && go run /tmp/test-url-extract.go
-
-true
+go run /tmp/test-url-extract.go
