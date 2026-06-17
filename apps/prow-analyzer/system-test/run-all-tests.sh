@@ -61,6 +61,7 @@ package main
 
 import (
     "fmt"
+    "os"
     "github.com/oramraz/prow-analyzer/pkg/analyzer"
 )
 
@@ -113,6 +114,9 @@ func main() {
     }
 
     fmt.Printf("\n📊 URL Extraction: %d passed, %d failed\n\n", passed, failed)
+    if failed > 0 {
+        os.Exit(1)
+    }
 }
 GOEOF
 

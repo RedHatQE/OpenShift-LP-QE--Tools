@@ -45,9 +45,8 @@ Post a Prow URL in your monitored channel and watch for bot response.
 podman login quay.io
 
 # Build and push using Makefile (from repo root)
-cd image/container/prow-analyzer
-make build IMAGE_NAMESPACE=<your-org> IMAGE_TAG=v1.0.0
-make push IMAGE_NAMESPACE=<your-org> IMAGE_TAG=v1.0.0
+make -C image/container/prow-analyzer build IMAGE_NAMESPACE=<your-org> IMAGE_TAG=v1.0.0
+make -C image/container/prow-analyzer push IMAGE_NAMESPACE=<your-org> IMAGE_TAG=v1.0.0
 ```
 
 ### Step 2: Create Secrets

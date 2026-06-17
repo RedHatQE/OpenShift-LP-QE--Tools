@@ -55,8 +55,14 @@ func (h *handler) Handle(callback *slackevents.EventsAPIEvent, logger *logrus.En
 	})
 	logger.Info("Prow analyzer detected failure URL")
 
-	// Analyze async (can take 30-60s)
-	go h.analyzeAndRespond(event, prowURL, logger)
+	// Acquire semaphore before spawning goroutine to prevent unbounded buildup
+	select {
+	case h.semaphore <- struct{}{}:
+		// Analyze async (can take 30-60s)
+		go h.analyzeAndRespond(event, prowURL, logger)
+	default:
+		logger.Warn("Prow analyzer queue full, dropping request")
+	}
 
 	return true, nil
 }
@@ -66,8 +72,7 @@ func (h *handler) Identifier() string {
 }
 
 func (h *handler) analyzeAndRespond(event *slackevents.MessageEvent, prowURL string, logger *logrus.Entry) {
-	// Acquire semaphore slot (blocks if 5 analyses already running)
-	h.semaphore <- struct{}{}
+	// Release semaphore slot when done
 	defer func() { <-h.semaphore }()
 
 	result, err := h.analyzer.AnalyzeFailure(context.Background(), prowURL)

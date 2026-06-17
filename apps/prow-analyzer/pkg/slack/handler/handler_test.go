@@ -285,6 +285,9 @@ func TestAnalyzeAndRespond_WithMockServer(t *testing.T) {
 	}
 
 	logger := logrus.NewEntry(logrus.New())
+
+	// Acquire semaphore before calling analyzeAndRespond (mimics Handle behavior)
+	h.semaphore <- struct{}{}
 	h.analyzeAndRespond(event, "https://prow.ci.openshift.org/view/test", logger)
 
 	// Wait for message to be posted (with timeout)
@@ -340,6 +343,9 @@ func TestAnalyzeAndRespond_PostError(t *testing.T) {
 	}
 
 	logger := logrus.NewEntry(logrus.New())
+
+	// Acquire semaphore before calling analyzeAndRespond (mimics Handle behavior)
+	h.semaphore <- struct{}{}
 	// Should not panic, just log error
 	h.analyzeAndRespond(event, "https://prow.ci.openshift.org/view/test", logger)
 

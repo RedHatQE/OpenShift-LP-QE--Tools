@@ -80,6 +80,11 @@ spec:
             configMapKeyRef:
               name: prow-analyzer-config
               key: monitored-channels
+        - name: PROMPT_TEMPLATE
+          valueFrom:
+            configMapKeyRef:
+              name: prow-analyzer-config
+              key: prompt-template
         resources:
           requests:
             memory: "128Mi"
