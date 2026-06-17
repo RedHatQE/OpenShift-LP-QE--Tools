@@ -29,6 +29,7 @@ export SHIP_HELP_MCP_TOKEN="<your-token>"
 ```
 
 Example:
+
 ```bash
 export SHIP_HELP_MCP_URL="https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp"
 export SHIP_HELP_MCP_TOKEN="eyJhbGc..."
