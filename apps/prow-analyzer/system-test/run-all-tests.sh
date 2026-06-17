@@ -41,12 +41,14 @@ if grep -qi 'analysis completed' /tmp/test1-output.txt; then
     : '✅ PASS: Analysis completed successfully'
 else
     : '❌ FAIL: Analysis did not complete'
+    exit 1
 fi
 
 if grep -qi 'root cause\|jira\|recommendation' /tmp/test1-output.txt; then
     : '✅ PASS: Ship-help MCP returned structured analysis'
 else
     : '❌ FAIL: No structured analysis found'
+    exit 1
 fi
 
 # Test 2: URL Extraction
@@ -114,8 +116,8 @@ func main() {
 }
 GOEOF
 
-cd /tmp && /usr/local/go/bin/go run test-url-extraction.go
-cd ~/prow-analyzer
+cd /tmp && go run test-url-extraction.go
+cd "$(dirname "$0")/.."
 
 # Test 3: Error Handling - Invalid URL
 : '════════════════════════════════════════════════════════════════'
@@ -132,6 +134,7 @@ if ((test3ExitCode != 0)); then
     : '✅ PASS: Correctly failed on invalid URL'
 else
     : '❌ FAIL: Should have failed on invalid URL'
+    exit 1
 fi
 : 'Error output:'
 cat /tmp/test3-output.txt
@@ -145,6 +148,7 @@ if grep -qi 'usage\|flag' /tmp/test4-output.txt; then
     : '✅ PASS: Help output displayed'
 else
     : '❌ FAIL: Help output missing'
+    exit 1
 fi
 cat /tmp/test4-output.txt
 

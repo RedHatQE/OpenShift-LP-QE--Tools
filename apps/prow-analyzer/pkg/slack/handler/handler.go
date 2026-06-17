@@ -20,6 +20,7 @@ type handler struct {
 	client            *slack.Client
 	analyzer          *analyzer.Analyzer
 	monitoredChannels map[string]bool
+	semaphore         chan struct{} // Limit concurrent analyses
 }
 
 func (h *handler) Handle(callback *slackevents.EventsAPIEvent, logger *logrus.Entry) (handled bool, err error) {
@@ -65,6 +66,10 @@ func (h *handler) Identifier() string {
 }
 
 func (h *handler) analyzeAndRespond(event *slackevents.MessageEvent, prowURL string, logger *logrus.Entry) {
+	// Acquire semaphore slot (blocks if 5 analyses already running)
+	h.semaphore <- struct{}{}
+	defer func() { <-h.semaphore }()
+
 	result, err := h.analyzer.AnalyzeFailure(context.Background(), prowURL)
 	if err != nil {
 		logger.WithError(err).Error("Prow analyzer analysis failed")
@@ -97,5 +102,6 @@ func New(client *slack.Client, analyzer *analyzer.Analyzer, monitoredChannels []
 		client:            client,
 		analyzer:          analyzer,
 		monitoredChannels: channelMap,
+		semaphore:         make(chan struct{}, 5), // Limit to 5 concurrent analyses
 	}
 }

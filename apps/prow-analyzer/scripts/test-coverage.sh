@@ -9,18 +9,18 @@ typeset coverageHTML='coverage.html'
 # Use race detector if CGO is available, otherwise skip it
 # Only test pkg/ directory (excludes cmd/main.go files)
 if [[ "${CGO_ENABLED:-1}" == "1" ]] && command -v gcc &> /dev/null; then
-    /usr/local/go/bin/go test -v -race -coverprofile="${coverageFile}" -covermode=atomic ./pkg/...
+    go test -v -race -coverprofile="${coverageFile}" -covermode=atomic ./pkg/...
 else
     : 'CGO not available, running without race detector'
-    /usr/local/go/bin/go test -v -coverprofile="${coverageFile}" -covermode=atomic ./pkg/...
+    go test -v -coverprofile="${coverageFile}" -covermode=atomic ./pkg/...
 fi
 
 : 'Generating coverage report...'
-/usr/local/go/bin/go tool cover -html="${coverageFile}" -o "${coverageHTML}"
+go tool cover -html="${coverageFile}" -o "${coverageHTML}"
 
 : 'Calculating coverage percentage...'
 typeset coverageOutput
-coverageOutput=$(/usr/local/go/bin/go tool cover -func="${coverageFile}")
+coverageOutput=$(go tool cover -func="${coverageFile}")
 
 : "${coverageOutput}"
 

@@ -315,9 +315,16 @@ func TestAnalyzeFailure_SessionReuse(t *testing.T) {
 	ctx := context.Background()
 
 	// First call - should initialize
-	analyzer.AnalyzeFailure(ctx, "url1")
+	_, err := analyzer.AnalyzeFailure(ctx, "url1")
+	if err != nil {
+		t.Fatalf("First AnalyzeFailure failed: %v", err)
+	}
+
 	// Second call - should reuse session
-	analyzer.AnalyzeFailure(ctx, "url2")
+	_, err = analyzer.AnalyzeFailure(ctx, "url2")
+	if err != nil {
+		t.Fatalf("Second AnalyzeFailure failed: %v", err)
+	}
 
 	if callCount != 1 {
 		t.Errorf("Expected 1 initialize call, got %d", callCount)
