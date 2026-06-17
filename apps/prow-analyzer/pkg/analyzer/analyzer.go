@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -24,6 +25,7 @@ type Analyzer struct {
 	client      HTTPDoer
 	template    string
 	sessionID   string // MCP session ID
+	sessionMu   sync.Mutex
 	jsonMarshal func(v interface{}) ([]byte, error)
 	newRequest  func(ctx context.Context, method, url string, body io.Reader) (*http.Request, error)
 }
@@ -85,7 +87,11 @@ func (a *Analyzer) AnalyzeFailure(ctx context.Context, jobURL string) (*Analysis
 	startTime := time.Now()
 
 	// Initialize MCP session if needed
-	if a.sessionID == "" {
+	a.sessionMu.Lock()
+	needsInit := a.sessionID == ""
+	a.sessionMu.Unlock()
+
+	if needsInit {
 		if err := a.initializeSession(ctx); err != nil {
 			return nil, fmt.Errorf("initialize session: %w", err)
 		}
@@ -120,7 +126,11 @@ func (a *Analyzer) AnalyzeFailure(ctx context.Context, jobURL string) (*Analysis
 	req.Header.Set("Authorization", "Bearer "+a.token)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, text/event-stream")
-	req.Header.Set("Mcp-Session-Id", a.sessionID)
+
+	a.sessionMu.Lock()
+	sessionID := a.sessionID
+	a.sessionMu.Unlock()
+	req.Header.Set("Mcp-Session-Id", sessionID)
 
 	resp, err := a.client.Do(req)
 	if err != nil {
@@ -264,6 +274,12 @@ func (a *Analyzer) initializeSession(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 
+	// Check HTTP status code first
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("init request failed (HTTP %d): %s", resp.StatusCode, string(body))
+	}
+
 	// Extract session ID from response header
 	sessionID := resp.Header.Get("Mcp-Session-Id")
 	if sessionID == "" {
@@ -271,17 +287,22 @@ func (a *Analyzer) initializeSession(ctx context.Context) error {
 		return fmt.Errorf("no session ID in response (HTTP %d): %s", resp.StatusCode, string(body))
 	}
 
+	a.sessionMu.Lock()
 	a.sessionID = sessionID
+	a.sessionMu.Unlock()
 	return nil
 }
 
 // parseSSEMessage extracts JSON data from Server-Sent Events response
-// SSE format: "event: message\ndata: {json}\n\n"
+// SSE format: "event: message\ndata: {json}\n\n" or "data:{json}\n\n"
 func parseSSEMessage(body string) string {
 	lines := strings.Split(body, "\n")
 	for _, line := range lines {
 		if strings.HasPrefix(line, "data: ") {
 			return strings.TrimPrefix(line, "data: ")
+		}
+		if strings.HasPrefix(line, "data:") {
+			return strings.TrimPrefix(line, "data:")
 		}
 	}
 	return ""

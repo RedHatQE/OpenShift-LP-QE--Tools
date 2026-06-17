@@ -491,8 +491,8 @@ func TestAnalyzeFailure_Errors(t *testing.T) {
 		analyzer := NewAnalyzer(server.URL, "token", "template")
 		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
 
-		if err == nil || !strings.Contains(err.Error(), "no session ID") {
-			t.Errorf("Expected session ID error, got: %v", err)
+		if err == nil || !strings.Contains(err.Error(), "init request failed") {
+			t.Errorf("Expected init request failed error, got: %v", err)
 		}
 	})
 }

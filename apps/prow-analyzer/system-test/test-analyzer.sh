@@ -24,7 +24,7 @@ typeset testURL='https://prow.ci.openshift.org/view/gs/test-platform-results/log
 
 : 'Testing prow-analyzer...'
 : "MCP URL: ${mcpURL}"
-: "Token: ${SHIP_HELP_MCP_TOKEN:0:20}... (${tokenLength} chars)"
+: "Token: <set> (${tokenLength} chars)"
 
 time ./prow-analyzer--cli analyze "${testURL}"
 

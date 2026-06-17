@@ -1,6 +1,6 @@
 # Binaries
-prow-analyzer
-prow-analyzer-bot
+prow-analyzer--cli
+prow-analyzer--bot
 *.exe
 *.exe~
 *.dll

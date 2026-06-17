@@ -4,7 +4,7 @@ go 1.22
 
 require (
 	github.com/sirupsen/logrus v1.9.3
-	github.com/slack-go/slack v0.12.3
+	github.com/slack-go/slack v0.14.0
 )
 
 require (
