@@ -21,14 +21,10 @@ Automated Prow CI failure analysis using Red Hat's ship-help MCP (AI helpdesk).
 ### CLI Usage
 
 ```bash
-# Set required environment variables (obtain token from ship-help team)
+cd apps/prow-analyzer
+go build ./cmd/prow-analyzer--cli
 export SHIP_HELP_MCP_URL="https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp"
 export SHIP_HELP_MCP_TOKEN="your-jwt-token-here"
-
-# Build CLI
-go build ./cmd/prow-analyzer--cli
-
-# Analyze a Prow job
 ./prow-analyzer--cli analyze https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-stolostron-policy-collection-main-ocp4.22-interop-opp-aws/2066255424226594816
 ```
 
