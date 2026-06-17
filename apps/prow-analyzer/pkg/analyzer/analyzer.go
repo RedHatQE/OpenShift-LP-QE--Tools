@@ -20,16 +20,16 @@ type HTTPDoer interface {
 
 // Analyzer provides test failure analysis using ship-help MCP
 type Analyzer struct {
-	mcpURL      string
-	token       string
-	client      HTTPDoer
-	template    string
-	sessionID   string // MCP session ID
-	sessionMu   sync.Mutex
-	initOnce    sync.Once
-	initErr     error
-	jsonMarshal func(v interface{}) ([]byte, error)
-	newRequest  func(ctx context.Context, method, url string, body io.Reader) (*http.Request, error)
+	mcpURL        string
+	token         string
+	client        HTTPDoer
+	template      string
+	sessionID     string // MCP session ID
+	sessionMu     sync.Mutex
+	initMu        sync.Mutex
+	initialized   bool
+	jsonMarshal   func(v interface{}) ([]byte, error)
+	newRequest    func(ctx context.Context, method, url string, body io.Reader) (*http.Request, error)
 }
 
 // NewAnalyzer creates a new Analyzer instance
@@ -88,13 +88,16 @@ type AnalysisResult struct {
 func (a *Analyzer) AnalyzeFailure(ctx context.Context, jobURL string) (*AnalysisResult, error) {
 	startTime := time.Now()
 
-	// Initialize MCP session once (thread-safe)
-	a.initOnce.Do(func() {
-		a.initErr = a.initializeSession(ctx)
-	})
-	if a.initErr != nil {
-		return nil, fmt.Errorf("initialize session: %w", a.initErr)
+	// Initialize MCP session if needed (only caches successful initialization)
+	a.initMu.Lock()
+	if !a.initialized {
+		if err := a.initializeSession(ctx); err != nil {
+			a.initMu.Unlock()
+			return nil, fmt.Errorf("initialize session: %w", err)
+		}
+		a.initialized = true
 	}
+	a.initMu.Unlock()
 
 	// Build prompt using the configured template
 	prompt := strings.ReplaceAll(a.template, "{job_url}", jobURL)

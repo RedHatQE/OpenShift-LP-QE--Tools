@@ -529,7 +529,7 @@ func TestErrorInjection(t *testing.T) {
 			jsonMarshal: mockJSONMarshalError,  // Inject failing marshaler
 			newRequest:  http.NewRequestWithContext,
 		}
-		analyzer.initOnce.Do(func() {}) // Mark initialization as complete
+		analyzer.initialized = true // Mark initialization as complete
 
 		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
 		if err == nil || !strings.Contains(err.Error(), "marshal request") {
@@ -559,7 +559,7 @@ func TestErrorInjection(t *testing.T) {
 			jsonMarshal: json.Marshal,
 			newRequest:  mockNewRequestError, // Inject failing request builder
 		}
-		analyzer.initOnce.Do(func() {}) // Mark initialization as complete
+		analyzer.initialized = true // Mark initialization as complete
 
 		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
 		if err == nil || !strings.Contains(err.Error(), "create request") {
@@ -619,7 +619,7 @@ func TestErrorInjection(t *testing.T) {
 			jsonMarshal: json.Marshal,
 			newRequest:  http.NewRequestWithContext,
 		}
-		analyzer.initOnce.Do(func() {}) // Mark initialization as complete
+		analyzer.initialized = true // Mark initialization as complete
 
 		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
 		if err == nil || !strings.Contains(err.Error(), "read response") {
@@ -643,11 +643,52 @@ func TestErrorInjection(t *testing.T) {
 			jsonMarshal: json.Marshal,
 			newRequest:  http.NewRequestWithContext,
 		}
-		analyzer.initOnce.Do(func() {}) // Mark initialization as complete
+		analyzer.initialized = true // Mark initialization as complete
 
 		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
 		if err == nil || !strings.Contains(err.Error(), "send request") {
 			t.Errorf("Expected 'send request' error, got: %v", err)
+		}
+	})
+
+	t.Run("initialization failure is retryable", func(t *testing.T) {
+		callCount := 0
+		mockClient := &mockHTTPClient{
+			doFunc: func(req *http.Request) (*http.Response, error) {
+				callCount++
+				if callCount == 1 {
+					// First call fails
+					return nil, errors.New("temporary network error")
+				}
+				// Second call succeeds
+				resp := &http.Response{
+					StatusCode: 200,
+					Body:       io.NopCloser(strings.NewReader(`{"jsonrpc":"2.0","id":0}`)),
+					Header:     make(http.Header),
+				}
+				resp.Header.Set("Mcp-Session-Id", "session-123")
+				return resp, nil
+			},
+		}
+
+		analyzer := &Analyzer{
+			mcpURL:      "http://test.com",
+			token:       "token",
+			client:      mockClient,
+			template:    "template",
+			jsonMarshal: json.Marshal,
+			newRequest:  http.NewRequestWithContext,
+		}
+
+		// First call should fail
+		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
+		if err == nil || !strings.Contains(err.Error(), "temporary network error") {
+			t.Errorf("Expected temporary network error, got: %v", err)
+		}
+
+		// Second call should retry initialization and succeed (would fail if error was cached)
+		if callCount != 1 {
+			t.Errorf("Expected 1 init attempt, got %d", callCount)
 		}
 	})
 }
