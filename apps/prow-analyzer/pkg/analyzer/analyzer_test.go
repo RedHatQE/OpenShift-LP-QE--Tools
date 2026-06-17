@@ -529,6 +529,7 @@ func TestErrorInjection(t *testing.T) {
 			jsonMarshal: mockJSONMarshalError,  // Inject failing marshaler
 			newRequest:  http.NewRequestWithContext,
 		}
+		analyzer.initOnce.Do(func() {}) // Mark initialization as complete
 
 		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
 		if err == nil || !strings.Contains(err.Error(), "marshal request") {
@@ -558,6 +559,7 @@ func TestErrorInjection(t *testing.T) {
 			jsonMarshal: json.Marshal,
 			newRequest:  mockNewRequestError, // Inject failing request builder
 		}
+		analyzer.initOnce.Do(func() {}) // Mark initialization as complete
 
 		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
 		if err == nil || !strings.Contains(err.Error(), "create request") {
@@ -617,6 +619,7 @@ func TestErrorInjection(t *testing.T) {
 			jsonMarshal: json.Marshal,
 			newRequest:  http.NewRequestWithContext,
 		}
+		analyzer.initOnce.Do(func() {}) // Mark initialization as complete
 
 		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
 		if err == nil || !strings.Contains(err.Error(), "read response") {
@@ -640,6 +643,7 @@ func TestErrorInjection(t *testing.T) {
 			jsonMarshal: json.Marshal,
 			newRequest:  http.NewRequestWithContext,
 		}
+		analyzer.initOnce.Do(func() {}) // Mark initialization as complete
 
 		_, err := analyzer.AnalyzeFailure(context.Background(), "url")
 		if err == nil || !strings.Contains(err.Error(), "send request") {
