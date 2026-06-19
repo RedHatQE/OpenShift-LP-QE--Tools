@@ -25,23 +25,29 @@ function TestReport--JUnit--AddTC () {
 #           TC_EXEC_TIME [-f MSG | -e MSG]
 #
 #   Args:
-#       JUNIT_FILE      Path to write (or update) the JUnit XML report.
-#                       Parent directory must exist.  Created on first call.
-#       REPORT_NAME     Name of the report root (<testsuites name="...">).
-#                       Must match across all AddTC calls for the same JUNIT_FILE.
-#       TS_NAME         Name of the test suite (<testsuite name="...">).
-#       TC_NAME         Name of the test case (<testcase name="...">).
-#       TC_EXEC_TIME    Duration in seconds (integer or decimal).
-#       -f MSG          Mark the testcase as failed with the given message.
-#       -e MSG          Mark the testcase as errored with the given message.
-#                       -f and -e are mutually exclusive.
-#                       Omitting both marks the testcase as passed.
+#       JUNIT_FILE      Path to write (or update) the JUnit XML report file.
+#       REPORT_NAME     Name of the Test Report, i.e. JUnit XML Root Node
+#                       `<testsuites name="...">`.
+#                       Must match across all AddTC calls for the same
+#                       JUNIT_FILE.
+#       TS_NAME         Name of the Test Suite (TS), i.e. JUnit XML node
+#                       `<testsuite name="...">`.
+#       TC_NAME         Name of the Test Case (TC), i.e. JUnit XML node
+#                       `<testcase name="...">`.
+#       TC_EXEC_TIME    TC duration in seconds (integer or decimal).
+#       -f MSG          Mark the TC as failed with the given message.
+#       -e MSG          Mark the TC as an error with the given message.
 #
 #   Notes:
-#     - The generated XML has <testsuites> as the root node (JUnit plural form).
-#     - Suite and testsuites counts (tests, failures, errors, time) are updated
+#     - The generated XML has the `<testsuites>` element as the root node.
+#     - TC Status:
+#         - A TC is considered "failed" if its execution fails to reach the
+#           expected outcome.
+#         - A TC is considered an "error" if its execution fails due to an
+#           issue with the test itself.
+#         - A TC without a "failed" or "error" status is marked as "passed".
+#     - Suite and test suite counts (tests, failures, errors, time) are updated
 #       after every call.
-#     - uv is installed on-demand via EnsureReqs if not already in PATH.
 ################################################################################
     typeset junitFile="${1:?TestReport--JUnit--AddTC: JUNIT_FILE is required as non-empty string.}"; (($#)) && shift
     typeset rptName="${1?TestReport--JUnit--AddTC: REPORT_NAME is required.}"; (($#)) && shift
