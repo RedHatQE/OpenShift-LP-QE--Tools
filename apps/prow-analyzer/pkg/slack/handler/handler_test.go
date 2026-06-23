@@ -208,7 +208,11 @@ func TestHandle_NoProwURL(t *testing.T) {
 
 func TestHandle_Success(t *testing.T) {
 	// Create a mock Slack server that accepts posts
+	messageChan := make(chan bool, 1)
 	slackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/chat.postMessage" {
+			messageChan <- true
+		}
 		w.Write([]byte(`{"ok":true,"ts":"123"}`))
 	}))
 	defer slackServer.Close()
@@ -238,8 +242,13 @@ func TestHandle_Success(t *testing.T) {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
-	// Give goroutine time to complete (it will fail to analyze but should post error message)
-	time.Sleep(100 * time.Millisecond)
+	// Wait for error message to be posted (analyzer will fail but should post error)
+	select {
+	case <-messageChan:
+		// Success - error message was posted
+	case <-time.After(2 * time.Second):
+		t.Error("Timeout waiting for error message to be posted to Slack")
+	}
 }
 
 // TestAnalyzeAndRespond_WithMockServer tests the async path with a real HTTP server
@@ -325,8 +334,10 @@ func TestAnalyzeAndRespond_PostError(t *testing.T) {
 	defer mcpServer.Close()
 
 	// Create Slack server that returns errors
+	postAttemptChan := make(chan bool, 1)
 	slackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/chat.postMessage" {
+			postAttemptChan <- true
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(`{"ok":false,"error":"posting_error"}`))
 		}
@@ -355,8 +366,13 @@ func TestAnalyzeAndRespond_PostError(t *testing.T) {
 	// Should not panic, just log error
 	h.analyzeAndRespond(event, "https://prow.ci.openshift.org/view/test", logger)
 
-	// Give it time to complete
-	time.Sleep(100 * time.Millisecond)
+	// Wait for post attempt (with timeout)
+	select {
+	case <-postAttemptChan:
+		// Success - posting was attempted (though it failed as expected)
+	case <-time.After(2 * time.Second):
+		t.Error("Timeout waiting for Slack post attempt")
+	}
 }
 
 // Interface compliance check
