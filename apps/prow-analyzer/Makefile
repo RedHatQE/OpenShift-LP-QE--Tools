@@ -28,10 +28,10 @@ clean:
 
 # Help
 help:
-	@echo "Prow Analyzer - Available targets:"
-	@echo "  build           - Build both CLI and Bot binaries"
-	@echo "  build-cli       - Build CLI binary only"
-	@echo "  build-bot       - Build Bot binary only"
-	@echo "  test            - Run unit tests with race detector"
-	@echo "  test-coverage   - Run tests with coverage (enforces 100%% threshold)"
-	@echo "  clean           - Remove build artifacts and coverage reports"
+	@echo "Prow Analyzer - Available targets:"; \
+	echo "  build           - Build both CLI and Bot binaries"; \
+	echo "  build-cli       - Build CLI binary only"; \
+	echo "  build-bot       - Build Bot binary only"; \
+	echo "  test            - Run unit tests with race detector"; \
+	echo "  test-coverage   - Run tests with coverage (enforces 100%% threshold)"; \
+	echo "  clean           - Remove build artifacts and coverage reports"
