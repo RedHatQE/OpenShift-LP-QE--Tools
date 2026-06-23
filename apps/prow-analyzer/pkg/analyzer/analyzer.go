@@ -26,8 +26,8 @@ type Analyzer struct {
 	client        HTTPDoer
 	template      string
 	sessionID     string // MCP session ID
-	sessionMu     sync.Mutex
-	initMu        sync.Mutex
+	sessionMtx    sync.Mutex
+	initMtx       sync.Mutex
 	initialized   bool
 	jsonMarshal   func(v interface{}) ([]byte, error)
 	newRequest    func(ctx context.Context, method, url string, body io.Reader) (*http.Request, error)
@@ -90,15 +90,15 @@ func (a *Analyzer) AnalyzeFailure(ctx context.Context, jobURL string) (*Analysis
 	startTime := time.Now()
 
 	// Initialize MCP session if needed (only caches successful initialization)
-	a.initMu.Lock()
+	a.initMtx.Lock()
 	if !a.initialized {
 		if err := a.initializeSession(ctx); err != nil {
-			a.initMu.Unlock()
+			a.initMtx.Unlock()
 			return nil, fmt.Errorf("initialize session: %w", err)
 		}
 		a.initialized = true
 	}
-	a.initMu.Unlock()
+	a.initMtx.Unlock()
 
 	// Build prompt using the configured template
 	prompt := strings.ReplaceAll(a.template, "{job_url}", jobURL)
@@ -130,9 +130,9 @@ func (a *Analyzer) AnalyzeFailure(ctx context.Context, jobURL string) (*Analysis
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, text/event-stream")
 
-	a.sessionMu.Lock()
+	a.sessionMtx.Lock()
 	sessionID := a.sessionID
-	a.sessionMu.Unlock()
+	a.sessionMtx.Unlock()
 	req.Header.Set("Mcp-Session-Id", sessionID)
 
 	resp, err := a.client.Do(req)
@@ -276,9 +276,9 @@ func (a *Analyzer) initializeSession(ctx context.Context) error {
 		return fmt.Errorf("no session ID in response (HTTP %d): %s", resp.StatusCode, string(body))
 	}
 
-	a.sessionMu.Lock()
+	a.sessionMtx.Lock()
 	a.sessionID = sessionID
-	a.sessionMu.Unlock()
+	a.sessionMtx.Unlock()
 	return nil
 }
 
