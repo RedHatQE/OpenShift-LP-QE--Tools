@@ -47,9 +47,12 @@ GOEOF
 typeset mcpURL='https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp'
 export SHIP_HELP_MCP_URL="${mcpURL}"
 
-set +x
-export SHIP_HELP_MCP_TOKEN="$(tr -d '\n' < /tmp/ship-help-token.txt)"
-set -x
+# Verify token is set via environment variable
+if [[ -z "${SHIP_HELP_MCP_TOKEN:-}" ]]; then
+    echo "Error: SHIP_HELP_MCP_TOKEN environment variable is not set" >&2
+    echo "Usage: export SHIP_HELP_MCP_TOKEN='your-token' && $0" >&2
+    exit 1
+fi
 
 : '⏱️  Running analysis...'
 typeset -i startTime endTime duration
