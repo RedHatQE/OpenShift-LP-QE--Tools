@@ -3,7 +3,7 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 # Test URL extraction logic (what Slack bot uses to detect Prow URLs)
 
-cd "$(dirname "$0")/.."
+cd "${0%/*}/.."
 
 go run - <<'GOEOF'
 package main

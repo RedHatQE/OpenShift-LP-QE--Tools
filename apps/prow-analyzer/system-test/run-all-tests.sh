@@ -122,7 +122,7 @@ GOEOF
 
 go run system-test/test-url-extraction.go
 rm -f system-test/test-url-extraction.go
-cd "$(dirname "$0")/.."
+cd "${0%/*}/.."
 
 # Test 3: Error Handling - Invalid URL
 : '════════════════════════════════════════════════════════════════'

@@ -19,7 +19,7 @@ typeset slackMessage='Hey team, check this failure: https://prow.ci.openshift.or
 
 # Step 1: URL Extraction (what the bot does)
 : 'Step 1: Bot extracts Prow URL from message...'
-cd "$(dirname "$0")/.."
+cd "${0%/*}/.."
 
 typeset extractedURL
 extractedURL=$(/usr/local/go/bin/go run - "${slackMessage}" 2>/dev/null <<'GOEOF' | grep -oP 'https://[^\s]+'
