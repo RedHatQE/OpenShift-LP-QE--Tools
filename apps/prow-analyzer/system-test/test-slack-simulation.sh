@@ -3,12 +3,6 @@ set -euxo pipefail; shopt -s inherit_errexit
 
 # Simulate what happens when Slack bot receives a message
 
-# Create temporary files and ensure cleanup
-typeset tmpExtractGo tmpSlackReply
-tmpExtractGo=$(mktemp -t extract-url.XXXXXX.go)
-tmpSlackReply=$(mktemp -t slack-reply.XXXXXX.txt)
-trap 'rm -f "$tmpExtractGo" "$tmpSlackReply"' EXIT
-
 : '═══════════════════════════════════════════════════════'
 : 'Slack Bot Integration Simulation'
 : '═══════════════════════════════════════════════════════'
@@ -27,7 +21,8 @@ typeset slackMessage='Hey team, check this failure: https://prow.ci.openshift.or
 : 'Step 1: Bot extracts Prow URL from message...'
 cd "$(dirname "$0")/.."
 
-cat > "$tmpExtractGo" << 'GOEOF'
+typeset extractedURL
+extractedURL=$(/usr/local/go/bin/go run - "${slackMessage}" 2>/dev/null <<'GOEOF' | grep -oP 'https://[^\s]+'
 package main
 import (
     "fmt"
@@ -43,9 +38,7 @@ func main() {
     }
 }
 GOEOF
-
-typeset extractedURL
-extractedURL=$(/usr/local/go/bin/go run "$tmpExtractGo" "${slackMessage}" 2>/dev/null | grep -oP 'https://[^\s]+')
+)
 
 # Step 2: Analysis (what the bot does in background)
 : 'Step 2: Bot analyzes URL via ship-help MCP...'
@@ -72,8 +65,7 @@ duration=$((endTime - startTime))
 : '═══════════════════════════════════════════════════════'
 : '📨 Simulated Slack Thread Reply:'
 : '═══════════════════════════════════════════════════════'
-echo "${analysis}" > "$tmpSlackReply"
-head -40 "$tmpSlackReply"
+printf '%s\n' "${analysis}" | head -40
 : '... (truncated)'
 : '═══════════════════════════════════════════════════════'
 : 'Bot Workflow Complete!'
