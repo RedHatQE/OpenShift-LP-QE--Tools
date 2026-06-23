@@ -51,7 +51,6 @@ func (h *handler) Handle(callback *slackevents.EventsAPIEvent, logger *slog.Logg
 	}
 
 	logger = logger.With("channel", event.Channel, "url", prowURL)
-	logger.Info("Prow analyzer detected failure URL")
 
 	// Acquire semaphore before spawning goroutine to prevent unbounded buildup
 	select {

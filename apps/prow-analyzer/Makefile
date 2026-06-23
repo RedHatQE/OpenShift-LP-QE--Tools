@@ -23,15 +23,16 @@ test-coverage:
 
 # Clean build artifacts
 clean:
-	rm -f prow-analyzer--cli prow-analyzer--bot
+	rm -f prow-analyzer--cli prow-analyzer--bot; \
 	rm -f coverage.out coverage.html
 
 # Help
 help:
-	@echo "Prow Analyzer - Available targets:"; \
-	echo "  build           - Build both CLI and Bot binaries"; \
-	echo "  build-cli       - Build CLI binary only"; \
-	echo "  build-bot       - Build Bot binary only"; \
-	echo "  test            - Run unit tests with race detector"; \
-	echo "  test-coverage   - Run tests with coverage (enforces 100%% threshold)"; \
-	echo "  clean           - Remove build artifacts and coverage reports"
+	@printf '%s\n' \
+		'Prow Analyzer - Available targets:' \
+		'  build         - Build both CLI and Bot binaries.' \
+		'  build-cli     - Build CLI binary only.' \
+		'  build-bot     - Build Bot binary only.' \
+		'  test          - Run unit tests with race detector.' \
+		'  test-coverage - Run tests with coverage.' \
+		'  clean         - Remove build artifacts and coverage reports.'

@@ -139,17 +139,16 @@ func (a *Analyzer) AnalyzeFailure(ctx context.Context, jobURL string) (*Analysis
 	if err != nil {
 		return nil, fmt.Errorf("send request: %w", err)
 	}
-	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
 
 	// Check HTTP status code before parsing JSON
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
 	}
 
 	// Parse SSE response (ship-help MCP returns text/event-stream format)
@@ -261,18 +260,21 @@ func (a *Analyzer) initializeSession(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("send init request: %w", err)
 	}
-	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return fmt.Errorf("read response: %w", err)
+	}
 
 	// Check HTTP status code first
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("init request failed (HTTP %d): %s", resp.StatusCode, string(body))
 	}
 
 	// Extract session ID from response header
 	sessionID := resp.Header.Get("Mcp-Session-Id")
 	if sessionID == "" {
-		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("no session ID in response (HTTP %d): %s", resp.StatusCode, string(body))
 	}
 
