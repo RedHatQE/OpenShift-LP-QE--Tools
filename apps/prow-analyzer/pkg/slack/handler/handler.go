@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
 	"github.com/slack-go/slack"
@@ -75,10 +74,10 @@ func (h *handler) analyzeAndRespond(event *slackevents.MessageEvent, prowURL str
 	result, err := h.analyzer.AnalyzeFailure(context.Background(), prowURL)
 	if err != nil {
 		logger.Error("Prow analyzer analysis failed", "error", err)
-		// Reply to user with error message
+		// Reply to user with error message (don't expose internal error details)
 		_, _, postErr := h.client.PostMessage(
 			event.Channel,
-			slack.MsgOptionText(fmt.Sprintf("❌ Analysis failed: %v", err), false),
+			slack.MsgOptionText("❌ Analysis failed. Please retry shortly or contact maintainers if this persists.", false),
 			slack.MsgOptionTS(event.TimeStamp),
 		)
 		if postErr != nil {
