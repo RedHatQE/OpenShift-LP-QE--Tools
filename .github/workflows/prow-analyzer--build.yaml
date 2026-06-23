@@ -33,16 +33,21 @@ jobs:
     - name: Test with Coverage
       working-directory: ./apps/prow-analyzer
       run: |
-        go test -v -race -coverprofile=coverage.out -covermode=atomic ./pkg/...
-        go tool cover -func=coverage.out
+        ( set -euxo pipefail; shopt -s inherit_errexit
+            go test -v -race -coverprofile=coverage.out -covermode=atomic ./pkg/...
+            go tool cover -func=coverage.out
+        true )
 
     - name: Check Coverage Threshold
       working-directory: ./apps/prow-analyzer
       run: |
-        COVERAGE=$(go tool cover -func=coverage.out | grep 'total:' | awk '{print $3}' | sed 's/%//')
-        THRESHOLD=100.0
-        if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
-          echo "❌ Coverage $COVERAGE% below threshold $THRESHOLD%"
-          exit 1
-        fi
-        echo "✅ Coverage $COVERAGE% meets threshold $THRESHOLD%"
+        ( set -euxo pipefail; shopt -s inherit_errexit
+            typeset coverage
+            coverage=$(go tool cover -func=coverage.out | grep 'total:' | awk '{print $3}' | sed 's/%//')
+            typeset -r threshold=100.0
+            if (( $(echo "${coverage} < ${threshold}" | bc -l) )); then
+                echo "❌ Coverage ${coverage}% below threshold ${threshold}%"
+                exit 1
+            fi
+            echo "✅ Coverage ${coverage}% meets threshold ${threshold}%"
+        true )

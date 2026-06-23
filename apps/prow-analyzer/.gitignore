@@ -1,35 +1,18 @@
 # Binaries
 prow-analyzer--cli
 prow-analyzer--bot
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-
-# Test binary
 *.test
 
-# Output of the go coverage tool
+# Coverage and temporary files
 *.out
-
-# Dependency directories
-vendor/
-
-# Go workspace file
-go.work
-
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS files
-.DS_Store
-
-# Temporary files
-/tmp/
 *.tmp
 coverage.html
+
+# Dependency and workspace
+vendor/
+go.work
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store

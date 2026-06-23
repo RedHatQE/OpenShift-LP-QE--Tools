@@ -3,16 +3,16 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 
-	"github.com/oramraz/prow-analyzer/pkg/analyzer"
+	"github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/analyzer"
 )
 
 // mockSlackClient implements a mock Slack client for testing
@@ -93,7 +93,7 @@ func TestIdentifier(t *testing.T) {
 
 func TestHandle_NotCallbackEvent(t *testing.T) {
 	h := New(&slack.Client{}, analyzer.NewAnalyzer("", "", ""), []string{"C123"})
-	logger := logrus.NewEntry(logrus.New())
+	logger := slog.Default()
 
 	callback := &slackevents.EventsAPIEvent{
 		Type: slackevents.URLVerification,
@@ -111,7 +111,7 @@ func TestHandle_NotCallbackEvent(t *testing.T) {
 
 func TestHandle_NotMessageEvent(t *testing.T) {
 	h := New(&slack.Client{}, analyzer.NewAnalyzer("", "", ""), []string{"C123"})
-	logger := logrus.NewEntry(logrus.New())
+	logger := slog.Default()
 
 	callback := &slackevents.EventsAPIEvent{
 		Type: slackevents.CallbackEvent,
@@ -133,7 +133,7 @@ func TestHandle_NotMessageEvent(t *testing.T) {
 
 func TestHandle_BotMessage(t *testing.T) {
 	h := New(&slack.Client{}, analyzer.NewAnalyzer("", "", ""), []string{"C123"})
-	logger := logrus.NewEntry(logrus.New())
+	logger := slog.Default()
 
 	callback := &slackevents.EventsAPIEvent{
 		Type: slackevents.CallbackEvent,
@@ -158,7 +158,7 @@ func TestHandle_BotMessage(t *testing.T) {
 
 func TestHandle_UnmonitoredChannel(t *testing.T) {
 	h := New(&slack.Client{}, analyzer.NewAnalyzer("", "", ""), []string{"C123"})
-	logger := logrus.NewEntry(logrus.New())
+	logger := slog.Default()
 
 	callback := &slackevents.EventsAPIEvent{
 		Type: slackevents.CallbackEvent,
@@ -183,7 +183,7 @@ func TestHandle_UnmonitoredChannel(t *testing.T) {
 
 func TestHandle_NoProwURL(t *testing.T) {
 	h := New(&slack.Client{}, analyzer.NewAnalyzer("", "", ""), []string{"C123"})
-	logger := logrus.NewEntry(logrus.New())
+	logger := slog.Default()
 
 	callback := &slackevents.EventsAPIEvent{
 		Type: slackevents.CallbackEvent,
@@ -207,18 +207,24 @@ func TestHandle_NoProwURL(t *testing.T) {
 }
 
 func TestHandle_Success(t *testing.T) {
-	// Note: We can't easily test the async analyzeAndRespond here,
-	// but we can verify that Handle returns true and spawns the goroutine
-	h := New(&slack.Client{}, analyzer.NewAnalyzer("", "", ""), []string{"C123"})
-	logger := logrus.NewEntry(logrus.New())
+	// Create a mock Slack server that accepts posts
+	slackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"ok":true,"ts":"123"}`))
+	}))
+	defer slackServer.Close()
+
+	slackClient := slack.New("test-token", slack.OptionAPIURL(slackServer.URL+"/"))
+	h := New(slackClient, analyzer.NewAnalyzer("", "", ""), []string{"C123"})
+	logger := slog.Default()
 
 	callback := &slackevents.EventsAPIEvent{
 		Type: slackevents.CallbackEvent,
 		InnerEvent: slackevents.EventsAPIInnerEvent{
 			Type: string(slackevents.Message),
 			Data: &slackevents.MessageEvent{
-				Channel: "C123",
-				Text:    "Check this: https://prow.ci.openshift.org/view/gs/test/job/1",
+				Channel:   "C123",
+				TimeStamp: "123.456",
+				Text:      "Check this: https://prow.ci.openshift.org/view/gs/test/job/1",
 			},
 		},
 	}
@@ -232,8 +238,8 @@ func TestHandle_Success(t *testing.T) {
 		t.Errorf("Expected no error, got %v", err)
 	}
 
-	// Give goroutine time to start (though we can't easily verify its completion)
-	time.Sleep(10 * time.Millisecond)
+	// Give goroutine time to complete (it will fail to analyze but should post error message)
+	time.Sleep(100 * time.Millisecond)
 }
 
 // TestAnalyzeAndRespond_WithMockServer tests the async path with a real HTTP server
@@ -284,7 +290,7 @@ func TestAnalyzeAndRespond_WithMockServer(t *testing.T) {
 		TimeStamp: "123.456",
 	}
 
-	logger := logrus.NewEntry(logrus.New())
+	logger := slog.Default()
 
 	// Acquire semaphore before calling analyzeAndRespond (mimics Handle behavior)
 	h.semaphore <- struct{}{}
@@ -342,7 +348,7 @@ func TestAnalyzeAndRespond_PostError(t *testing.T) {
 		TimeStamp: "123",
 	}
 
-	logger := logrus.NewEntry(logrus.New())
+	logger := slog.Default()
 
 	// Acquire semaphore before calling analyzeAndRespond (mimics Handle behavior)
 	h.semaphore <- struct{}{}

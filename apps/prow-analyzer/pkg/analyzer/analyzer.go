@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -140,14 +141,15 @@ func (a *Analyzer) AnalyzeFailure(ctx context.Context, jobURL string) (*Analysis
 	}
 	defer resp.Body.Close()
 
+	// Check HTTP status code before parsing JSON
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)
-	}
-
-	// Check HTTP status code before parsing JSON
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
 	}
 
 	// Parse SSE response (ship-help MCP returns text/event-stream format)
@@ -181,42 +183,27 @@ func (a *Analyzer) AnalyzeFailure(ctx context.Context, jobURL string) (*Analysis
 	}, nil
 }
 
+var prowURLPattern = regexp.MustCompile(
+	`(?:https://(?:` +
+		`prow\.ci\.openshift\.org/view/gs/|` +
+		`prow\.ci\.openshift\.org/\?pr=|` +
+		`deck-internal-ci\.apps\.ci\.l2s4\.p1\.openshiftapps\.com/)` +
+		`[^\s)<>\]|}]+)`,
+)
+
 // ExtractProwURL extracts a Prow job URL from a message
 func ExtractProwURL(text string) string {
-	// Look for Prow URLs
-	patterns := []string{
-		"https://prow.ci.openshift.org/view/gs/",
-		"https://prow.ci.openshift.org/?pr=",
-		"https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/",
+	match := prowURLPattern.FindString(text)
+	if match == "" {
+		return ""
 	}
 
-	for _, pattern := range patterns {
-		if idx := strings.Index(text, pattern); idx != -1 {
-			// Extract URL until whitespace
-			urlStart := idx
-			urlEnd := urlStart
-			for urlEnd < len(text) && !isWhitespace(text[urlEnd]) {
-				urlEnd++
-			}
-
-			// Trim trailing punctuation (handles cases like "https://...)" or "<https://...>")
-			url := text[urlStart:urlEnd]
-			url = strings.TrimRight(url, ")>]}.,;:")
-
-			// Handle Slack link format: <URL|label> - remove |label part
-			if pipeIdx := strings.Index(url, "|"); pipeIdx != -1 {
-				url = url[:pipeIdx]
-			}
-
-			return url
-		}
+	// Handle Slack link format: <URL|label> - remove |label part
+	if pipeIdx := strings.Index(match, "|"); pipeIdx != -1 {
+		match = match[:pipeIdx]
 	}
 
-	return ""
-}
-
-func isWhitespace(c byte) bool {
-	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
+	return match
 }
 
 // ContainsProwURL checks if a message contains a Prow URL
@@ -298,13 +285,9 @@ func (a *Analyzer) initializeSession(ctx context.Context) error {
 // parseSSEMessage extracts JSON data from Server-Sent Events response
 // SSE format: "event: message\ndata: {json}\n\n" or "data:{json}\n\n"
 func parseSSEMessage(body string) string {
-	lines := strings.Split(body, "\n")
-	for _, line := range lines {
-		if strings.HasPrefix(line, "data: ") {
-			return strings.TrimPrefix(line, "data: ")
-		}
-		if strings.HasPrefix(line, "data:") {
-			return strings.TrimPrefix(line, "data:")
+	for _, line := range strings.Split(body, "\n") {
+		if data, found := strings.CutPrefix(line, "data:"); found {
+			return strings.TrimSpace(data)
 		}
 	}
 	return ""

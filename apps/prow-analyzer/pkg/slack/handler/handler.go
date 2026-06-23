@@ -2,17 +2,18 @@ package handler
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 
-	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 
-	"github.com/oramraz/prow-analyzer/pkg/analyzer"
+	"github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/analyzer"
 )
 
 // PartialHandler processes Slack events
 type PartialHandler interface {
-	Handle(callback *slackevents.EventsAPIEvent, logger *logrus.Entry) (handled bool, err error)
+	Handle(callback *slackevents.EventsAPIEvent, logger *slog.Logger) (handled bool, err error)
 	Identifier() string
 }
 
@@ -23,7 +24,7 @@ type handler struct {
 	semaphore         chan struct{} // Limit concurrent analyses
 }
 
-func (h *handler) Handle(callback *slackevents.EventsAPIEvent, logger *logrus.Entry) (handled bool, err error) {
+func (h *handler) Handle(callback *slackevents.EventsAPIEvent, logger *slog.Logger) (handled bool, err error) {
 	if callback.Type != slackevents.CallbackEvent {
 		return false, nil
 	}
@@ -49,10 +50,7 @@ func (h *handler) Handle(callback *slackevents.EventsAPIEvent, logger *logrus.En
 		return false, nil
 	}
 
-	logger = logger.WithFields(logrus.Fields{
-		"channel": event.Channel,
-		"url":     prowURL,
-	})
+	logger = logger.With("channel", event.Channel, "url", prowURL)
 	logger.Info("Prow analyzer detected failure URL")
 
 	// Acquire semaphore before spawning goroutine to prevent unbounded buildup
@@ -71,13 +69,22 @@ func (h *handler) Identifier() string {
 	return "prow-analyzer"
 }
 
-func (h *handler) analyzeAndRespond(event *slackevents.MessageEvent, prowURL string, logger *logrus.Entry) {
+func (h *handler) analyzeAndRespond(event *slackevents.MessageEvent, prowURL string, logger *slog.Logger) {
 	// Release semaphore slot when done
 	defer func() { <-h.semaphore }()
 
 	result, err := h.analyzer.AnalyzeFailure(context.Background(), prowURL)
 	if err != nil {
-		logger.WithError(err).Error("Prow analyzer analysis failed")
+		logger.Error("Prow analyzer analysis failed", "error", err)
+		// Reply to user with error message
+		_, _, postErr := h.client.PostMessage(
+			event.Channel,
+			slack.MsgOptionText(fmt.Sprintf("❌ Analysis failed: %v", err), false),
+			slack.MsgOptionTS(event.TimeStamp),
+		)
+		if postErr != nil {
+			logger.Error("Failed to post error message to user", "error", postErr)
+		}
 		return
 	}
 
@@ -90,9 +97,9 @@ func (h *handler) analyzeAndRespond(event *slackevents.MessageEvent, prowURL str
 	)
 
 	if err != nil {
-		logger.WithError(err).Error("Failed to post prow analyzer response")
+		logger.Error("Failed to post prow analyzer response", "error", err)
 	} else {
-		logger.WithField("duration", result.Duration).Info("Prow analyzer analysis posted successfully")
+		logger.Info("Prow analyzer analysis posted successfully", "duration", result.Duration)
 	}
 }
 

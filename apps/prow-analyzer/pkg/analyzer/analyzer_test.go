@@ -133,27 +133,6 @@ func TestContainsProwURL(t *testing.T) {
 	}
 }
 
-func TestIsWhitespace(t *testing.T) {
-	tests := []struct {
-		char     byte
-		expected bool
-	}{
-		{' ', true},
-		{'\t', true},
-		{'\n', true},
-		{'\r', true},
-		{'a', false},
-		{'1', false},
-	}
-
-	for _, tt := range tests {
-		result := isWhitespace(tt.char)
-		if result != tt.expected {
-			t.Errorf("For char %q: expected %v, got %v", tt.char, tt.expected, result)
-		}
-	}
-}
-
 func TestFormatSlackResponse(t *testing.T) {
 	t.Run("valid result", func(t *testing.T) {
 		result := &AnalysisResult{

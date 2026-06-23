@@ -62,7 +62,7 @@ package main
 import (
     "fmt"
     "os"
-    "github.com/oramraz/prow-analyzer/pkg/analyzer"
+    "github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/analyzer"
 )
 
 func main() {

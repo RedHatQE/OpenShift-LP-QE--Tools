@@ -30,22 +30,22 @@ cd "$(dirname "$0")/.."
 cat > "$tmpExtractGo" << 'GOEOF'
 package main
 import (
-	"fmt"
-	"os"
-	"github.com/oramraz/prow-analyzer/pkg/analyzer"
+    "fmt"
+    "os"
+    "github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/analyzer"
 )
 func main() {
-	url := analyzer.ExtractProwURL(os.Args[1])
-	if url != "" {
-		fmt.Printf("✅ URL detected: %s\n", url)
-	} else {
-		fmt.Println("❌ No Prow URL found")
-	}
+    url := analyzer.ExtractProwURL(os.Args[1])
+    if url != "" {
+        fmt.Printf("✅ URL detected: %s\n", url)
+    } else {
+        fmt.Println("❌ No Prow URL found")
+    }
 }
 GOEOF
 
 typeset extractedURL
-extractedURL=$(go run "$tmpExtractGo" "${slackMessage}" 2>/dev/null | grep -oP 'https://[^\s]+')
+extractedURL=$(/usr/local/go/bin/go run "$tmpExtractGo" "${slackMessage}" 2>/dev/null | grep -oP 'https://[^\s]+')
 
 # Step 2: Analysis (what the bot does in background)
 : 'Step 2: Bot analyzes URL via ship-help MCP...'

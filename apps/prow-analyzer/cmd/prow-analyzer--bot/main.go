@@ -3,16 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
-	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	"github.com/slack-go/slack/socketmode"
 
-	"github.com/oramraz/prow-analyzer/pkg/analyzer"
-	"github.com/oramraz/prow-analyzer/pkg/slack/handler"
+	"github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/analyzer"
+	"github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/slack/handler"
 )
 
 func main() {
@@ -29,16 +29,20 @@ func main() {
 
 	// Validate required flags
 	if *slackToken == "" {
-		logrus.Fatal("--slack-token is required (or set SLACK_BOT_TOKEN)")
+		slog.Error("--slack-token is required (or set SLACK_BOT_TOKEN)")
+		os.Exit(1)
 	}
 	if *appToken == "" {
-		logrus.Fatal("--app-token is required (or set SLACK_APP_TOKEN)")
+		slog.Error("--app-token is required (or set SLACK_APP_TOKEN)")
+		os.Exit(1)
 	}
 	if *mcpURL == "" || *mcpToken == "" {
-		logrus.Fatal("Both --mcp-url and --mcp-token are required (or set SHIP_HELP_MCP_URL and SHIP_HELP_MCP_TOKEN)")
+		slog.Error("Both --mcp-url and --mcp-token are required (or set SHIP_HELP_MCP_URL and SHIP_HELP_MCP_TOKEN)")
+		os.Exit(1)
 	}
 	if *channels == "" {
-		logrus.Fatal("--channels is required (or set MONITORED_CHANNELS)")
+		slog.Error("--channels is required (or set MONITORED_CHANNELS)")
+		os.Exit(1)
 	}
 
 	// Parse monitored channels
@@ -47,8 +51,8 @@ func main() {
 		monitoredChannels[i] = strings.TrimSpace(monitoredChannels[i])
 	}
 
-	logrus.Infof("Starting prow-analyzer-bot")
-	logrus.Infof("Monitoring channels: %v", monitoredChannels)
+	slog.Info("Starting prow-analyzer-bot")
+	slog.Info("Monitoring channels", "channels", monitoredChannels)
 
 	// Create Slack client
 	slackClient := slack.New(
@@ -74,16 +78,16 @@ func main() {
 			case socketmode.EventTypeEventsAPI:
 				eventsAPIEvent, ok := evt.Data.(slackevents.EventsAPIEvent)
 				if !ok {
-					logrus.Warnf("Ignored %+v", evt)
+					slog.Warn("Ignored event", "event", evt)
 					continue
 				}
 
 				socketClient.Ack(*evt.Request)
 
-				logger := logrus.WithField("type", eventsAPIEvent.Type)
+				logger := slog.With("type", eventsAPIEvent.Type)
 				handled, err := h.Handle(&eventsAPIEvent, logger)
 				if err != nil {
-					logger.WithError(err).Error("Failed to handle event")
+					logger.Error("Failed to handle event", "error", err)
 				} else if handled {
 					logger.Info("Event handled")
 				}
@@ -93,6 +97,7 @@ func main() {
 
 	fmt.Println("Prow analyzer bot is running...")
 	if err := socketClient.Run(); err != nil {
-		logrus.Fatalf("Socket mode error: %v", err)
+		slog.Error("Socket mode error", "error", err)
+		os.Exit(1)
 	}
 }
