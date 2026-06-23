@@ -665,9 +665,10 @@ func TestErrorInjection(t *testing.T) {
 			t.Errorf("Expected temporary network error, got: %v", err)
 		}
 
-		// Second call should retry initialization and succeed (would fail if error was cached)
-		if callCount != 1 {
-			t.Errorf("Expected 1 init attempt, got %d", callCount)
+		// Second call should retry initialization (would be skipped if failure were cached)
+		_, _ = analyzer.AnalyzeFailure(context.Background(), "url")
+		if callCount < 2 {
+			t.Errorf("Expected retry to trigger another HTTP call, got %d total calls", callCount)
 		}
 	})
 }
