@@ -9,7 +9,7 @@ function EnsureReqs () {
 #   Usage:
 #       eval "$(
 #           typeset -a _fURL=()
-#           type -t wget 1>/dev/null && _fURL=(wget -qO-) || _fURL=(curl -fsSL)
+#           type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
 #           "${_fURL[@]}" \
 #       https://<urlAuthToRawContent>/<urlPathToRawContents...>\
 #       <repoPaths...>/EnsureReqs.sh
@@ -26,7 +26,7 @@ function EnsureReqs () {
 
     typeset -a _fURL=()
 
-    type -t wget 1>/dev/null && _fURL=(wget -qO) || _fURL=(curl -fsSLo)
+    type -t wget 1>/dev/null && _fURL=(wget -nv -O) || _fURL=(curl -fsSLo)
     PATH="$(exec 3>&1 1>&2
         typeset binDir="/tmp/bin" toolName=
         mkdir -p "${binDir}"
