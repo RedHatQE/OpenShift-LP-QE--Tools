@@ -18,7 +18,6 @@ func main() {
 
 	defaultUsage := flag.Usage
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [flags] analyze <prow-url>\n\n", os.Args[0])
 		defaultUsage()
 		fmt.Fprintf(flag.CommandLine.Output(), "\n\nEnvironment variables:\n")
 		fmt.Fprintf(flag.CommandLine.Output(), "  SHIP_HELP_MCP_URL    Ship-help MCP endpoint\n")

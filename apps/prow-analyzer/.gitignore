@@ -1,18 +1,12 @@
-# Binaries
+# Go binaries
 prow-analyzer--cli
 prow-analyzer--bot
 *.test
 
-# Coverage and temporary files
+# Coverage
 *.out
-*.tmp
 coverage.html
 
-# Dependency and workspace
+# Go workspace/dependency
 vendor/
 go.work
-
-# IDE and OS
-.vscode/
-.idea/
-.DS_Store

@@ -57,7 +57,13 @@ func (h *handler) Handle(callback *slackevents.EventsAPIEvent, logger *slog.Logg
 		// Analyze async (can take 30-60s)
 		go h.analyzeAndRespond(event, prowURL, logger)
 	default:
-		logger.Warn("Prow analyzer queue full, dropping request")
+		logger.Info("Prow analyzer queue full, dropping request")
+		// Inform the requester via Slack that the queue is full
+		_, _, _ = h.client.PostMessage(
+			event.Channel,
+			slack.MsgOptionText("⚠️ Analysis queue is currently full. Please retry in a moment.", false),
+			slack.MsgOptionTS(event.TimeStamp),
+		)
 	}
 
 	return true, nil
