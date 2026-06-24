@@ -196,7 +196,7 @@ func ExtractProwURL(text string) string {
 	if match == nil {
 		return ""
 	}
-	return match[1]
+	return strings.TrimRight(match[1], ".")
 }
 
 // ContainsProwURL checks if a message contains a Prow URL
