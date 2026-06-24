@@ -27,7 +27,7 @@ func main() {
 	flag.CommandLine.SetOutput(os.Stdout)
 	flag.Parse()
 
-	if len(flag.Args()) < 2 {
+	if len(flag.Args()) != 2 {
 		flag.CommandLine.SetOutput(os.Stderr)
 		flag.Usage()
 		os.Exit(1)
