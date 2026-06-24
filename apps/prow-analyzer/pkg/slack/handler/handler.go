@@ -59,11 +59,14 @@ func (h *handler) Handle(callback *slackevents.EventsAPIEvent, logger *slog.Logg
 	default:
 		logger.Info("Prow analyzer queue full, dropping request")
 		// Inform the requester via Slack that the queue is full
-		_, _, _ = h.client.PostMessage(
+		_, _, postErr := h.client.PostMessage(
 			event.Channel,
 			slack.MsgOptionText("⚠️ Analysis queue is currently full. Please retry in a moment.", false),
 			slack.MsgOptionTS(event.TimeStamp),
 		)
+		if postErr != nil {
+			logger.Error("Failed to post error message to user", "error", postErr)
+		}
 	}
 
 	return true, nil

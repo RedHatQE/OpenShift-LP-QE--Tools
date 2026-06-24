@@ -186,8 +186,8 @@ var prowURLPattern = regexp.MustCompile(
 	`(https://(?:` +
 		`prow\.ci\.openshift\.org/(?:view/gs/|\?pr=)|` +
 		`deck-internal-ci\.apps\.ci\.l2s4\.p1\.openshiftapps\.com/` +
-		// Stops at Slack (`<url|label>`) and Markdown (`[label](url)`) delimiters; `\s` covers whitespace-terminated URLs; and `\.?` covers the normal period-terminated sentence.
-		`)[^|\s)>]+)\.?`,
+	// Stops at Slack (`<url|label>`) and Markdown (`[label](url)`) delimiters; `\s` covers whitespace-terminated URLs; and `\.?` covers the normal period-terminated sentence.
+	`)[^|\s)>]+)\.?`,
 )
 
 // ExtractProwURL extracts a Prow job URL from a message
