@@ -35,6 +35,28 @@ Repository for OpenShift Layered Product Quality Engineering Tooling.
 └── tools/                              # Repository maintenance scripts.
 ```
 
+## Applications
+
+### [prow-analyzer](apps/prow-analyzer/)
+Automated Prow CI failure analysis using Red Hat's ship-help MCP (AI helpdesk).
+
+**Features:**
+- CLI tool for manual Prow URL analysis
+- Slack bot for automated channel monitoring
+- Integrates with ship-help MCP (9+ data sources: Jira, GitHub, Firewatch, build logs)
+- Reduces failure triage from 30-60 minutes to 2 minutes
+
+**Quick Start:**
+```bash
+cd apps/prow-analyzer
+go build ./cmd/prow-analyzer--cli
+export SHIP_HELP_MCP_URL="https://<your-mcp-endpoint>"
+export SHIP_HELP_MCP_TOKEN="<your-token>"
+./prow-analyzer--cli analyze <prow-url>
+```
+
+See [apps/prow-analyzer/README.md](apps/prow-analyzer/README.md) for full documentation.
+
 ## Directory Conventions
 ### `apps/`
 Application code organized by application name. Each application is self-contained with its own source, tests, and documentation.

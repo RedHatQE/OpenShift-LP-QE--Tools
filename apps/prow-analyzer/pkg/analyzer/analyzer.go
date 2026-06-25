@@ -1,0 +1,290 @@
+// Package analyzer provides test failure analysis using ship-help MCP
+package analyzer
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"regexp"
+	"strings"
+	"sync"
+	"time"
+)
+
+// HTTPDoer interface allows mocking of HTTP client
+type HTTPDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// Analyzer provides test failure analysis using ship-help MCP
+type Analyzer struct {
+	mcpURL        string
+	token         string
+	client        HTTPDoer
+	template      string
+	sessionID     string // MCP session ID
+	sessionMtx    sync.Mutex
+	initMtx       sync.Mutex
+	initialized   bool
+	jsonMarshal   func(v interface{}) ([]byte, error)
+	newRequest    func(ctx context.Context, method, url string, body io.Reader) (*http.Request, error)
+}
+
+// NewAnalyzer creates a new Analyzer instance
+func NewAnalyzer(mcpURL, token, promptTemplate string) *Analyzer {
+	return &Analyzer{
+		mcpURL:   mcpURL,
+		token:    token,
+		template: promptTemplate,
+		client: &http.Client{
+			Timeout: 240 * time.Second, // Ship-help analysis can take 3-4 minutes
+		},
+		jsonMarshal: json.Marshal,
+		newRequest:  http.NewRequestWithContext,
+	}
+}
+
+// MCPRequest represents an MCP JSON-RPC request
+type MCPRequest struct {
+	JSONRPC string      `json:"jsonrpc"`
+	ID      int         `json:"id"`
+	Method  string      `json:"method"`
+	Params  interface{} `json:"params"`
+}
+
+// ToolCallParams represents parameters for calling an MCP tool
+type ToolCallParams struct {
+	Name      string                 `json:"name"`
+	Arguments map[string]interface{} `json:"arguments"`
+}
+
+// MCPResponse represents an MCP JSON-RPC response
+type MCPResponse struct {
+	JSONRPC string `json:"jsonrpc"`
+	ID      int    `json:"id"`
+	Result  struct {
+		Content []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		} `json:"content"`
+	} `json:"result"`
+	Error *struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	} `json:"error,omitempty"`
+}
+
+// AnalysisResult contains the result of a failure analysis
+type AnalysisResult struct {
+	JobURL   string
+	Analysis string
+	Duration time.Duration
+	Error    error
+}
+
+// AnalyzeFailure analyzes a Prow CI job failure using ship-help MCP
+func (a *Analyzer) AnalyzeFailure(ctx context.Context, jobURL string) (*AnalysisResult, error) {
+	startTime := time.Now()
+
+	// Initialize MCP session if needed (only caches successful initialization)
+	a.initMtx.Lock()
+	if !a.initialized {
+		if err := a.initializeSession(ctx); err != nil {
+			a.initMtx.Unlock()
+			return nil, fmt.Errorf("initialize session: %w", err)
+		}
+		a.initialized = true
+	}
+	a.initMtx.Unlock()
+
+	// Build prompt using the configured template
+	prompt := strings.ReplaceAll(a.template, "{job_url}", jobURL)
+
+	// Call ship-help MCP tools/call method
+	reqBody := MCPRequest{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "tools/call",
+		Params: map[string]interface{}{
+			"name": "ask_persona",
+			"arguments": map[string]interface{}{
+				"question": prompt,
+			},
+		},
+	}
+
+	jsonData, err := a.jsonMarshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := a.newRequest(ctx, "POST", a.mcpURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+a.token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+
+	a.sessionMtx.Lock()
+	sessionID := a.sessionID
+	a.sessionMtx.Unlock()
+	req.Header.Set("Mcp-Session-Id", sessionID)
+
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("send request: %w", err)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	// Check HTTP status code before parsing JSON
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Parse SSE response (ship-help MCP returns text/event-stream format)
+	sseData := parseSSEMessage(string(body))
+	if sseData == "" {
+		return nil, fmt.Errorf("no JSON data in SSE response: %s", string(body))
+	}
+
+	// Parse MCP response
+	var mcpResp MCPResponse
+	if err := json.Unmarshal([]byte(sseData), &mcpResp); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+
+	// Check for errors
+	if mcpResp.Error != nil {
+		return nil, fmt.Errorf("MCP error %d: %s", mcpResp.Error.Code, mcpResp.Error.Message)
+	}
+
+	// Extract analysis text
+	if len(mcpResp.Result.Content) == 0 {
+		return nil, fmt.Errorf("no content in response")
+	}
+
+	analysis := mcpResp.Result.Content[0].Text
+
+	return &AnalysisResult{
+		JobURL:   jobURL,
+		Analysis: analysis,
+		Duration: time.Since(startTime),
+	}, nil
+}
+
+var prowURLPattern = regexp.MustCompile(
+	`(https://(?:` +
+		`prow\.ci\.openshift\.org/(?:view/gs/|\?pr=)|` +
+		`deck-internal-ci\.apps\.ci\.l2s4\.p1\.openshiftapps\.com/` +
+	// Stops at Slack (`<url|label>`) and Markdown (`[label](url)`) delimiters; `\s` covers whitespace-terminated URLs; and `\.?` covers the normal period-terminated sentence.
+	`)[^|\s)>]+)\.?`,
+)
+
+// ExtractProwURL extracts a Prow job URL from a message
+func ExtractProwURL(text string) string {
+	match := prowURLPattern.FindStringSubmatch(text)
+	if match == nil {
+		return ""
+	}
+	return strings.TrimRight(match[1], ".")
+}
+
+// ContainsProwURL checks if a message contains a Prow URL
+func ContainsProwURL(text string) bool {
+	return ExtractProwURL(text) != ""
+}
+
+// FormatSlackResponse formats the analysis for Slack using Block Kit
+// Returns a simple text message since we're posting in a thread
+func FormatSlackResponse(result *AnalysisResult) string {
+	// Guard against nil result to prevent panic
+	if result == nil {
+		return "❌ Error: Unable to format analysis (nil result)"
+	}
+
+	// Format as markdown text for thread reply
+	return fmt.Sprintf("🔍 *Prow Analyzer Analysis*\n\n%s\n\n_Analysis completed in %.1fs • Powered by ship-help MCP_",
+		result.Analysis,
+		result.Duration.Seconds(),
+	)
+}
+
+// initializeSession initializes an MCP session and stores the session ID
+func (a *Analyzer) initializeSession(ctx context.Context) error {
+	// Create initialize request with required MCP protocol params
+	reqBody := MCPRequest{
+		JSONRPC: "2.0",
+		ID:      0,
+		Method:  "initialize",
+		Params: map[string]interface{}{
+			"protocolVersion": "2024-11-05",
+			"capabilities":    map[string]interface{}{},
+			"clientInfo": map[string]interface{}{
+				"name":    "prow-analyzer",
+				"version": "1.0",
+			},
+		},
+	}
+
+	jsonData, err := a.jsonMarshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("marshal init request: %w", err)
+	}
+
+	req, err := a.newRequest(ctx, "POST", a.mcpURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("create init request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+a.token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("send init request: %w", err)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return fmt.Errorf("read response: %w", err)
+	}
+
+	// Check HTTP status code first
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("init request failed (HTTP %d): %s", resp.StatusCode, string(body))
+	}
+
+	// Extract session ID from response header
+	sessionID := resp.Header.Get("Mcp-Session-Id")
+	if sessionID == "" {
+		return fmt.Errorf("no session ID in response (HTTP %d): %s", resp.StatusCode, string(body))
+	}
+
+	a.sessionMtx.Lock()
+	a.sessionID = sessionID
+	a.sessionMtx.Unlock()
+	return nil
+}
+
+// parseSSEMessage extracts JSON data from Server-Sent Events response
+// SSE format: "event: message\ndata: {json}\n\n" or "data:{json}\n\n"
+func parseSSEMessage(body string) string {
+	for _, line := range strings.Split(body, "\n") {
+		if data, found := strings.CutPrefix(line, "data:"); found {
+			return strings.TrimSpace(data)
+		}
+	}
+	return ""
+}

@@ -1,0 +1,12 @@
+# Go binaries
+prow-analyzer--cli
+prow-analyzer--bot
+*.test
+
+# Coverage
+*.out
+coverage.html
+
+# Go workspace/dependency
+vendor/
+go.work
