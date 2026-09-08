@@ -70,6 +70,21 @@ else
   warns+=("no Minidump directory found")
 fi
 
+# Event log files (.evtx) for offline crash-event parsing
+typeset evtxDir="${winRoot}/System32/winevt/Logs"
+typeset -a evtxTargets=("System.evtx" "Application.evtx")
+mkdir -p "${out}/winevt" 2>/dev/null || true
+for evtxName in "${evtxTargets[@]}"; do
+  if CopyOut "System32/winevt/Logs/${evtxName}"; then
+    # virt-copy-out preserves the path structure; move to our flat winevt/ dir
+    typeset srcEvtx="${out}/${evtxName}"
+    [[ -f "${srcEvtx}" ]] && mv "${srcEvtx}" "${out}/winevt/${evtxName}" 2>/dev/null || true
+    found+=("winevt/${evtxName}")
+  else
+    warns+=("${evtxName} not found at ${evtxDir}")
+  fi
+done
+
 typeset filesJson=''
 filesJson="$(printf '%s\n' "${found[@]:-}" | jq -R . | jq -s 'map(select(length>0))')"
 typeset warnJson=''
