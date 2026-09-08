@@ -18,7 +18,9 @@ exec {BASH_XTRACEFD}>/dev/null
 typeset disk=''
 typeset out='/out'
 typeset winRoot='/Windows'
+# Warn — print a diagnostic message to stderr.
 function Warn () { echo "extract-dump: $*" >&2; true; }
+# Emit — write the final JSON result object to stdout.
 function Emit () {
   printf '{"ok":%s,"disk":%s,"outputDir":%s,"dumpFiles":%s,"warnings":%s}\n' \
     "$1" "$(jq -Rn --arg v "${disk}" '$v')" "$(jq -Rn --arg v "${out}" '$v')" \
@@ -46,6 +48,7 @@ typeset -a found=()
 
 # Locate the Windows partition automatically; -i inspects the OS layout.
 # virt-copy-out reads read-only by default.
+# CopyOut — copy a file from the guest disk image to the output directory.
 function CopyOut () {
   typeset src="${winRoot}/$1"
   if virt-ls -a "${disk}" "${src}" >/dev/null 2>&1; then

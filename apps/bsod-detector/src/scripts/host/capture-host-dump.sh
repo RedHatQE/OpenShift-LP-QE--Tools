@@ -34,8 +34,11 @@ export LIBVIRT_DEFAULT_URI="${LIBVIRT_DEFAULT_URI:-qemu:///system}"
 typeset vm=""
 typeset outDir=""
 
+# Warn — print a diagnostic message to stderr.
 function Warn () { echo "capture-host-dump: $*" >&2; true; }
+# Die — print a fatal error to stderr and exit.
 function Die ()  { Warn "$*"; exit 2; }
+# Have — return 0 if the named command is available on PATH.
 function Have () { command -v "$1" >/dev/null 2>&1; }
 
 # Emit a JSON failure object to stdout and exit 1.
@@ -91,7 +94,7 @@ if [[ ! -f "${elfFile}" ]]; then
   EmitFailure "virsh dump completed but ELF file not found at ${elfFile}"
 fi
 
-chmod u+rw "${elfFile}" 2>/dev/null || warnings+=("could not fix permissions on ${elfFile}; elf2dmp may fail")
+chmod u+rw "${elfFile}" 2>/dev/null || warnings+=("could not fix permissions on ${elfFile}")
 
 typeset elfSize=''
 elfSize="$(stat -c%s "${elfFile}" 2>/dev/null)" || elfSize="unknown"

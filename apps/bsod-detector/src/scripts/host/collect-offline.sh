@@ -54,6 +54,7 @@ done
 
 mkdir -p "${outDir}"
 
+# Log — print a timestamped diagnostic message to stderr.
 function Log () { echo "[collect-offline] $*" >&2; true; }
 
 typeset -a warnings=()
@@ -86,6 +87,7 @@ if [[ -z "${disk}" ]]; then
   disk="$(GuestDisk "${vm}")" || true
 fi
 
+# shellcheck disable=SC2034  # extractOk/extractJson reserved for future use
 typeset extractOk=false
 typeset extractJson=""
 if [[ -z "${disk}" ]]; then
@@ -145,6 +147,7 @@ Log "collecting host-side signals"
 
 # --- Phase 7: Assemble evidence summary ---
 Log "assembling evidence summary"
+# shellcheck disable=SC2034  # hasScreenshot reserved for screenshot capture phase
 typeset hasScreenshot=false
 typeset hasHostSignals=false
 [[ -s "${outDir}/host-signals.json" ]] && hasHostSignals=true

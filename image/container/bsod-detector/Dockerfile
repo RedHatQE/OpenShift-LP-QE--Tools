@@ -11,6 +11,7 @@
 #   - qemu-img         : inspect/convert disk images
 #   - libvirt-client   : virsh, to query guest state (via mounted socket)
 #   - python3          : dump-header parsing helpers
+#   - python-evtx      : offline Windows .evtx event log parsing
 #
 # Build:  podman build -t bsod-host-tools host-tools/
 # Run:    use host-tools/run.sh (wires up the right mounts).
@@ -22,7 +23,9 @@ RUN microdnf install -y \
         qemu-img \
         libvirt-client \
         python3 \
+        python3-pip \
         jq \
+    && pip3 install --no-cache-dir python-evtx \
     && microdnf clean all
 
 # libguestfs runs its own tiny KVM appliance; allow TCG fallback when the

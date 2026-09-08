@@ -26,11 +26,11 @@ folder — use `../watch-crash.sh` and friends instead.
 The host-side harnesses drive a local libvirt test VM using utilities that live
 in the parent `src/scripts/` (they are shared with, or generic to, the detector):
 
-- `../vmctl.sh` + `../bsod-test.domain.xml` — define/snapshot/revert the golden VM.
-- `../guest-ssh.sh` — run PowerShell in the guest over SSH.
-- `../install-ssh-key.ps1` — provision key auth in the guest.
-- `../collect-all.sh` — evidence collection (invoked by `run-dry-run.sh`).
-- `../../data/trigger-methods.json` — per-code `KeBugCheckEx` parameters.
+- `../host/vmctl.sh` + `../host/bsod-test.domain.xml` — define/snapshot/revert the golden VM.
+- `../host/guest-ssh.sh` — run PowerShell in the guest over SSH (trigger-only, not collection).
+- `../host/collect-all.sh` — legacy evidence collection (invoked by `run-dry-run.sh`).
+- `../host/collect-offline.sh` — offline-first evidence collection.
+- `../../../src/data/trigger-methods.json` — per-code `KeBugCheckEx` parameters.
 
 ## Test VM model
 
@@ -69,24 +69,18 @@ system-managed (~8 GB), the CrashMe driver staged in `C:\Tools`, the project
 installed, and Driver Verifier enabled. To rebuild from scratch:
 
 ```bash
-./src/scripts/vmctl.sh start
-./src/scripts/guest-ssh.sh -f src/scripts/crash-injector/prep-guest.ps1   # idempotent
-./src/scripts/guest-ssh.sh -c 'Restart-Computer -Force'                   # activates page file
-./src/scripts/vmctl.sh stop
-virsh snapshot-delete bsod-test clean-baseline; ./src/scripts/vmctl.sh snapshot
-```
-
-To re-provision key auth on a fresh guest:
-
-```bash
-./src/scripts/guest-ssh.sh -f src/scripts/install-ssh-key.ps1 -- "-PublicKey '$(cat .ssh/bsod-test.pub)'"
+./src/scripts/host/vmctl.sh start
+./src/scripts/host/guest-ssh.sh -f src/scripts/crash-injector/prep-guest.ps1   # idempotent
+./src/scripts/host/guest-ssh.sh -c 'Restart-Computer -Force'                   # activates page file
+./src/scripts/host/vmctl.sh stop
+virsh snapshot-delete bsod-test clean-baseline; ./src/scripts/host/vmctl.sh snapshot
 ```
 
 ## Recreating the VM from scratch
 
 ```bash
-./src/scripts/vmctl.sh define      # (re)define domain from ../bsod-test.domain.xml
-./src/scripts/vmctl.sh start
+./src/scripts/host/vmctl.sh define      # (re)define domain from host/bsod-test.domain.xml
+./src/scripts/host/vmctl.sh start
 ```
 
 The domain XML references a disk at `/var/lib/libvirt/images/bsod-test.qcow2`

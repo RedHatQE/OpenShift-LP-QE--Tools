@@ -524,7 +524,7 @@ function RunTrigger () {
     domState="$(virsh domstate "${vmName}" 2>/dev/null)" || domState="unknown"
 
     if [[ "${domState}" == "crashed" || "${domState}" == "paused" ]]; then
-      : "[${triggerId}] domain preserved; attempting host-side elf2dmp"
+      : "[${triggerId}] domain preserved; attempting host-side raw memory capture"
       typeset chaosDir="output/chaos-${triggerId}"
       mkdir -p "${chaosDir}"
       "${repoDir}/src/scripts/capture-host-dump.sh" --vm "${vmName}" --out "${chaosDir}" \

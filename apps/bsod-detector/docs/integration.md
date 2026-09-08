@@ -271,7 +271,10 @@ These are set by `src/scripts/crash-injector/prep-guest.ps1` and baked into the 
   `podman build -t bsod-host-tools -f image/container/bsod-detector/Dockerfile apps/bsod-detector`
 - The guest disk must be **readable** by the invoking user and the VM **shut off**.
 
-**Guest script deployment:** Copy `src/scripts/collect-guest.ps1` (and its `lib/` directory) to `C:\bsod-detector\scripts` on the guest, and `src/data/` to `C:\bsod-detector\data`, before the test run. The CI example above assumes this layout.
+**Guest script deployment:** In the offline-first flow, no guest-side scripts
+need to be staged. Evidence (dumps, event logs) is extracted from the guest
+disk after the VM is stopped. Only the CrashMe driver needs to be pre-installed
+for deliberate crash testing (see `crash-injector/prep-guest.ps1`).
 
 ---
 

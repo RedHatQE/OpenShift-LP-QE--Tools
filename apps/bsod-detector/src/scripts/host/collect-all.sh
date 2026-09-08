@@ -15,7 +15,7 @@
 #
 # Outputs: <out>/ containing:
 #   bsod-screenshot.png    - framebuffer capture (best frame from rapid burst)
-#   host-crash.dmp         - host-side WinDbg dump via elf2dmp (when VM preserved)
+#   guest-memory.elf       - host-side raw memory capture (when VM preserved)
 #   collect-guest.json     - structured guest-side report
 #   host-signals.json      - host-side kernel log + hyperv evidence
 #   Minidump/*.dmp         - crash dump files copied from guest
@@ -68,7 +68,7 @@ if [[ "${domState}" == "crashed" || "${domState}" == "paused" ]]; then
   kill "${capturePid}" 2>/dev/null || true
   wait "${capturePid}" 2>/dev/null || true
 
-  Log "domain is preserved; attempting host-side memory dump via elf2dmp"
+  Log "domain is preserved; capturing raw memory via virsh dump"
   if "${scriptDir}/capture-host-dump.sh" --vm "${vm}" --out "${outDir}" > "${outDir}/capture-host-dump.json"; then
     if [[ -f "${outDir}/guest-memory.elf" ]]; then
       Log "host-side raw memory captured: guest-memory.elf"
