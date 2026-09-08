@@ -70,8 +70,8 @@ if [[ "${domState}" == "crashed" || "${domState}" == "paused" ]]; then
 
   Log "domain is preserved; attempting host-side memory dump via elf2dmp"
   if "${scriptDir}/capture-host-dump.sh" --vm "${vm}" --out "${outDir}" > "${outDir}/capture-host-dump.json"; then
-    if [[ -f "${outDir}/host-crash.dmp" ]]; then
-      Log "host-side dump captured: host-crash.dmp"
+    if [[ -f "${outDir}/guest-memory.elf" ]]; then
+      Log "host-side raw memory captured: guest-memory.elf"
     fi
   else
     Log "WARNING: host-side dump failed (see capture-host-dump.json for details)"
@@ -166,7 +166,7 @@ if [[ -f "${outDir}/MEMORY.DMP" ]]; then
   dumpFiles+=("MEMORY.DMP")
 fi
 
-typeset hasHostDump=false; [[ -f "${outDir}/host-crash.dmp" ]] && hasHostDump=true
+typeset hasHostDump=false; [[ -f "${outDir}/guest-memory.elf" ]] && hasHostDump=true
 
 python3 - "${outDir}" "${hasScreenshot}" "${guestCollected}" "${hasHostSignals}" "${hasHostDump}" "${dumpFiles[@]}" <<'PY'
 import json, sys, os
@@ -199,7 +199,7 @@ summary = {
     "collectedAt": __import__("datetime").datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
     "artifacts": {
         "screenshot": "bsod-screenshot.png" if has_screenshot else None,
-        "hostDump": "host-crash.dmp" if has_host_dump else None,
+        "hostDump": "guest-memory.elf" if has_host_dump else None,
         "guestReport": "collect-guest.json" if guest_collected else None,
         "hostSignals": "host-signals.json" if has_host_signals else None,
         "dumpFiles": dump_files,
