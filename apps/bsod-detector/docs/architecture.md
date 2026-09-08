@@ -34,31 +34,35 @@ Both write into one shared evidence folder.
                     │   crash-dump settings · host signals           │
                     └──────────────────────────────────────────────┘
                          ▲  every script reads its tables here (no hard-coding)
-       ┌──────────────────┴───────────────────┐
-       │                                       │
-┌──────────────────────────┐      ┌────────────────────────────────────┐
-│  INSIDE the Windows guest │      │  OUTSIDE — on the Linux host / node  │
-│  (PowerShell)             │      │  (Bash)                              │
-│                           │      │                                      │
-│ • configure-dumps.ps1     │      │ • capture-vm-screen.sh   screenshot  │
-│     set up dump writing   │      │ • collect-host-signals.sh  ← TLB-    │
-│ • collect-guest.ps1       │      │     host-only split-lock/TLB signal  │
-│     pull dumps + events   │      │ • collect-from-host.(sh|ps1)         │
-│ • analyze-dump.ps1        │      │     detect freeze, recover dump      │
-│     deep symbolized       │      │ • parse-dump-header.sh               │
-│     analysis (MS debugger)│      │     read stop code, no debugger      │
-│                           │      │ • host-tools/ (libguestfs)           │
-│                           │      │     read dump off a disk image       │
-└──────────────────────────┘      └────────────────────────────────────┘
-       │                                       │
-       └──────────────►  ONE EVIDENCE FOLDER  ◄─┘
-             screenshot.png · *.dmp (dumps) · *.json (structured results)
+                         │
+      ┌──────────────────┴───────────────────────────────────┐
+      │  HOST-SIDE ONLY — on the Linux host / KubeVirt node    │
+      │  (Bash + Python)  src/scripts/host/                    │
+      │                                                        │
+      │ • collect-offline.sh      offline evidence orchestrator │
+      │ • capture-host-dump.sh    raw VM memory (ELF backup)   │
+      │ • capture-vm-screen.sh    BSOD screenshot              │
+      │ • collect-host-signals.sh TLB-flush / split-lock #AC   │
+      │ • parse-dump-header.sh    dump header (no debugger)     │
+      │ • extract-evtx.py        offline .evtx event parsing   │
+      │ • host-tools/ (libguestfs) disk extraction              │
+      │ • backends/dispatch.sh    KVM ↔ KubeVirt abstraction   │
+      └────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+                ONE EVIDENCE FOLDER
+      screenshot.png · *.dmp · *.evtx · *.json (structured)
 ```
 
-**Design choices to highlight:**
-- **One job per script**, each emits **exactly one JSON object** → automatable, consistent, no log-squinting.
-- **All lookup tables live in `data/`** → adding a new crash code is a *data* change, not a code change.
-- **Guest tools and host tools are separated** → host tools still work when the guest is dead or frozen.
+**Offline-first:** the guest is a pure crash target. After a BSOD, the host
+stops the VM, mounts the disk via guestfs, and extracts dumps + event logs
+offline. No guest-side scripts, SSH, or staging needed for evidence collection.
+
+**Design choices:**
+- **One job per script**, each emits **exactly one JSON object**.
+- **All lookup tables live in `data/`** → adding a new crash code is a *data* change.
+- **Backend-abstracted:** `BSOD_DET__HYP_PROV=kvm|kubevirt` selects virsh vs virtctl.
+- **AutoReboot=0:** Windows stays at the crash screen so the dump is fully written before the host stops the VM.
 
 ---
 
@@ -66,12 +70,14 @@ Both write into one shared evidence folder.
 
 | Stage | Tool | Output |
 |-------|------|--------|
-| BSOD / freeze **detection** | `collect-from-host.*` | is the guest crashed / hung / running? |
-| **Screenshot** capture | `capture-vm-screen.sh` | `screenshot.png` of the blue screen + stop code |
-| Crash **dump** collection | `collect-guest.ps1` / `host-tools/` | `MEMORY.DMP` + minidump |
-| Dump **analysis** | `parse-dump-header.sh`, `analyze-dump.ps1` | stop code, guilty driver, call stack |
-| Host-only **TLB-flush** signal | `collect-host-signals.sh` | split-lock `#AC` → HYPERVISOR_ERROR correlation |
-| **Evidence manifest** | (assembled) | `evidence-summary.json` tying it all together |
+| BSOD / freeze **detection** | `collect-from-host.sh`, `watch-crash.sh` | guest state: crashed / hung / running |
+| **Screenshot** capture | `capture-vm-screen.sh` | `bsod-screenshot.png` |
+| **Raw memory** backup | `capture-host-dump.sh` | `guest-memory.elf` (ELF) |
+| **Offline dump** extraction | `host-tools/extract-dump.sh` (guestfs) | `MEMORY.DMP` + `Minidump/*.dmp` |
+| **Offline event log** parsing | `extract-evtx.py` | crash detection from `.evtx` files |
+| Dump header **analysis** | `parse-dump-header.sh` | stop code + parameters (no debugger) |
+| Host-only **TLB-flush** signal | `collect-host-signals.sh` | split-lock `#AC` → HYPERVISOR_ERROR |
+| **Evidence orchestration** | `collect-offline.sh` | `evidence-summary.json` |
 
 ---
 

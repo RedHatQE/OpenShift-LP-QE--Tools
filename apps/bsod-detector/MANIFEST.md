@@ -1,94 +1,94 @@
 # bsod-detector — File Manifest
 
-A catalog of what ships in this tool and why each file is kept. The guiding
-split:
+A catalog of what ships in this tool and why each file is kept.
 
-- **The Catcher** — detect, capture, and analyze a *real, naturally-occurring*
-  BSOD/freeze on an OpenShift **KubeVirt** Windows VM. Everything in
-  `src/scripts/` (except the `crash-injector/` subfolder) serves this.
-- **The Pitcher** — *intentionally* crash a disposable test guest to validate the
-  Catcher. Quarantined under [`src/scripts/crash-injector/`](src/scripts/crash-injector/README.md).
+## Architecture
 
-Primary production path (OCP KubeVirt): `watch-crash.sh` → `guest-agent.py` →
-`collect-guest.ps1`/`compress-dump.ps1` → `analyze-dump.ps1`, using data files in
-`src/data/`.
+- **Offline-first:** the guest is a pure crash target. After a BSOD, the host
+  stops the VM, mounts the disk via guestfs, and extracts dumps + event logs
+  offline. No guest-side scripts, staging, or SSH needed for evidence collection.
+
+- **Backend-abstracted:** VM operations go through `backends/dispatch.sh` which
+  selects `kvm.sh` (virsh) or `kubevirt.sh` (virtctl/oc) based on
+  `BSOD_DET__HYP_PROV`.
 
 ---
 
-## src/scripts/ — detection & analysis toolkit (The Catcher)
+## src/scripts/host/ — host-side detection, collection, analysis
 
 ### Detect / watch
 | File | Description |
 |---|---|
-| `watch-crash.sh` | **Primary OCP entry point.** Watch a KubeVirt Windows VM for a natural BSOD/freeze (via the guest agent through the virt-launcher pod) and kick off evidence collection when one is seen. |
-| `collect-from-host.sh` | libvirt/KVM host-side BSOD/freeze detector + dump recovery — the local-VM counterpart to `watch-crash.sh` (used for development/validation on a libvirt host). |
-| `collect-host-signals.sh` | Capture Linux/KVM **host-side** crash-correlation signals (qemu/libvirt logs, dmesg, VM state) to pair with in-guest evidence. |
-| `collect-from-host.ps1` | Hyper-V host-side detector counterpart to `collect-guest.ps1`. **Not part of the OCP KubeVirt path** — kept for Windows/Hyper-V hosts only. |
+| `watch-crash.sh` | Primary KubeVirt entry point. Watch a Windows VM for a natural BSOD/freeze via the guest agent and collect evidence offline. |
+| `collect-from-host.sh` | Libvirt host-side BSOD/freeze detector + offline dump recovery. |
+| `collect-host-signals.sh` | Capture host-side crash-correlation signals (split-lock `#AC`, Hyper-V enlightenments). |
 
-### Access layer (guest ↔ host)
+### Collect / capture
 | File | Description |
 |---|---|
-| `guest-agent.py` | Drive a KubeVirt Windows guest via the qemu-guest-agent (maps `<ns>_<vm>` domain names, runs commands, moves files). Core of the no-SSH OCP access model. |
-| `guest-ssh.sh` | Run PowerShell in a guest over SSH robustly (EncodedCommand, CLIXML filtering). Used for the local libvirt test VM; shared with `crash-injector/`. |
-
-### Collect / capture evidence
-| File | Description |
-|---|---|
-| `collect-all.sh` | Host-side evidence-collection orchestrator that ties the guest + host collectors together. |
-| `collect-guest.ps1` | Collect BSOD post-mortem evidence from **inside** the guest after reboot (dump, event log, config). |
-| `capture-vm-screen.sh` | Rapid-fire VM framebuffer capture — grabs the BSOD screen as image evidence. |
-| `compress-dump.ps1` | Copy and compress `C:\Windows\MEMORY.DMP` for extraction over the guest agent. |
+| `collect-offline.sh` | **Primary orchestrator.** Stop VM → extract dumps+evtx via guestfs → parse → assemble evidence. |
+| `capture-host-dump.sh` | Raw VM memory capture via `virsh dump --memory-only` (ELF backup artifact). |
+| `capture-vm-screen.sh` | Rapid-fire VM framebuffer capture for BSOD screenshot. |
 
 ### Analyze
 | File | Description |
 |---|---|
-| `analyze-dump.ps1` | Symbolize a Windows crash dump and extract bucket ID, faulting image, and bug-check details. |
-| `parse-dump-header.sh` | Read the bug-check code and parameters straight from a Windows kernel dump header (no debugger needed). |
-| `test-bugcheck-lookup.ps1` | Self-test: verify the collector's bug-check parsing/lookup resolves every code in `src/data/`. |
+| `parse-dump-header.sh` | Read bug-check code and parameters from a Windows crash dump header (no debugger). |
+| `extract-evtx.py` | Parse offline-extracted `.evtx` event log files into crash-detection JSON. |
 
-### Configure guest for capture
+### Access / lifecycle
 | File | Description |
 |---|---|
-| `configure-dumps.ps1` | Configure Windows crash-dump settings so a dump is written on the next BSOD. |
-| `probe-dump-config.ps1` | Report the guest's current crash-dump configuration and dump inventory. |
-| `clear-dumps.ps1` | Delete existing crash dumps so a test captures only the new one. |
+| `guest-agent.py` | Drive a KubeVirt guest via the qemu-guest-agent. |
+| `guest-ssh.sh` | Run PowerShell in the guest over SSH. **Trigger-only** — not used for collection. |
+| `vmctl.sh` | Manage the local libvirt test VM and its snapshots. |
+| `bsod-test.domain.xml` | Libvirt domain definition for the golden test VM. |
 
-### Deploy / provision
+### Backend abstraction
 | File | Description |
 |---|---|
-| `stage-toolkit.ps1` | Unpack the uploaded toolkit archive into `C:\bsod-detector` in the guest. |
-| `install-debuggers.ps1` | Install the Windows Debugging Tools (cdb) in the guest for deep dump analysis. |
-| `install-ssh-key.ps1` | Install an SSH public key for passwordless admin login to the guest. |
+| `backends/dispatch.sh` | Source the correct backend based on `BSOD_DET__HYP_PROV`. |
+| `backends/kvm.sh` | virsh-based VM operations (tested). |
+| `backends/kubevirt.sh` | virtctl/oc-based VM operations (untested — requires live cluster). |
 
-### VM lifecycle (local test rig)
+---
+
+## src/scripts/guest/ — guest-side configuration (one-time setup)
+
 | File | Description |
 |---|---|
-| `vmctl.sh` | Manage the local libvirt test VM (`bsod-test`) and its `clean-baseline` snapshot: define / snapshot / revert / start / stop. Shared with `crash-injector/`. |
-| `bsod-test.domain.xml` | libvirt domain definition for the golden Windows test VM (Q35+UEFI, virtio, TPM, guest agent). Shared with `crash-injector/`. |
-
-### Shared library
-| File | Description |
-|---|---|
-| `lib/Common.ps1` | Shared PowerShell helpers (path resolution to repo/data dirs, logging) used by the collector/config scripts. |
+| `configure-dumps.ps1` | Configure CrashControl registry settings (`AutoReboot=0`, dump type). |
+| `clear-dumps.ps1` | Delete existing dumps before a test run. |
 
 ---
 
 ## src/data/ — reference data
-| File | Description |
+
+| File | Consumed by |
 |---|---|
-| `bugcheck-codes.json` | Bug-check code → human-readable name/description lookup. |
-| `crash-control.json` | Expected Windows CrashControl registry settings for a capture-ready guest. |
-| `event-sources.json` | Windows event-log sources relevant to crash/freeze correlation. |
-| `host-signals.json` | Host-side signals to collect and how to correlate them. |
-| `trigger-methods.json` | Per-`KeBugCheckEx` code parameters (also drives the injector's sweep). |
+| `bugcheck-codes.json` | parse-dump-header.sh, extract-evtx.py |
+| `crash-control.json` | configure-dumps.ps1, prep-guest.ps1 |
+| `event-sources.json` | extract-evtx.py |
+| `host-signals.json` | collect-host-signals.sh (host-only) |
+| `trigger-methods.json` | sweep-crashme.sh (host-only) |
+| `chaos-triggers.json` | sweep-chaos.sh (host-only) |
+| `blkdebug-read-errors.conf` | QEMU blkdebug chaos trigger (host-only) |
 
 ---
 
-## src/scripts/crash-injector/ — The Pitcher (intentional BSOD, test-only)
+## src/scripts/crash-injector/ — The Pitcher (test-only)
 
 Quarantined destructive tooling used only to validate the detector against a
 disposable snapshotted test VM. See
-[`src/scripts/crash-injector/README.md`](src/scripts/crash-injector/README.md)
-for the per-file breakdown (`trigger-bsod.ps1`, `setup-notmyfault.ps1`,
-`diag-critical-api.ps1`, `prep-guest.ps1`, `run-dry-run.sh`, `sweep-crashme.sh`,
-`test-driver/`).
+[`src/scripts/crash-injector/README.md`](src/scripts/crash-injector/README.md).
+
+---
+
+## host-tools/ — containerized offline extraction
+
+| File | Description |
+|---|---|
+| `extract-dump.sh` | (in-container) Extract MEMORY.DMP, minidumps, and .evtx files from a guest disk. |
+| `run.sh` | (host) `podman run` wrapper with correct mounts. |
+
+Container image definition: `image/container/bsod-detector/`.

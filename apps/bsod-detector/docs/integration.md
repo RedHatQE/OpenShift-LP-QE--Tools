@@ -234,25 +234,18 @@ For CI use, the trigger is gated by:
 ## Decision tree: which collection path?
 
 ```
-Guest rebooted after crash?
-  ├─ YES (SSH reachable)
-  │   └─ collect-guest.ps1    <- preferred; gets events + dumps + system context
-  │
-  └─ NO (frozen / boot loop / won't start)
-      └─ Is the disk image accessible from the host?
-          ├─ YES
-          │   └─ host-tools/extract-dump.sh  <- offline dump extraction
-          │       (only gets dump files; no event logs or system context)
-          │
-          └─ NO (remote host, cloud, no disk access)
-              └─ Manual intervention required
-                  (attach debugger, pull VHDX, or use cloud provider's
-                   serial console / crash dump facility)
+Crash detected (guest agent dead / domain crashed)?
+  └─ collect-offline.sh --vm <name> --out <dir>
+       1. Capture raw memory backup (guest-memory.elf)
+       2. Stop the VM (virsh destroy / virtctl stop --force)
+       3. Extract dumps + .evtx offline (guestfs)
+       4. Parse dump headers + event logs
+       5. Collect host-side signals
+       6. Assemble evidence-summary.json
 ```
 
-Always prefer the guest-side path when available — it captures the full picture
-(events, system context, timeline). The host-side path is a fallback that only
-recovers the raw dump files.
+The offline path is always preferred. It extracts crash dumps, event logs,
+and system context without needing guest-side scripts, SSH, or a reboot.
 
 ---
 
@@ -266,7 +259,7 @@ These are set by `src/scripts/crash-injector/prep-guest.ps1` and baked into the 
 |---|---|---|
 | `CrashDumpEnabled` | 2 (kernel) | Write a kernel dump on BSOD |
 | `AlwaysKeepMemoryDump` | 1 | Don't delete the dump on low disk |
-| `AutoReboot` | 1 | Reboot after crash so SSH comes back |
+| `AutoReboot` | 0 | Stay at crash screen so MEMORY.DMP is fully written; host extracts offline |
 | `LogEvent` | 1 | Log the BugCheck event (System/1001) |
 | Page file | System-managed; complete dumps require >= RAM + 257 MB | Kernel dumps need a page file on the system volume; complete dumps need one at least as large as physical RAM |
 | OpenSSH | Enabled, key auth | Remote access for automation |

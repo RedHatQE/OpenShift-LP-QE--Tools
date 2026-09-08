@@ -17,8 +17,9 @@ image bundles libguestfs, qemu-img, and libvirt-client for that purpose.
 
 ## Contents
 
-- `extract-dump.sh` — (runs in-container) copies `MEMORY.DMP` and
-  `Minidump\*.dmp` out of a disk image; emits one JSON result to stdout.
+- `extract-dump.sh` — (runs in-container) copies `MEMORY.DMP`,
+  `Minidump\*.dmp`, and `.evtx` event log files (System.evtx,
+  Application.evtx) out of a disk image; emits one JSON result to stdout.
 - `run.sh` — (runs on host) `podman run` wrapper wiring the correct mounts.
 
 The container **Dockerfile** and build **Makefile** live in the repo's image
