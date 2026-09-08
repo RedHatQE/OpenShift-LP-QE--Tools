@@ -5,10 +5,10 @@
 #   1. (optional) revert the guest to the crashme-installed snapshot
 #   2. start the guest and wait for SSH
 #   3. trigger a BSOD via the CrashMe driver with a specified code
-#   4. delegate to src/scripts/collect-all.sh for evidence collection
+#   4. delegate to src/scripts/host/collect-all.sh for evidence collection
 #   5. print summary
 #
-# All guest interaction goes through src/scripts/guest-ssh.sh (SSH key auth). Never
+# All guest interaction goes through src/scripts/host/guest-ssh.sh (SSH key auth). Never
 # point this at anything but a disposable/snapshotted test VM.
 #
 # Usage:
@@ -22,7 +22,7 @@ export LIBVIRT_DEFAULT_URI="${LIBVIRT_DEFAULT_URI:-qemu:///system}"
 typeset here; here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 typeset repo; repo="$(cd "${here}/../../.." && pwd)"   # crash-injector -> scripts -> src -> app root
 typeset vmName="${VM_NAME:-bsod-test}"
-typeset gssh="${repo}/src/scripts/guest-ssh.sh"
+typeset gssh="${repo}/src/scripts/host/guest-ssh.sh"
 typeset snapshot="${SNAPSHOT:-crashme-installed}"
 
 typeset code="0x19"
@@ -92,7 +92,7 @@ Log "triggering BSOD: ${codeNorm} ${params}"
 
 # --- Delegate all evidence collection to the detector ---
 Log "collecting evidence via collect-all.sh"
-"${repo}/src/scripts/collect-all.sh" \
+"${repo}/src/scripts/host/collect-all.sh" \
   --vm "${vmName}" \
   --out "${out}" \
   --ssh "${gssh}"

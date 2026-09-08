@@ -24,7 +24,7 @@ exec {BASH_XTRACEFD}>/dev/null
 set -euxo pipefail; shopt -s inherit_errexit
 
 typeset scriptDir; scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-typeset repoRoot; repoRoot="$(cd "${scriptDir}/../.." && pwd)"
+typeset repoRoot; repoRoot="$(cd "${scriptDir}/../../.." && pwd)"
 
 export LIBVIRT_DEFAULT_URI="${LIBVIRT_DEFAULT_URI:-qemu:///system}"
 

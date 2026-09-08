@@ -21,7 +21,7 @@ exec {BASH_XTRACEFD}>/dev/null
 set -euxo pipefail; shopt -s inherit_errexit
 
 typeset scriptDir; scriptDir="$(cd "$(dirname "$0")" && pwd)"
-typeset repoRoot; repoRoot="$(cd "${scriptDir}/../.." && pwd)"
+typeset repoRoot; repoRoot="$(cd "${scriptDir}/../../.." && pwd)"
 typeset codesFile="${repoRoot}/src/data/bugcheck-codes.json"
 
 function Die () { echo "parse-dump-header: $*" >&2; exit 2; }

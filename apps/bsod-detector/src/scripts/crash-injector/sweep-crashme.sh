@@ -32,7 +32,7 @@ function WaitSsh () {
   typeset max="${1:-30}"
   typeset _i=''
   while IFS= read -r _i; do
-    ./src/scripts/guest-ssh.sh -c '"up"' 2>/dev/null | grep -q up && return 0
+    ./src/scripts/host/guest-ssh.sh -c '"up"' 2>/dev/null | grep -q up && return 0
     sleep 8
   done < <(seq 1 "${max}")
   return 1
@@ -45,7 +45,7 @@ function CollectResult () {
   mkdir -p "${sweepDir}"
 
   typeset json=''
-  json=$(./src/scripts/guest-ssh.sh -c "& C:\\bsod-detector\\scripts\\collect-guest.ps1 -OutputDir C:\\bsod-detector\\output\\sweep-${codeHex}" 2>&1) || true
+  json=$(./src/scripts/host/guest-ssh.sh -c "& C:\\bsod-detector\\scripts\\collect-guest.ps1 -OutputDir C:\\bsod-detector\\output\\sweep-${codeHex}" 2>&1) || true
   if [[ -n "${json}" ]]; then
     echo "${json}" > "${sweepDir}/collect-guest.json"
     echo "${json}"
@@ -78,7 +78,7 @@ for entry in "${codes[@]}"; do
 
   : "[${codeUpper}] Starting CrashMe driver..."
   typeset scOut=''
-  scOut=$(./src/scripts/guest-ssh.sh -c 'sc.exe start CrashMe' 2>&1) || true
+  scOut=$(./src/scripts/host/guest-ssh.sh -c 'sc.exe start CrashMe' 2>&1) || true
   if echo "${scOut}" | grep -qi "RUNNING\|START_PENDING"; then
     : "[${codeUpper}] Driver running"
   else
@@ -86,7 +86,7 @@ for entry in "${codes[@]}"; do
   fi
 
   : "[${codeUpper}] Triggering BugCheck ${codeUpper} ${p1} ${p2} ${p3} ${p4}"
-  ./src/scripts/guest-ssh.sh -c "C:\\Tools\\crashme-ctl.exe ${code} ${p1} ${p2} ${p3} ${p4}" 2>&1 || true
+  ./src/scripts/host/guest-ssh.sh -c "C:\\Tools\\crashme-ctl.exe ${code} ${p1} ${p2} ${p3} ${p4}" 2>&1 || true
 
   : "[${codeUpper}] Waiting for reboot (~45s)..."
   sleep 45

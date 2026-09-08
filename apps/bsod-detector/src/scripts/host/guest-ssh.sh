@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # guest-ssh.sh - run PowerShell in the test guest over SSH, robustly.
 #
-# Runs on the HOST. Wraps sshpass + OpenSSH to execute PowerShell in the guest
+# Runs on the HOST. Used for CRASH TRIGGERING ONLY (crash-injector scripts),
+# NOT for evidence collection. Evidence is collected offline via guestfs after
+# the VM is stopped.
+#
+# Wraps sshpass + OpenSSH to execute PowerShell in the guest
 # using -EncodedCommand (base64/UTF-16LE) so quoting is never an issue, and
 # filters out PowerShell's CLIXML/progress noise so stdout is clean.
 #
@@ -24,7 +28,7 @@ export LIBVIRT_DEFAULT_URI="${LIBVIRT_DEFAULT_URI:-qemu:///system}"
 typeset GUEST_USER="${GUEST_USER:-Administrator}"
 typeset VM_NAME="${VM_NAME:-bsod-test}"
 typeset scriptDir=""; scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-typeset GUEST_KEY="${GUEST_KEY:-${scriptDir}/../../.ssh/bsod-test}"   # src/scripts -> src -> app root/.ssh
+typeset GUEST_KEY="${GUEST_KEY:-${scriptDir}/../../../.ssh/bsod-test}"   # src/scripts/host -> src/scripts -> src -> app root/.ssh
 
 function Die () { echo "guest-ssh: $*" >&2; exit 1; }
 

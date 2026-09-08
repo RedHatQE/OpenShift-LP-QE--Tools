@@ -3,6 +3,18 @@
 Shared lookup tables. Scripts **read** these; they never inline or duplicate the
 values. If a table is wrong, fix it here once and every consumer picks it up.
 
+## Consumer context
+
+| File | Consumed by |
+|---|---|
+| `bugcheck-codes.json` | Host-side scripts (parse-dump-header.sh, extract-evtx.py) |
+| `crash-control.json` | Guest-side (configure-dumps.ps1, prep-guest.ps1) |
+| `event-sources.json` | Host-side (extract-evtx.py offline parser) |
+| `trigger-methods.json` | **Host-only** (sweep-crashme.sh, sweep-chaos.sh) |
+| `chaos-triggers.json` | **Host-only** (sweep-chaos.sh) |
+| `host-signals.json` | **Host-only** (collect-host-signals.sh) |
+| `blkdebug-read-errors.conf` | **Host-only** (QEMU blkdebug chaos trigger) |
+
 ## Files
 
 ### `bugcheck-codes.json`

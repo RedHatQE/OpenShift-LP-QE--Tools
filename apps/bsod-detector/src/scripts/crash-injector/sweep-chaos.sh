@@ -31,7 +31,7 @@ function WaitSsh () {
   typeset -i maxAttempts="${1:-30}"
   typeset -i i=0
   while ((i < maxAttempts)); do
-    if ./vm/guest-ssh.sh -c '"up"' 2>/dev/null | grep -q up; then
+    if ./host/guest-ssh.sh -c '"up"' 2>/dev/null | grep -q up; then
       return 0
     fi
     sleep 8
@@ -77,7 +77,7 @@ function CollectGuestEvidence () {
   mkdir -p "${chaosDir}"
 
   typeset json=""
-  json=$(./vm/guest-ssh.sh -c "& C:\\bsod-detector\\scripts\\collect-guest.ps1 -OutputDir C:\\bsod-detector\\output\\chaos-${triggerId}" 2>&1) || true
+  json=$(./host/guest-ssh.sh -c "& C:\\bsod-detector\\scripts\\collect-guest.ps1 -OutputDir C:\\bsod-detector\\output\\chaos-${triggerId}" 2>&1) || true
   if [[ -n "${json}" ]]; then
     echo "${json}" > "${chaosDir}/collect-guest.json"
   else
@@ -462,7 +462,7 @@ function RunTrigger () {
   typeset -i workloadPid=0
   if [[ -n "${guestWorkload}" ]]; then
     : "[${triggerId}] starting guest workload"
-    ./vm/guest-ssh.sh -c "${guestWorkload}" 2>/dev/null &
+    ./host/guest-ssh.sh -c "${guestWorkload}" 2>/dev/null &
     workloadPid=$!
     sleep 5
   fi
@@ -598,10 +598,10 @@ function PrepSnapshots () {
     fi
 
     : "[prep] setting verifier flags to ${flags}"
-    ./vm/guest-ssh.sh -c "verifier /flags ${flags} /all" 2>&1 || true
+    ./host/guest-ssh.sh -c "verifier /flags ${flags} /all" 2>&1 || true
 
     : "[prep] rebooting guest to activate verifier"
-    ./vm/guest-ssh.sh -c "Restart-Computer -Force" 2>&1 || true
+    ./host/guest-ssh.sh -c "Restart-Computer -Force" 2>&1 || true
     sleep 30
 
     if ! WaitSsh 30; then

@@ -40,7 +40,7 @@ with open('$file', 'wb') as f:
   local dump="$BATS_TMPDIR/test.dmp"
   create_pagedu64_dump "$dump" "0x000000D1"
 
-  run "$REPO_ROOT/src/scripts/parse-dump-header.sh" "$dump"
+  run "$REPO_ROOT/src/scripts/host/parse-dump-header.sh" "$dump"
   [ "$status" -eq 0 ]
 
   code=$(echo "$output" | jq -r '.dumps[0].bugCheckCode')
@@ -51,7 +51,7 @@ with open('$file', 'wb') as f:
   local dump="$BATS_TMPDIR/test.dmp"
   create_pagedu64_dump "$dump" "0x00000019" "0x0000000000000003" "0x0000000000000000" "0x0000000000000000" "0x0000000000000000"
 
-  run "$REPO_ROOT/src/scripts/parse-dump-header.sh" "$dump"
+  run "$REPO_ROOT/src/scripts/host/parse-dump-header.sh" "$dump"
   [ "$status" -eq 0 ]
 
   p1=$(echo "$output" | jq -r '.dumps[0].parameters[0]')
@@ -62,7 +62,7 @@ with open('$file', 'wb') as f:
   local dump="$BATS_TMPDIR/test.dmp"
   create_pagedu64_dump "$dump" "0x000000D1"
 
-  run "$REPO_ROOT/src/scripts/parse-dump-header.sh" "$dump"
+  run "$REPO_ROOT/src/scripts/host/parse-dump-header.sh" "$dump"
   [ "$status" -eq 0 ]
 
   name=$(echo "$output" | jq -r '.dumps[0].bugCheckName')
@@ -74,7 +74,7 @@ with open('$file', 'wb') as f:
   printf 'NOTADUMP' > "$dump"
   dd if=/dev/zero bs=1 count=88 >> "$dump" 2>/dev/null
 
-  run "$REPO_ROOT/src/scripts/parse-dump-header.sh" "$dump"
+  run "$REPO_ROOT/src/scripts/host/parse-dump-header.sh" "$dump"
   [ "$status" -eq 0 ]
 
   valid=$(echo "$output" | jq -r '.dumps[0].valid')
@@ -82,11 +82,11 @@ with open('$file', 'wb') as f:
 }
 
 @test "parse-dump-header exits 2 on missing file" {
-  run "$REPO_ROOT/src/scripts/parse-dump-header.sh" "/nonexistent/file.dmp"
+  run "$REPO_ROOT/src/scripts/host/parse-dump-header.sh" "/nonexistent/file.dmp"
   [ "$status" -eq 2 ]
 }
 
 @test "parse-dump-header exits 2 with no arguments" {
-  run "$REPO_ROOT/src/scripts/parse-dump-header.sh"
+  run "$REPO_ROOT/src/scripts/host/parse-dump-header.sh"
   [ "$status" -eq 2 ]
 }
