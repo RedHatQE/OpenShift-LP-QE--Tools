@@ -15,6 +15,12 @@ complex fault injection paths.
 - The code-to-parameters mapping lives in
   [`data/trigger-methods.json`](../src/data/trigger-methods.json).
 
+The primary justification for the custom driver over Sysinternals NotMyFault is
+**arbitrary bug-check code control** — NotMyFault cannot produce most of the 19
+stop codes the test suite exercises. See
+[`crashme-vs-notmyfault.md`](crashme-vs-notmyfault.md) for the full tradeoff
+comparison.
+
 ## What to gather, by perspective
 
 ### From inside the guest (the detector's normal home; runs after reboot)
