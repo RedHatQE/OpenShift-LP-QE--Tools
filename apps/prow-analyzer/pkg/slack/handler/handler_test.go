@@ -83,6 +83,68 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestNew_EmptyChannelsMonitorsAll(t *testing.T) {
+	h := New(&slack.Client{}, analyzer.NewAnalyzer("", "", ""), []string{})
+
+	handler, ok := h.(*handler)
+	if !ok {
+		t.Fatal("Expected handler type")
+	}
+	if !handler.monitorAll {
+		t.Error("Expected monitorAll to be true when no channels are configured")
+	}
+	if len(handler.monitoredChannels) != 0 {
+		t.Errorf("Expected empty channel map, got %d entries", len(handler.monitoredChannels))
+	}
+}
+
+func TestNew_BlankChannelEntriesIgnored(t *testing.T) {
+	// A stray empty entry (e.g. from a trailing comma) must not be treated as an
+	// explicit allowlist, otherwise monitorAll would be disabled unexpectedly.
+	h := New(&slack.Client{}, analyzer.NewAnalyzer("", "", ""), []string{""})
+
+	handler, ok := h.(*handler)
+	if !ok {
+		t.Fatal("Expected handler type")
+	}
+	if !handler.monitorAll {
+		t.Error("Expected monitorAll to be true when only blank channel entries are provided")
+	}
+}
+
+func TestHandle_MonitorAllChannels(t *testing.T) {
+	// With no configured channels, a Prow URL in ANY channel should be handled.
+	slackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"ok":true,"ts":"123"}`))
+	}))
+	defer slackServer.Close()
+
+	slackClient := slack.New("test-token", slack.OptionAPIURL(slackServer.URL+"/"))
+	h := New(slackClient, analyzer.NewAnalyzer("", "", ""), []string{})
+	logger := slog.Default()
+
+	callback := &slackevents.EventsAPIEvent{
+		Type: slackevents.CallbackEvent,
+		InnerEvent: slackevents.EventsAPIInnerEvent{
+			Type: string(slackevents.Message),
+			Data: &slackevents.MessageEvent{
+				Channel:   "C-never-configured",
+				TimeStamp: "123.456",
+				Text:      "https://prow.ci.openshift.org/view/gs/test/job/1",
+			},
+		},
+	}
+
+	handled, err := h.Handle(callback, logger)
+
+	if !handled {
+		t.Error("Expected event in unconfigured channel to be handled when monitorAll is enabled")
+	}
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+}
+
 func TestIdentifier(t *testing.T) {
 	h := New(&slack.Client{}, analyzer.NewAnalyzer("", "", ""), []string{})
 
@@ -303,7 +365,7 @@ func TestAnalyzeAndRespond_WithMockServer(t *testing.T) {
 
 	// Acquire semaphore before calling analyzeAndRespond (mimics Handle behavior)
 	h.semaphore <- struct{}{}
-	h.analyzeAndRespond(event, "https://prow.ci.openshift.org/view/test", logger)
+	h.analyzeAndRespond(context.Background(), event, "https://prow.ci.openshift.org/view/test", logger)
 
 	// Wait for message to be posted (with timeout)
 	select {
@@ -364,7 +426,7 @@ func TestAnalyzeAndRespond_PostError(t *testing.T) {
 	// Acquire semaphore before calling analyzeAndRespond (mimics Handle behavior)
 	h.semaphore <- struct{}{}
 	// Should not panic, just log error
-	h.analyzeAndRespond(event, "https://prow.ci.openshift.org/view/test", logger)
+	h.analyzeAndRespond(context.Background(), event, "https://prow.ci.openshift.org/view/test", logger)
 
 	// Wait for post attempt (with timeout)
 	select {
@@ -372,6 +434,250 @@ func TestAnalyzeAndRespond_PostError(t *testing.T) {
 		// Success - posting was attempted (though it failed as expected)
 	case <-time.After(2 * time.Second):
 		t.Error("Timeout waiting for Slack post attempt")
+	}
+}
+
+// newSlackTestServer returns a Slack client wired to a test server that accepts
+// any API call (used for handled=true paths where an async post is attempted).
+func newSlackTestServer(t *testing.T) *slack.Client {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"ok":true,"ts":"123"}`))
+	}))
+	t.Cleanup(srv.Close)
+	return slack.New("test-token", slack.OptionAPIURL(srv.URL+"/"))
+}
+
+func TestHandle_AllowedBotMessage(t *testing.T) {
+	// A Prow URL posted by an allow-listed bot should be handled.
+	h := New(newSlackTestServer(t), analyzer.NewAnalyzer("", "", ""), []string{"C123"},
+		WithAllowedBotIDs([]string{"B-chai"}))
+	logger := slog.Default()
+
+	callback := &slackevents.EventsAPIEvent{
+		Type: slackevents.CallbackEvent,
+		InnerEvent: slackevents.EventsAPIInnerEvent{
+			Type: string(slackevents.Message),
+			Data: &slackevents.MessageEvent{
+				BotID:     "B-chai",
+				Channel:   "C123",
+				TimeStamp: "123.456",
+				Text:      "https://prow.ci.openshift.org/view/gs/test/job/1",
+			},
+		},
+	}
+
+	handled, err := h.Handle(callback, logger)
+
+	if !handled {
+		t.Error("Expected allow-listed bot message to be handled")
+	}
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+}
+
+func TestHandle_NonAllowedBotMessageIgnored(t *testing.T) {
+	// A bot that is not on the allow-list must still be ignored, even when other
+	// bots are allow-listed.
+	h := New(&slack.Client{}, analyzer.NewAnalyzer("", "", ""), []string{"C123"},
+		WithAllowedBotIDs([]string{"B-chai"}))
+	logger := slog.Default()
+
+	callback := &slackevents.EventsAPIEvent{
+		Type: slackevents.CallbackEvent,
+		InnerEvent: slackevents.EventsAPIInnerEvent{
+			Type: string(slackevents.Message),
+			Data: &slackevents.MessageEvent{
+				BotID:     "B-other",
+				Channel:   "C123",
+				TimeStamp: "123.456",
+				Text:      "https://prow.ci.openshift.org/view/gs/test/job/1",
+			},
+		},
+	}
+
+	handled, err := h.Handle(callback, logger)
+
+	if handled {
+		t.Error("Expected non-allow-listed bot message to be ignored")
+	}
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+}
+
+func TestHandle_SelfBotMessageIgnored(t *testing.T) {
+	// The bot's own posts must never be analyzed, even if its ID is (mistakenly)
+	// on the allow-list — this prevents an analysis loop.
+	h := New(&slack.Client{}, analyzer.NewAnalyzer("", "", ""), []string{"C123"},
+		WithAllowedBotIDs([]string{"B-self"}), WithSelfBotID("B-self"))
+	logger := slog.Default()
+
+	callback := &slackevents.EventsAPIEvent{
+		Type: slackevents.CallbackEvent,
+		InnerEvent: slackevents.EventsAPIInnerEvent{
+			Type: string(slackevents.Message),
+			Data: &slackevents.MessageEvent{
+				BotID:     "B-self",
+				Channel:   "C123",
+				TimeStamp: "123.456",
+				Text:      "https://prow.ci.openshift.org/view/gs/test/job/1",
+			},
+		},
+	}
+
+	handled, err := h.Handle(callback, logger)
+
+	if handled {
+		t.Error("Expected the bot's own message to be ignored")
+	}
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+}
+
+func TestHandle_ProwURLInAttachment(t *testing.T) {
+	// Bots like chai-bot put the Prow URL in an attachment, not the message body.
+	h := New(newSlackTestServer(t), analyzer.NewAnalyzer("", "", ""), []string{"C123"},
+		WithAllowedBotIDs([]string{"B-chai"}))
+	logger := slog.Default()
+
+	callback := &slackevents.EventsAPIEvent{
+		Type: slackevents.CallbackEvent,
+		InnerEvent: slackevents.EventsAPIInnerEvent{
+			Type: string(slackevents.Message),
+			Data: &slackevents.MessageEvent{
+				BotID:     "B-chai",
+				Channel:   "C123",
+				TimeStamp: "123.456",
+				Text:      "Job failed :x:",
+				Attachments: []slack.Attachment{
+					{Text: "See https://prow.ci.openshift.org/view/gs/test/job/1 for details"},
+				},
+			},
+		},
+	}
+
+	handled, err := h.Handle(callback, logger)
+
+	if !handled {
+		t.Error("Expected a Prow URL in an attachment to be handled")
+	}
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+}
+
+func TestHandle_DuplicateSuppressed(t *testing.T) {
+	// The same (channel, URL) delivered twice (e.g. a Slack retry) must trigger
+	// only one analysis; the second is acknowledged (handled) but suppressed.
+	h := New(newSlackTestServer(t), analyzer.NewAnalyzer("", "", ""), []string{"C123"})
+	logger := slog.Default()
+
+	newCallback := func(ts string) *slackevents.EventsAPIEvent {
+		return &slackevents.EventsAPIEvent{
+			Type: slackevents.CallbackEvent,
+			InnerEvent: slackevents.EventsAPIInnerEvent{
+				Type: string(slackevents.Message),
+				Data: &slackevents.MessageEvent{
+					Channel:   "C123",
+					TimeStamp: ts,
+					Text:      "https://prow.ci.openshift.org/view/gs/test/job/1",
+				},
+			},
+		}
+	}
+
+	if handled, err := h.Handle(newCallback("111.111"), logger); !handled || err != nil {
+		t.Fatalf("first delivery: handled=%v err=%v", handled, err)
+	}
+	// Second delivery of the same URL (different timestamp) should be suppressed.
+	if handled, err := h.Handle(newCallback("222.222"), logger); !handled || err != nil {
+		t.Fatalf("second delivery: handled=%v err=%v", handled, err)
+	}
+
+	hh := h.(*handler)
+	hh.mu.Lock()
+	seen := len(hh.recentlySeen)
+	hh.mu.Unlock()
+	if seen != 1 {
+		t.Errorf("Expected exactly 1 deduplicated entry, got %d", seen)
+	}
+}
+
+func TestHandle_DeletedMessageIgnored(t *testing.T) {
+	h := New(&slack.Client{}, analyzer.NewAnalyzer("", "", ""), []string{"C123"})
+	logger := slog.Default()
+
+	callback := &slackevents.EventsAPIEvent{
+		Type: slackevents.CallbackEvent,
+		InnerEvent: slackevents.EventsAPIInnerEvent{
+			Type: string(slackevents.Message),
+			Data: &slackevents.MessageEvent{
+				SubType:   "message_deleted",
+				Channel:   "C123",
+				TimeStamp: "123.456",
+				Text:      "https://prow.ci.openshift.org/view/gs/test/job/1",
+			},
+		},
+	}
+
+	handled, err := h.Handle(callback, logger)
+
+	if handled {
+		t.Error("Expected a deleted message to be ignored")
+	}
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+}
+
+func TestHandle_EditedMessageResolved(t *testing.T) {
+	// An edit (message_changed) carries the real content in the nested Message and
+	// the channel only on the outer event; the URL must still be found and handled.
+	h := New(newSlackTestServer(t), analyzer.NewAnalyzer("", "", ""), []string{"C123"})
+	logger := slog.Default()
+
+	callback := &slackevents.EventsAPIEvent{
+		Type: slackevents.CallbackEvent,
+		InnerEvent: slackevents.EventsAPIInnerEvent{
+			Type: string(slackevents.Message),
+			Data: &slackevents.MessageEvent{
+				SubType: "message_changed",
+				Channel: "C123",
+				Message: &slackevents.MessageEvent{
+					TimeStamp: "123.456",
+					Text:      "https://prow.ci.openshift.org/view/gs/test/job/1",
+				},
+			},
+		},
+	}
+
+	handled, err := h.Handle(callback, logger)
+
+	if !handled {
+		t.Error("Expected an edited message with a Prow URL to be handled")
+	}
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+}
+
+func TestSeenRecently(t *testing.T) {
+	h := &handler{recentlySeen: make(map[string]time.Time)}
+
+	if h.seenRecently("k1") {
+		t.Error("First observation of a key must not be reported as seen")
+	}
+	if !h.seenRecently("k1") {
+		t.Error("Second observation within TTL must be reported as seen")
+	}
+
+	// A stale entry must expire and be dropped.
+	h.recentlySeen["k2"] = time.Now().Add(-2 * dedupTTL)
+	if h.seenRecently("k2") {
+		t.Error("An entry older than dedupTTL must not be reported as seen")
 	}
 }
 
