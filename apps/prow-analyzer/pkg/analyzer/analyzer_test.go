@@ -824,6 +824,11 @@ func TestFinishedJSONURL(t *testing.T) {
 			expected: "https://storage.googleapis.com/bucket/job/1/finished.json",
 		},
 		{
+			name:     "empty path after marker has no derivable build",
+			input:    "https://prow.ci.openshift.org/view/gs/",
+			expected: "",
+		},
+		{
 			name:     "PR dashboard URL has no derivable build",
 			input:    "https://prow.ci.openshift.org/?pr=12345",
 			expected: "",
@@ -889,6 +894,38 @@ func TestJobOutcomeFor(t *testing.T) {
 		}
 	})
 
+	t.Run("result FAILURE without boolean is failed", func(t *testing.T) {
+		a := NewAnalyzer("mcp", "tok", "tmpl")
+		a.client = &mockHTTPClient{doFunc: jsonResp(200, `{"result":"FAILURE"}`)}
+		if got := a.JobOutcomeFor(context.Background(), viewURL); got != OutcomeFailed {
+			t.Errorf("outcome = %v, want OutcomeFailed", got)
+		}
+	})
+
+	t.Run("empty finished.json is unknown", func(t *testing.T) {
+		a := NewAnalyzer("mcp", "tok", "tmpl")
+		a.client = &mockHTTPClient{doFunc: jsonResp(200, `{}`)}
+		if got := a.JobOutcomeFor(context.Background(), viewURL); got != OutcomeUnknown {
+			t.Errorf("outcome = %v, want OutcomeUnknown", got)
+		}
+	})
+
+	t.Run("undecodable body is unknown", func(t *testing.T) {
+		a := NewAnalyzer("mcp", "tok", "tmpl")
+		a.client = &mockHTTPClient{doFunc: jsonResp(200, `{not json`)}
+		if got := a.JobOutcomeFor(context.Background(), viewURL); got != OutcomeUnknown {
+			t.Errorf("outcome = %v, want OutcomeUnknown", got)
+		}
+	})
+
+	t.Run("request build error is unknown", func(t *testing.T) {
+		a := NewAnalyzer("mcp", "tok", "tmpl")
+		a.newRequest = mockNewRequestError
+		if got := a.JobOutcomeFor(context.Background(), viewURL); got != OutcomeUnknown {
+			t.Errorf("outcome = %v, want OutcomeUnknown", got)
+		}
+	})
+
 	t.Run("404 is unknown", func(t *testing.T) {
 		a := NewAnalyzer("mcp", "tok", "tmpl")
 		a.client = &mockHTTPClient{doFunc: jsonResp(404, `not found`)}
@@ -921,4 +958,124 @@ func TestJobOutcomeFor(t *testing.T) {
 			t.Error("expected no HTTP request for a non-view URL")
 		}
 	})
+}
+
+func TestNewAnalyzer_TLSInsecure(t *testing.T) {
+	t.Setenv("TLS_INSECURE_SKIP_VERIFY", "true")
+	a := NewAnalyzer("url", "token", "template")
+
+	httpClient, ok := a.client.(*http.Client)
+	if !ok {
+		t.Fatal("Expected client to be *http.Client")
+	}
+	if httpClient.Transport == nil {
+		t.Error("Expected a custom Transport when TLS_INSECURE_SKIP_VERIFY=true")
+	}
+}
+
+func TestNewAnalyzer_WithHTTPClient(t *testing.T) {
+	stub := &mockHTTPClient{}
+	a := NewAnalyzer("url", "token", "template", WithHTTPClient(stub))
+	if a.client != stub {
+		t.Error("Expected WithHTTPClient to override the analyzer's HTTP client")
+	}
+}
+
+func TestPersonaFromURL(t *testing.T) {
+	tests := []struct {
+		name string
+		url  string
+		want string
+	}{
+		{name: "no personas marker", url: "https://example.com/mcp", want: "unknown"},
+		{name: "persona with trailing segment", url: "https://host/personas/ocp_ai_helpdesk/mcp", want: "ocp_ai_helpdesk"},
+		{name: "persona without trailing slash", url: "https://host/personas/ship_public", want: "ship_public"},
+		{name: "empty persona after marker", url: "https://host/personas/", want: "unknown"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := personaFromURL(tt.url); got != tt.want {
+				t.Errorf("personaFromURL(%q) = %q, want %q", tt.url, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestAnalyzeFailure_ReinitFailsAfterSessionExpired covers the path where the
+// server reports "Session not found", the analyzer invalidates and retries, and
+// the re-initialization itself fails — surfacing the re-init error.
+func TestAnalyzeFailure_ReinitFailsAfterSessionExpired(t *testing.T) {
+	initCount := 0
+	mockClient := &mockHTTPClient{
+		doFunc: func(req *http.Request) (*http.Response, error) {
+			var mcpReq MCPRequest
+			json.NewDecoder(req.Body).Decode(&mcpReq)
+
+			if mcpReq.Method == "initialize" {
+				initCount++
+				if initCount == 1 {
+					resp := &http.Response{
+						StatusCode: 200,
+						Body:       io.NopCloser(strings.NewReader(`{"jsonrpc":"2.0","id":0}`)),
+						Header:     make(http.Header),
+					}
+					resp.Header.Set("Mcp-Session-Id", "session-1")
+					return resp, nil
+				}
+				// Re-initialization after the expired session fails.
+				return nil, errors.New("reinit network error")
+			}
+			// tools/call: report an expired session to trigger the retry.
+			return &http.Response{
+				StatusCode: 404,
+				Body:       io.NopCloser(strings.NewReader("Session not found")),
+				Header:     make(http.Header),
+			}, nil
+		},
+	}
+
+	a := &Analyzer{
+		mcpURL:      "http://test.com",
+		token:       "token",
+		client:      mockClient,
+		template:    "template",
+		jsonMarshal: json.Marshal,
+		newRequest:  http.NewRequestWithContext,
+	}
+
+	_, err := a.AnalyzeFailure(context.Background(), "url")
+	if err == nil || !strings.Contains(err.Error(), "reinit network error") {
+		t.Errorf("Expected re-init error to surface, got: %v", err)
+	}
+	if initCount != 2 {
+		t.Errorf("Expected 2 initialize attempts (original + failed recovery), got %d", initCount)
+	}
+}
+
+// TestInitializeSession_ReadBodyError covers the init path where reading the
+// response body fails.
+func TestInitializeSession_ReadBodyError(t *testing.T) {
+	mockClient := &mockHTTPClient{
+		doFunc: func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: 200,
+				Body:       &errorReader{}, // fails on Read
+				Header:     make(http.Header),
+			}, nil
+		},
+	}
+
+	a := &Analyzer{
+		mcpURL:      "http://test.com",
+		token:       "token",
+		client:      mockClient,
+		template:    "template",
+		jsonMarshal: json.Marshal,
+		newRequest:  http.NewRequestWithContext,
+	}
+
+	_, err := a.AnalyzeFailure(context.Background(), "url")
+	if err == nil || !strings.Contains(err.Error(), "read response") {
+		t.Errorf("Expected 'read response' error, got: %v", err)
+	}
 }

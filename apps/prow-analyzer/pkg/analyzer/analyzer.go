@@ -83,8 +83,19 @@ func mcpTimeout() time.Duration {
 	return defaultMCPTimeout
 }
 
+// AnalyzerOption configures optional Analyzer behavior. Existing callers that
+// pass only the required arguments keep working unchanged.
+type AnalyzerOption func(*Analyzer)
+
+// WithHTTPClient overrides the HTTP client (HTTPDoer) used for both MCP and Prow
+// requests. It is primarily useful for tests and for supplying a custom
+// transport.
+func WithHTTPClient(c HTTPDoer) AnalyzerOption {
+	return func(a *Analyzer) { a.client = c }
+}
+
 // NewAnalyzer creates a new Analyzer instance
-func NewAnalyzer(mcpURL, token, promptTemplate string) *Analyzer {
+func NewAnalyzer(mcpURL, token, promptTemplate string, opts ...AnalyzerOption) *Analyzer {
 	httpClient := &http.Client{
 		Timeout: mcpTimeout(),
 	}
@@ -94,7 +105,7 @@ func NewAnalyzer(mcpURL, token, promptTemplate string) *Analyzer {
 		}
 	}
 
-	return &Analyzer{
+	a := &Analyzer{
 		mcpURL:      mcpURL,
 		token:       token,
 		template:    promptTemplate,
@@ -102,6 +113,10 @@ func NewAnalyzer(mcpURL, token, promptTemplate string) *Analyzer {
 		jsonMarshal: json.Marshal,
 		newRequest:  http.NewRequestWithContext,
 	}
+	for _, opt := range opts {
+		opt(a)
+	}
+	return a
 }
 
 // MCPRequest represents an MCP JSON-RPC request

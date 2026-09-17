@@ -3,9 +3,12 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +17,49 @@ import (
 
 	"github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/analyzer"
 )
+
+// doerFunc adapts a function to analyzer.HTTPDoer so tests can drive the
+// analyzer's HTTP responses (e.g. Prow finished.json outcomes).
+type doerFunc func(*http.Request) (*http.Response, error)
+
+func (f doerFunc) Do(r *http.Request) (*http.Response, error) { return f(r) }
+
+// newCapturingSlackServer returns a Slack client whose posted message texts are
+// recorded. When ok is false, chat.postMessage returns an error so the caller's
+// post-error path is exercised.
+func newCapturingSlackServer(t *testing.T, ok bool) (*slack.Client, *[]string) {
+	t.Helper()
+	var mu sync.Mutex
+	texts := &[]string{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/chat.postMessage" {
+			_ = r.ParseForm()
+			mu.Lock()
+			*texts = append(*texts, r.FormValue("text"))
+			mu.Unlock()
+			if !ok {
+				w.Write([]byte(`{"ok":false,"error":"posting_error"}`))
+				return
+			}
+		}
+		w.Write([]byte(`{"ok":true,"ts":"123"}`))
+	}))
+	t.Cleanup(srv.Close)
+	return slack.New("test-token", slack.OptionAPIURL(srv.URL+"/")), texts
+}
+
+// passingJobAnalyzer builds an analyzer whose Prow finished.json fetch reports a
+// passing job, so the "skip analysis" path can be exercised.
+func passingJobAnalyzer() *analyzer.Analyzer {
+	stub := doerFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       io.NopCloser(strings.NewReader(`{"passed":true}`)),
+			Header:     make(http.Header),
+		}, nil
+	})
+	return analyzer.NewAnalyzer("", "", "", analyzer.WithHTTPClient(stub))
+}
 
 // mockSlackClient implements a mock Slack client for testing
 type mockSlackClient struct {
@@ -679,6 +725,98 @@ func TestSeenRecently(t *testing.T) {
 	if h.seenRecently("k2") {
 		t.Error("An entry older than dedupTTL must not be reported as seen")
 	}
+}
+
+func TestActorOf(t *testing.T) {
+	tests := []struct {
+		name string
+		msg  *slackevents.MessageEvent
+		want string
+	}{
+		{name: "human user", msg: &slackevents.MessageEvent{User: "U1"}, want: "U1"},
+		{name: "bot username", msg: &slackevents.MessageEvent{Username: "chai-bot"}, want: "chai-bot"},
+		{name: "bot id only", msg: &slackevents.MessageEvent{BotID: "B1"}, want: "B1"},
+		{name: "user preferred over username", msg: &slackevents.MessageEvent{User: "U1", Username: "name"}, want: "U1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := actorOf(tt.msg); got != tt.want {
+				t.Errorf("actorOf() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHandle_QueueFull(t *testing.T) {
+	// When every concurrency slot is taken, a new request is acknowledged
+	// (handled) but dropped, and the user is told the queue is full. A failing
+	// Slack post here also exercises the post-error branch.
+	client, texts := newCapturingSlackServer(t, false)
+	h := New(client, analyzer.NewAnalyzer("", "", ""), []string{"C123"})
+	logger := slog.Default()
+
+	hh := h.(*handler)
+	for i := 0; i < cap(hh.semaphore); i++ {
+		hh.semaphore <- struct{}{}
+	}
+
+	callback := &slackevents.EventsAPIEvent{
+		Type: slackevents.CallbackEvent,
+		InnerEvent: slackevents.EventsAPIInnerEvent{
+			Type: string(slackevents.Message),
+			Data: &slackevents.MessageEvent{
+				Channel:   "C123",
+				TimeStamp: "123.456",
+				Text:      "https://prow.ci.openshift.org/view/gs/test/job/1",
+			},
+		},
+	}
+
+	handled, err := h.Handle(callback, logger)
+	if !handled {
+		t.Error("Expected a queue-full request to be acknowledged (handled)")
+	}
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	if len(*texts) != 1 || !strings.Contains((*texts)[0], "queue is currently full") {
+		t.Errorf("Expected a queue-full notice to be posted, got %v", *texts)
+	}
+}
+
+func TestAnalyzeAndRespond_PassingJobSkipped(t *testing.T) {
+	// A passing job must skip analysis and post a "no analysis needed" notice.
+	client, texts := newCapturingSlackServer(t, true)
+	h := &handler{
+		client:            client,
+		analyzer:          passingJobAnalyzer(),
+		monitoredChannels: map[string]bool{"C123": true},
+		semaphore:         make(chan struct{}, 5),
+	}
+
+	event := &slackevents.MessageEvent{Channel: "C123", TimeStamp: "1"}
+	h.semaphore <- struct{}{}
+	h.analyzeAndRespond(context.Background(), event, "https://prow.ci.openshift.org/view/gs/bucket/job/1", slog.Default())
+
+	if len(*texts) != 1 || !strings.Contains((*texts)[0], "no failure analysis needed") {
+		t.Errorf("Expected a job-passed skip notice to be posted, got %v", *texts)
+	}
+}
+
+func TestAnalyzeAndRespond_PassingJobPostError(t *testing.T) {
+	// The skip-notice post failing must be handled gracefully (logged, no panic).
+	client, _ := newCapturingSlackServer(t, false)
+	h := &handler{
+		client:            client,
+		analyzer:          passingJobAnalyzer(),
+		monitoredChannels: map[string]bool{"C123": true},
+		semaphore:         make(chan struct{}, 5),
+	}
+
+	event := &slackevents.MessageEvent{Channel: "C123", TimeStamp: "1"}
+	h.semaphore <- struct{}{}
+	// Should not panic even though the Slack post fails.
+	h.analyzeAndRespond(context.Background(), event, "https://prow.ci.openshift.org/view/gs/bucket/job/1", slog.Default())
 }
 
 // Interface compliance check
