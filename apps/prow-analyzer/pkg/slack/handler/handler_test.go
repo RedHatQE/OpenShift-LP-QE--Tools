@@ -853,5 +853,50 @@ func TestAnalyzeAndRespond_PassingJobPostError(t *testing.T) {
 	h.analyzeAndRespond(context.Background(), event, "https://prow.ci.openshift.org/view/gs/bucket/job/1", slog.Default())
 }
 
+func TestAnalyzeAndRespond_AnalyzerFailure_PostError(t *testing.T) {
+	// MCP server that fails on tools/call
+	mcpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Method string `json:"method"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+
+		if req.Method == "initialize" {
+			w.Header().Set("Mcp-Session-Id", "test")
+			w.Write([]byte(`{"jsonrpc":"2.0","id":0}`))
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`internal error`))
+		}
+	}))
+	defer mcpServer.Close()
+
+	// Slack server that rejects posts
+	slackServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"ok":false,"error":"posting_error"}`))
+	}))
+	defer slackServer.Close()
+
+	slackClient := slack.New("test", slack.OptionAPIURL(slackServer.URL+"/"))
+	anal := analyzer.NewAnalyzer(mcpServer.URL, "token", "template")
+
+	h := &handler{
+		client:            slackClient,
+		analyzer:          anal,
+		monitoredChannels: map[string]bool{"C123": true},
+		semaphore:         make(chan struct{}, 5),
+	}
+
+	event := &slackevents.MessageEvent{
+		Channel:   "C123",
+		TimeStamp: "123",
+	}
+
+	h.semaphore <- struct{}{}
+	// Should not panic; exercises error path where both analyzer and post fail
+	h.analyzeAndRespond(context.Background(), event, "https://prow.ci.openshift.org/view/test", slog.Default())
+}
+
 // Interface compliance check
 var _ PartialHandler = (*handler)(nil)
