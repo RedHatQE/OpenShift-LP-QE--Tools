@@ -6,6 +6,7 @@ import (
 	"log"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/slack-go/slack"
@@ -16,6 +17,17 @@ import (
 	"github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/slack/handler"
 )
 
+// envBool reads a boolean environment variable, returning def when the variable
+// is unset, empty, or not a valid boolean (as understood by strconv.ParseBool).
+func envBool(key string, def bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
+	}
+	return def
+}
+
 func main() {
 	var (
 		slackToken  = flag.String("slack-token", os.Getenv("SLACK_BOT_TOKEN"), "Slack bot token")
@@ -25,6 +37,8 @@ func main() {
 		channels    = flag.String("channels", os.Getenv("MONITORED_CHANNELS"), "Comma-separated list of channel IDs to monitor")
 		allowedBots = flag.String("allowed-bots", os.Getenv("ALLOWED_BOT_IDS"), "Comma-separated list of bot IDs (B...) whose Prow URLs should be analyzed")
 		prompt      = flag.String("prompt", "Analyze this Prow CI failure in detail. Provide: (1) Root cause, (2) Related Jira issues, (3) Recurring pattern analysis, (4) Recommended actions. URL: {job_url}", "Analysis prompt template")
+		slackDebug  = flag.Bool("slack-debug", envBool("SLACK_DEBUG", false), "Enable verbose Slack SDK and Socket Mode debug logging (or set SLACK_DEBUG)")
+		tlsInsecure = flag.Bool("tls-insecure", envBool("TLS_INSECURE_SKIP_VERIFY", false), "Skip TLS certificate verification for MCP/Prow HTTP requests (or set TLS_INSECURE_SKIP_VERIFY)")
 	)
 
 	flag.Parse()
@@ -79,7 +93,7 @@ func main() {
 	slackClient := slack.New(
 		*slackToken,
 		slack.OptionAppLevelToken(*appToken),
-		slack.OptionDebug(true),
+		slack.OptionDebug(*slackDebug),
 		slack.OptionLog(log.New(os.Stdout, "slack: ", log.Lshortfile|log.LstdFlags)),
 	)
 
@@ -93,7 +107,7 @@ func main() {
 	}
 
 	// Create analyzer
-	a := analyzer.NewAnalyzer(*mcpURL, *mcpToken, *prompt)
+	a := analyzer.NewAnalyzer(*mcpURL, *mcpToken, *prompt, analyzer.WithInsecureSkipVerify(*tlsInsecure))
 
 	// Create handler
 	h := handler.New(slackClient, a, monitoredChannels, handlerOpts...)
@@ -101,7 +115,7 @@ func main() {
 	// Create socket mode client with debug logging
 	socketClient := socketmode.New(
 		slackClient,
-		socketmode.OptionDebug(true),
+		socketmode.OptionDebug(*slackDebug),
 		socketmode.OptionLog(log.New(os.Stdout, "socketmode: ", log.Lshortfile|log.LstdFlags)),
 	)
 

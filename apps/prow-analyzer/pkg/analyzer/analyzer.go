@@ -61,6 +61,7 @@ type Analyzer struct {
 	sessionMtx  sync.Mutex
 	initMtx     sync.Mutex
 	initialized bool
+	insecureTLS bool
 	jsonMarshal func(v interface{}) ([]byte, error)
 	newRequest  func(ctx context.Context, method, url string, body io.Reader) (*http.Request, error)
 }
@@ -68,13 +69,15 @@ type Analyzer struct {
 // defaultMCPTimeout is the HTTP client timeout for ship-help MCP requests. It
 // caps the ENTIRE request, including reading the streamed SSE response body, so
 // it must exceed the longest analysis. Upgrade-interop jobs can take >10 min, so
-// the default is 20 min. Override with MCP_TIMEOUT_SECONDS (see mcpTimeout).
+// the default is 20 min. Override with MCP_TIMEOUT_SECONDS (see MCPTimeout).
 const defaultMCPTimeout = 1200 * time.Second
 
-// mcpTimeout returns the ship-help MCP HTTP client timeout. It reads
+// MCPTimeout returns the ship-help MCP HTTP client timeout. It reads
 // MCP_TIMEOUT_SECONDS (a positive integer number of seconds) and falls back to
-// defaultMCPTimeout when the var is unset, empty, or invalid.
-func mcpTimeout() time.Duration {
+// defaultMCPTimeout when the var is unset, empty, or invalid. It is exported so
+// callers can size behavior (e.g. the handler's dedup window) to outlast the
+// longest an analysis may run.
+func MCPTimeout() time.Duration {
 	if v := os.Getenv("MCP_TIMEOUT_SECONDS"); v != "" {
 		if secs, err := strconv.Atoi(v); err == nil && secs > 0 {
 			return time.Duration(secs) * time.Second
@@ -94,27 +97,37 @@ func WithHTTPClient(c HTTPDoer) AnalyzerOption {
 	return func(a *Analyzer) { a.client = c }
 }
 
+// WithInsecureSkipVerify controls whether the default HTTP client skips TLS
+// certificate verification. It overrides the TLS_INSECURE_SKIP_VERIFY env var
+// default and lets callers (e.g. the bot's --tls-insecure flag) drive the
+// setting explicitly. It has no effect when WithHTTPClient supplies a client.
+func WithInsecureSkipVerify(insecure bool) AnalyzerOption {
+	return func(a *Analyzer) { a.insecureTLS = insecure }
+}
+
 // NewAnalyzer creates a new Analyzer instance
 func NewAnalyzer(mcpURL, token, promptTemplate string, opts ...AnalyzerOption) *Analyzer {
-	httpClient := &http.Client{
-		Timeout: mcpTimeout(),
-	}
-	if os.Getenv("TLS_INSECURE_SKIP_VERIFY") == "true" {
-		httpClient.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // user-opted via env var
-		}
-	}
-
 	a := &Analyzer{
 		mcpURL:      mcpURL,
 		token:       token,
 		template:    promptTemplate,
-		client:      httpClient,
 		jsonMarshal: json.Marshal,
 		newRequest:  http.NewRequestWithContext,
+		insecureTLS: os.Getenv("TLS_INSECURE_SKIP_VERIFY") == "true",
 	}
 	for _, opt := range opts {
 		opt(a)
+	}
+	if a.client == nil {
+		httpClient := &http.Client{
+			Timeout: MCPTimeout(),
+		}
+		if a.insecureTLS {
+			httpClient.Transport = &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // user-opted via env var/flag
+			}
+		}
+		a.client = httpClient
 	}
 	return a
 }

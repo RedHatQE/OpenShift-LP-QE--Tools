@@ -14,11 +14,16 @@ import (
 	"github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/audit"
 )
 
-// dedupTTL is how long a (channel, prowURL) pair is remembered so the same job
-// is not analyzed twice in quick succession. Duplicates arise from Slack event
-// retries (the socket occasionally resets, so acks time out and Slack redelivers)
-// and from streaming bots that edit one message many times.
-const dedupTTL = 10 * time.Minute
+// dedupGrace is added to the MCP request timeout when sizing the dedup window
+// (see New). The window must outlast a single analysis so a duplicate event
+// arriving mid-analysis cannot expire the dedup entry and spawn a second,
+// concurrent run of the same job. The grace covers the pre-analysis
+// JobOutcomeFor probe and post-analysis Slack posting on top of the MCP timeout.
+const dedupGrace = 5 * time.Minute
+
+// minDedupTTL is the floor for the dedup window, preserving the original
+// short-succession dedup behavior even when the MCP timeout is configured low.
+const minDedupTTL = 10 * time.Minute
 
 // PartialHandler processes Slack events
 type PartialHandler interface {
@@ -35,6 +40,7 @@ type handler struct {
 	selfBotID         string          // this bot's own bot ID, always ignored to prevent loops
 	semaphore         chan struct{}   // Limit concurrent analyses
 
+	dedupTTL     time.Duration        // how long a (channel|prowURL) pair is remembered; sized to outlast one analysis
 	mu           sync.Mutex           // guards recentlySeen
 	recentlySeen map[string]time.Time // (channel|prowURL) -> last time analysis was triggered
 }
@@ -115,7 +121,8 @@ func (h *handler) Handle(callback *slackevents.EventsAPIEvent, logger *slog.Logg
 	// Suppress duplicate analyses of the same job in the same channel. Without
 	// this, Slack event retries and streaming bot edits would each re-trigger a
 	// full (and costly) analysis of the same URL.
-	if h.seenRecently(event.Channel + "|" + prowURL) {
+	dedupKey := event.Channel + "|" + prowURL
+	if h.seenRecently(dedupKey) {
 		logger.Info("Skipping duplicate prow analysis request")
 		return true, nil
 	}
@@ -133,6 +140,11 @@ func (h *handler) Handle(callback *slackevents.EventsAPIEvent, logger *slog.Logg
 		// Analyze async (can take 30-60s)
 		go h.analyzeAndRespond(ctx, msg, prowURL, logger)
 	default:
+		// The request was not enqueued, so undo the dedup mark: otherwise the URL
+		// would stay "seen" for the full dedup window and a later Slack retry would
+		// be silently deduplicated (handled=true) with neither an analysis nor a
+		// "queue full" reply. Forgetting the key lets the retry try the queue again.
+		h.forget(dedupKey)
 		logger.Info("Prow analyzer queue full, dropping request")
 		audit.Outcome(ctx, "rejected", "reason", "queue_full")
 		// Inform the requester via Slack that the queue is full
@@ -188,15 +200,25 @@ func (h *handler) seenRecently(key string) bool {
 	now := time.Now()
 	// Opportunistically drop stale entries so the map does not grow unbounded.
 	for k, t := range h.recentlySeen {
-		if now.Sub(t) > dedupTTL {
+		if now.Sub(t) > h.dedupTTL {
 			delete(h.recentlySeen, k)
 		}
 	}
-	if t, ok := h.recentlySeen[key]; ok && now.Sub(t) <= dedupTTL {
+	if t, ok := h.recentlySeen[key]; ok && now.Sub(t) <= h.dedupTTL {
 		return true
 	}
 	h.recentlySeen[key] = now
 	return false
+}
+
+// forget removes key from the dedup set so a subsequent event for the same job
+// is treated as new. Used when a request that was marked seen could not actually
+// be enqueued (queue full), so a Slack retry is allowed to try again rather than
+// being silently deduplicated. Safe for concurrent use.
+func (h *handler) forget(key string) {
+	h.mu.Lock()
+	delete(h.recentlySeen, key)
+	h.mu.Unlock()
 }
 
 func (h *handler) Identifier() string {
@@ -219,7 +241,7 @@ func (h *handler) analyzeAndRespond(ctx context.Context, event *slackevents.Mess
 		audit.Outcome(ctx, "skipped", "reason", "job_passing")
 		_, _, postErr := h.client.PostMessage(
 			event.Channel,
-			slack.MsgOptionText("✅ This Prow job passed — no failure analysis needed.", false),
+			slack.MsgOptionText(analyzer.WithDisclaimer("✅ This Prow job passed — no failure analysis needed."), false),
 			slack.MsgOptionTS(event.TimeStamp),
 		)
 		if postErr != nil {
@@ -299,7 +321,7 @@ func (h *handler) analyzeAndRespond(ctx context.Context, event *slackevents.Mess
 
 // New creates a new prow analyzer event handler. Optional behavior (e.g. which
 // bots' messages to analyze) is configured via Option values.
-func New(client *slack.Client, analyzer *analyzer.Analyzer, monitoredChannels []string, opts ...Option) PartialHandler {
+func New(client *slack.Client, a *analyzer.Analyzer, monitoredChannels []string, opts ...Option) PartialHandler {
 	channelMap := make(map[string]bool)
 	for _, ch := range monitoredChannels {
 		if ch != "" {
@@ -307,13 +329,22 @@ func New(client *slack.Client, analyzer *analyzer.Analyzer, monitoredChannels []
 		}
 	}
 
+	// Size the dedup window to outlast a single analysis (bounded by the MCP
+	// timeout) plus a grace margin, so a duplicate event arriving mid-analysis
+	// cannot expire the entry and trigger a second, concurrent run of the same job.
+	dedupTTL := analyzer.MCPTimeout() + dedupGrace
+	if dedupTTL < minDedupTTL {
+		dedupTTL = minDedupTTL
+	}
+
 	h := &handler{
 		client:            client,
-		analyzer:          analyzer,
+		analyzer:          a,
 		monitoredChannels: channelMap,
 		monitorAll:        len(channelMap) == 0, // no explicit allowlist ⇒ monitor all joined channels
 		allowedBotIDs:     make(map[string]bool),
 		semaphore:         make(chan struct{}, 5), // Limit to 5 concurrent analyses
+		dedupTTL:          dedupTTL,
 		recentlySeen:      make(map[string]time.Time),
 	}
 	for _, opt := range opts {

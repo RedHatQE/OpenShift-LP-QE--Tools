@@ -711,7 +711,7 @@ func TestHandle_EditedMessageResolved(t *testing.T) {
 }
 
 func TestSeenRecently(t *testing.T) {
-	h := &handler{recentlySeen: make(map[string]time.Time)}
+	h := &handler{dedupTTL: 10 * time.Minute, recentlySeen: make(map[string]time.Time)}
 
 	if h.seenRecently("k1") {
 		t.Error("First observation of a key must not be reported as seen")
@@ -721,9 +721,29 @@ func TestSeenRecently(t *testing.T) {
 	}
 
 	// A stale entry must expire and be dropped.
-	h.recentlySeen["k2"] = time.Now().Add(-2 * dedupTTL)
+	h.recentlySeen["k2"] = time.Now().Add(-2 * h.dedupTTL)
 	if h.seenRecently("k2") {
 		t.Error("An entry older than dedupTTL must not be reported as seen")
+	}
+}
+
+func TestNew_DedupTTLFromTimeout(t *testing.T) {
+	// A large MCP timeout drives the dedup window to timeout + grace so it
+	// outlasts a single analysis.
+	t.Setenv("MCP_TIMEOUT_SECONDS", "1800") // 30m
+	h := New(&slack.Client{}, analyzer.NewAnalyzer("", "", ""), []string{"C123"}).(*handler)
+	if want := 1800*time.Second + dedupGrace; h.dedupTTL != want {
+		t.Errorf("dedupTTL = %v, want %v", h.dedupTTL, want)
+	}
+}
+
+func TestNew_DedupTTLFloor(t *testing.T) {
+	// A very low MCP timeout must be floored to minDedupTTL so short-succession
+	// duplicates are still suppressed.
+	t.Setenv("MCP_TIMEOUT_SECONDS", "1")
+	h := New(&slack.Client{}, analyzer.NewAnalyzer("", "", ""), []string{"C123"}).(*handler)
+	if h.dedupTTL != minDedupTTL {
+		t.Errorf("dedupTTL = %v, want floor %v", h.dedupTTL, minDedupTTL)
 	}
 }
 
@@ -782,6 +802,15 @@ func TestHandle_QueueFull(t *testing.T) {
 	if len(*texts) != 1 || !strings.Contains((*texts)[0], "queue is currently full") {
 		t.Errorf("Expected a queue-full notice to be posted, got %v", *texts)
 	}
+
+	// The dropped request must NOT remain in the dedup set: otherwise a later
+	// Slack retry would be silently deduplicated with no analysis and no notice.
+	hh.mu.Lock()
+	_, stillSeen := hh.recentlySeen["C123|https://prow.ci.openshift.org/view/gs/test/job/1"]
+	hh.mu.Unlock()
+	if stillSeen {
+		t.Error("Expected the queue-full request to be forgotten from the dedup set")
+	}
 }
 
 func TestAnalyzeAndRespond_PassingJobSkipped(t *testing.T) {
@@ -800,6 +829,11 @@ func TestAnalyzeAndRespond_PassingJobSkipped(t *testing.T) {
 
 	if len(*texts) != 1 || !strings.Contains((*texts)[0], "no failure analysis needed") {
 		t.Errorf("Expected a job-passed skip notice to be posted, got %v", *texts)
+	}
+	// The skip notice must carry the mandatory Red Hat AI agent disclaimer, like
+	// every other message the bot posts.
+	if len(*texts) == 1 && !strings.Contains((*texts)[0], analyzer.Disclaimer) {
+		t.Errorf("Expected the skip notice to include the AI disclaimer, got %q", (*texts)[0])
 	}
 }
 

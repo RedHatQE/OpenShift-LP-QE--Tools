@@ -69,8 +69,8 @@ func TestMCPTimeout(t *testing.T) {
 			} else {
 				os.Unsetenv("MCP_TIMEOUT_SECONDS")
 			}
-			if got := mcpTimeout(); got != tt.want {
-				t.Errorf("mcpTimeout() = %v, want %v", got, tt.want)
+			if got := MCPTimeout(); got != tt.want {
+				t.Errorf("MCPTimeout() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -978,6 +978,21 @@ func TestNewAnalyzer_WithHTTPClient(t *testing.T) {
 	a := NewAnalyzer("url", "token", "template", WithHTTPClient(stub))
 	if a.client != stub {
 		t.Error("Expected WithHTTPClient to override the analyzer's HTTP client")
+	}
+}
+
+func TestNewAnalyzer_WithInsecureSkipVerify(t *testing.T) {
+	// The option overrides the env-var default: force insecure on even though the
+	// env var is unset/false.
+	t.Setenv("TLS_INSECURE_SKIP_VERIFY", "")
+	a := NewAnalyzer("url", "token", "template", WithInsecureSkipVerify(true))
+
+	httpClient, ok := a.client.(*http.Client)
+	if !ok {
+		t.Fatal("Expected client to be *http.Client")
+	}
+	if httpClient.Transport == nil {
+		t.Error("Expected a custom Transport when WithInsecureSkipVerify(true) is set")
 	}
 }
 
