@@ -11,9 +11,9 @@
     "filtered":  { "CrashDumpEnabled": 11, "description": "Variable size. Filters out VM host/guest memory overhead, making offline extraction faster than full complete dumps on high-RAM servers." }
   },
   "recommended": {
-    "crashDumpType": "filtered",
+    "crashDumpType": "automatic",
     "values": {
-      "CrashDumpEnabled": 11,
+      "CrashDumpEnabled": 7,
       "AlwaysKeepMemoryDump": 1,
       "Overwrite": 1,
       "LogEvent": 1,
@@ -21,7 +21,7 @@
       "MinidumpDir": "%SystemRoot%\\Minidump",
       "DumpFile": "%SystemRoot%\\MEMORY.DMP"
     },
-    "notes": "CrashDumpEnabled=11 (filtered dump) writes a variable-size dump that filters out VM host/guest memory overhead — faster to write and extract than a complete dump on high-RAM servers. AutoReboot=0 keeps VM frozen for offline ODF snapshot extraction. Full RAM is also captured via virtctl memory-dump (vm-memory.elf.tar.gz)."
+    "notes": "CrashDumpEnabled=7 (automatic dump) writes kernel memory dump and lets OS manage page-file sizing (Win8+). AutoReboot=0 keeps VM frozen for offline snapshot extraction. Extraction via NTFS-3G in recovery pod provides: MEMORY.DMP (kernel dump), Minidump/*.dmp files, System.evtx, and Application.evtx. No PDB download or elf2dmp conversion needed. Simpler than type 1 and requires less disk space."
   },
   "pageFile": {
     "path": "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",

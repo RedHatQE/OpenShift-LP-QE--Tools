@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # RHOV crash watcher. It fails closed unless preflight, crash corroboration,
-# early disk progress, durable captures, and snapshot recovery all succeed.
+# early disk progress, and durable memory captures all succeed.
+#
+# Memory Dump Artifacts:
+#   PRIMARY: vm-memory-windows.dmp (elf2dmp converted from KubeVirt ELF export)
+#           (Windows DMP format, ready for volatility forensics, no PDB downloads)
+#   BACKUP:  vm-memory-raw.elf (extracted from KubeVirt export, raw physical memory)
+#           (for developer re-analysis with matching PDB/elf2dmp offline)
+# Uses elf2dmp conversion for reliable DMP generation without Kubernetes libvirt issues.
 set -euo pipefail; shopt -s inherit_errexit
 umask 077
 
@@ -13,12 +20,11 @@ typeset evidenceRoot="${BSOD_EVIDENCE_MOUNT:-}"; typeset evidenceKind="${BSOD_EV
 typeset evidenceId="${BSOD_EVIDENCE_STORAGE_ID:-}"; typeset readyFile=''
 typeset commandTimeout="${BSOD_COMMAND_TIMEOUT:-30}"; typeset preflightTimeout="${BSOD_PREFLIGHT_TIMEOUT:-300}"
 typeset captureTimeout="${BSOD_CAPTURE_TIMEOUT:-300}"; typeset memoryTimeout="${BSOD_MEMORY_CAPTURE_TIMEOUT:-1800}"
-typeset recoveryTimeout="${BSOD_RECOVERY_TIMEOUT:-1200}"; typeset armedTimeout="${BSOD_ARMED_TIMEOUT:-3600}"
+typeset armedTimeout="${BSOD_ARMED_TIMEOUT:-3600}"
 typeset runDir=''; typeset pvpanicFile=''; typeset pvpanicPid=''; typeset progressPid=''; typeset memoryAssociated=0
 typeset stageErrors=''; typeset pipelineLog=''; typeset summaryMode='natural-rhov'
 typeset -a guestAgent=(python3 "${scriptDir}/guest-agent.py")
 [[ -z "${BSOD_GUEST_AGENT_BIN:-}" ]] || guestAgent=("${BSOD_GUEST_AGENT_BIN}")
-typeset recoveryBin="${BSOD_RECOVERY_BIN:-${scriptDir}/recover-natural-crash.sh}"
 typeset hostSignalsBin="${BSOD_HOST_SIGNALS_BIN:-${scriptDir}/collect-host-signals.sh}"
 
 function Die () { echo "watch-crash: ERROR: $*" >&2; exit 1; }
@@ -230,19 +236,21 @@ EOF
   fi
   mv -f "${temporary}" "${target}"
   # Extract and convert the inner ELF memory dump to Windows crash dump format.
-  # elf2dmp (from qemu-tools) converts QEMU ELF core → Windows DMP so that
-  # parse-dump-header.sh can read the bugcheck code and stop code.
+  # Extract raw ELF as backup. Primary artifact is native MEMORY.DMP from ODF snapshot
+  # (extracted offline in recover-natural-crash.sh). elf2dmp conversion is deferred/optional
+  # to avoid runtime PDB download and conversion reliability issues.
   typeset innerDumpEntry=''
   innerDumpEntry="$(tar -tzf "${target}" 2>/dev/null | grep -i '\.memory\.dump$' | head -1 || true)"
   if [[ -n "${innerDumpEntry}" ]]; then
-    typeset elfRaw="${outDir}/.vm-memory-raw.elf"
+    typeset elfRaw="${outDir}/vm-memory-raw.elf"
     tar -xzf "${target}" -O "${innerDumpEntry}" 2>/dev/null > "${elfRaw}" || true
     if [[ -s "${elfRaw}" ]]; then
-      Log "extracted inner ELF ($(du -sh "${elfRaw}" | cut -f1)) — converting to Windows DMP with elf2dmp..."
+      Log "extracted inner ELF ($(du -sh "${elfRaw}" | cut -f1)) — keeping as backup artifact for developer re-analysis"
+      # elf2dmp conversion is now optional (deferred to recovery phase if needed)
       if command -v elf2dmp >/dev/null 2>&1; then
         typeset winDmp="${outDir}/vm-memory-windows.dmp"
         if RunTimed 300 elf2dmp "${elfRaw}" "${winDmp}" >>"${pipelineLog}" 2>&1 && [[ -s "${winDmp}" ]]; then
-          Log "elf2dmp conversion complete: $(du -sh "${winDmp}" | cut -f1)"
+          Log "elf2dmp conversion complete: $(du -sh "${winDmp}" | cut -f1) (optional convenience artifact)"
           bash "${scriptDir}/parse-dump-header.sh" "${winDmp}" > "${outDir}/parse-dump-header-memory.json" 2>/dev/null || true
           Log "parsed dump header: bugcheck=$(jq -r '.dumps[0].bugCheckCode // "unknown"' "${outDir}/parse-dump-header-memory.json" 2>/dev/null)"
           # Promote as the primary parse-dump-header.json — ODF snapshot rarely finds
@@ -343,9 +351,6 @@ function StartDumpMonitor () {
 function WaitDumpMonitor () {
   typeset status=0; wait "${progressPid}" || status=$?; progressPid=''; return "${status}"
 }
-function Recover () {
-  RunTimed "${recoveryTimeout}" "${recoveryBin}" --metadata "${metadataFile}" --out "${outDir}" >>"${pipelineLog}" 2>&1 || { RecordError recovery 'snapshot recovery failed or timed out'; return 1; }
-}
 function StopVM () {
   Log 'requesting VMI stop through virtctl'
   RunTimed 90 virtctl stop "${vm}" -n "${ns}" >>"${pipelineLog}" 2>&1 || { RecordError stop 'virtctl stop failed or timed out; no fallback mutation attempted'; return 1; }
@@ -359,6 +364,11 @@ function StopVM () {
 }
 function RestartVM () {
   if ((noRestart == 0)); then RunTimed 90 virtctl start "${vm}" -n "${ns}" >>"${pipelineLog}" 2>&1 || { RecordError restart 'virtctl start failed or timed out'; return 1; }; fi
+}
+function Recover () {
+  typeset recoveryTimeout=3600 recoveryBin="${scriptDir}/recover-natural-crash.sh"
+  [[ -x "${recoveryBin}" ]] || { RecordError recovery "recovery script missing: ${recoveryBin}"; return 1; }
+  RunTimed "${recoveryTimeout}" "${recoveryBin}" --metadata "${metadataFile}" --out "${outDir}" >>"${pipelineLog}" 2>&1
 }
 function CrashResponse () {
   typeset state="${1:?}"; typeset failed=0
@@ -394,7 +404,7 @@ function CrashResponse () {
   done
   # Stop VM AFTER all local processing complete (dump download, volatility extraction, host signals) to avoid race conditions
   StopVM || { WriteSummary || true; return 1; }
-  # Recovery runs on stopped VM for ODF snapshot
+  # Recovery phase: extract event logs and MEMORY.DMP from ODF snapshot via NTFS mount
   Recover || { WriteSummary || true; return 1; }
   RestartVM || { WriteSummary || true; return 1; }
   WriteSummary
