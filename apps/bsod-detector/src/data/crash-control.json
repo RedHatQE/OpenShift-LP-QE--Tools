@@ -7,12 +7,13 @@
     "complete":  { "CrashDumpEnabled": 1, "description": "Complete memory dump: entire physical memory. Requires page file >= RAM size (+1MB) or a dedicated dump file." },
     "kernel":    { "CrashDumpEnabled": 2, "description": "Kernel memory dump: kernel-mode read/write pages only. Good default for driver crashes." },
     "small":     { "CrashDumpEnabled": 3, "description": "Small (mini) dump, 64KB-ish, written to %SystemRoot%\\Minidump. Minimum useful dump." },
-    "automatic": { "CrashDumpEnabled": 7, "description": "Automatic memory dump (Win8+): like kernel dump but lets the OS manage page-file sizing." }
+    "automatic": { "CrashDumpEnabled": 7, "description": "Automatic memory dump (Win8+): like kernel dump but lets the OS manage page-file sizing." },
+    "filtered":  { "CrashDumpEnabled": 11, "description": "Variable size. Filters out VM host/guest memory overhead, making offline extraction faster than full complete dumps on high-RAM servers." }
   },
   "recommended": {
-    "crashDumpType": "automatic",
+    "crashDumpType": "filtered",
     "values": {
-      "CrashDumpEnabled": 7,
+      "CrashDumpEnabled": 11,
       "AlwaysKeepMemoryDump": 1,
       "Overwrite": 1,
       "LogEvent": 1,
@@ -20,7 +21,7 @@
       "MinidumpDir": "%SystemRoot%\\Minidump",
       "DumpFile": "%SystemRoot%\\MEMORY.DMP"
     },
-    "notes": "CrashDumpEnabled=7 (automatic dump, Win8+) writes both MEMORY.DMP (~kernel pages) and Minidump\\*.dmp (~600KB each) from a single crash. AutoReboot=1 — VM reboots after writing dumps so QGA comes back online and pulls evidence via guest-agent.py. AlwaysKeepMemoryDump=1 stops Windows from deleting MEMORY.DMP on low disk."
+    "notes": "CrashDumpEnabled=11 (filtered dump) writes a variable-size dump that filters out VM host/guest memory overhead — faster to write and extract than a complete dump on high-RAM servers. AutoReboot=0 keeps VM frozen for offline ODF snapshot extraction. Full RAM is also captured via virtctl memory-dump (vm-memory.elf.tar.gz)."
   },
   "pageFile": {
     "path": "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",

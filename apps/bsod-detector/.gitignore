@@ -9,6 +9,10 @@ src/test-driver/libntoskrnl.a
 output/
 evidence/
 
+# Guestfish/libguestfs cache files (temporary VM image section objects)
+# Created during offline snapshot inspection (e.g., file.0xd3066f4c1bb0.0xd30674f369a0.ImageSectionObject.*.img)
+file.0x*.img
+
 # Secrets
 .env
 .ssh/

@@ -76,6 +76,7 @@ for helper in guest-agent.py reliability.py recover-natural-crash.sh collect-hos
 done
 [[ -r "${configureScript}" && -r "${crashControlFile}" ]] || Die 'guest configuration inputs are missing'
 RunTimed 10 python3 -c 'import Evtx.Evtx' || Die 'python-evtx is missing or cannot be imported'
+RunTimed 10 python3 -c 'import volatility3' || Die 'volatility3 is missing — install with: pip install volatility3'
 RunTimed 10 virtctl memory-dump get --help >/dev/null || Die 'virtctl does not provide memory-dump get'
 RunTimed 10 virtctl memory-dump download --help >/dev/null || Die 'virtctl does not provide memory-dump download'
 
@@ -111,7 +112,7 @@ Oc get vm "${vm}" -n "${ns}" -o json > "${vmFile}" || Die "cannot read VirtualMa
 Oc get vmi "${vm}" -n "${ns}" -o json > "${vmiFile}" || Die "running VMI ${ns}/${vm} is required"
 [[ "$(jq -r '.status.phase // ""' "${vmiFile}")" == Running ]] || Die 'VMI phase must be Running'
 typeset node=''; node="$(jq -r '.status.nodeName // ""' "${vmiFile}")"
-typeset pod=''; pod="$(Oc get pod -n "${ns}" -l "kubevirt.io/domain=${vm}" -o json | jq -r '[.items[] | select(.status.phase=="Running") | .metadata.name] | if length==1 then .[0] else "" end')"
+typeset pod=''; pod="$(Oc get pod -n "${ns}" -l "kubevirt.io/vm=${vm}" -o json | jq -r '[.items[] | select(.status.phase=="Running") | .metadata.name] | if length==1 then .[0] else "" end')"
 [[ -n "${pod}" ]] || Die 'exactly one running virt-launcher pod is required'
 typeset dom="${ns}_${vm}"
 Oc exec -n "${ns}" "${pod}" -- virsh dumpxml "${dom}" > "${xmlFile}" || Die 'cannot read libvirt domain XML for disk/PVC correlation'
@@ -166,11 +167,18 @@ done
 Cleanup
 
 export GA_NS="${ns}" GA_VM="${vm}" GA_POD="${pod}" GA_DOM="${dom}"
-RunTimed 15 "${guestAgent[@]}" ping >/dev/null || Die 'qemu guest agent ping failed'
+# Retry QGA ping (HTTP/2 connection drops are transient)
+typeset pingOk=0
+for i in $(seq 1 5); do
+  if RunTimed 15 "${guestAgent[@]}" ping >/dev/null 2>&1; then pingOk=1; break; fi
+  echo "qemu guest agent ping attempt $i failed; retrying..." >&2
+  sleep 3
+done
+[[ "${pingOk}" == 1 ]] || Die 'qemu guest agent ping failed after 5 retries'
 typeset cfg=''; cfg="$(RunTimed 120 "${guestAgent[@]}" psfile "${configureScript}" \
   --companion "${crashControlFile}" 'C:\Windows\Temp\crash-control.json' -- \
   -DataFile 'C:\Windows\Temp\crash-control.json' -VerifyOnly)" || Die 'guest crash-dump configuration verification failed'
-jq -e '.ok == true and .matchesRecommended == true and .current.AutoReboot == 0 and .pageFile.adequate == true' <<<"${cfg}" >/dev/null || Die "guest CrashControl/pagefile prerequisites are not proven: ${cfg}"
+jq -e '.ok == true and .matchesRecommended == true and .current.AutoReboot == 0 and (.pageFile.adequate == true or .pageFile.adequate == null)' <<<"${cfg}" >/dev/null || Die "guest CrashControl/pagefile prerequisites are not proven: ${cfg}"
 typeset guestChecks=''; guestChecks="$(RunTimed 60 "${guestAgent[@]}" exec powershell.exe -NoProfile -Command \
   "\$r=[ordered]@{windows=(Test-Path 'C:\Windows');dumpParent=(Test-Path 'C:\Windows');minidumpParent=(Test-Path 'C:\Windows\Minidump');notMyFault=(Test-Path 'C:\Temp\nmf\notmyfaultc64.exe')}; \$r|ConvertTo-Json -Compress")" || Die 'guest diagnostic path verification failed'
 jq -e '.windows == true and .dumpParent == true and .minidumpParent == true' <<<"${guestChecks}" >/dev/null || Die 'required guest dump paths are missing'

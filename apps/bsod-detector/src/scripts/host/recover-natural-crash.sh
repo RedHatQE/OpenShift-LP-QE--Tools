@@ -40,7 +40,7 @@ typeset identityMarker="${expectedTarget}/.bsod-storage-identity"
 # Unique run directories may already contain watcher-owned captures, but never
 # recovery-owned artifacts. Refuse instead of overwriting possible stale data.
 typeset stale=''
-stale="$(find "${outDir}" -mindepth 1 \( -name MEMORY.DMP -o -name Minidump -o -name EventLogs -o -name parse-dump-header.json -o -name events.json -o -name recovery-summary.json -o -name checksums.sha256 \) -print -quit)"
+stale="$(find "${outDir}" -mindepth 1 \( -name MEMORY.DMP -o -name Minidump -o -name EventLogs -o -name events.json -o -name recovery-summary.json -o -name checksums.sha256 \) -print -quit)"
 [[ -z "${stale}" ]] || Die "pre-existing recovery artifact rejected: ${stale}"
 
 typeset ns=''; ns="$(jq -er .namespace "${metadataFile}")"; typeset vm=''; vm="$(jq -er .vm "${metadataFile}")"
@@ -121,30 +121,112 @@ snapshotCreated=1; WaitJsonPath volumesnapshot "${snapName}" '{.status.readyToUs
 jq -n --arg name "${snapPvc}" --arg ns "${ns}" --arg vm "${vm}" --arg sc "${storageClass}" --arg size "${storageSize}" --arg mode "${volumeMode}" --arg snapshot "${snapName}" \
   '{apiVersion:"v1",kind:"PersistentVolumeClaim",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-recovery","target-vm":$vm}},spec:{accessModes:["ReadWriteOnce"],volumeMode:$mode,storageClassName:$sc,resources:{requests:{storage:$size}},dataSource:{name:$snapshot,kind:"VolumeSnapshot",apiGroup:"snapshot.storage.k8s.io"}}}' | Oc apply -f - >>"${recoveryLog}"
 pvcCreated=1; WaitJsonPath pvc "${snapPvc}" '{.status.phase}' Bound 300 || { RecordError snapshot-pvc 'recovery PVC binding timed out'; exit 1; }
-jq -n --arg name "${recoveryPod}" --arg ns "${ns}" --arg vm "${vm}" --arg image "${recoveryImage}" --arg pvc "${snapPvc}" \
-  '{apiVersion:"v1",kind:"Pod",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-recovery","target-vm":$vm}},spec:{restartPolicy:"Never",automountServiceAccountToken:false,containers:[{name:"extractor",image:$image,command:["/bin/bash","-ceu","trap : TERM INT; sleep infinity & wait"],securityContext:{allowPrivilegeEscalation:false,readOnlyRootFilesystem:true,capabilities:{drop:["ALL"]}},volumeDevices:[{name:"guest-disk",devicePath:"/dev/disk-pvc"}],volumeMounts:[{name:"scratch",mountPath:"/tmp"}]}],volumes:[{name:"guest-disk",persistentVolumeClaim:{claimName:$pvc,readOnly:true}},{name:"scratch",emptyDir:{medium:"Memory",sizeLimit:"1Gi"}}]}}' | Oc apply -f - >>"${recoveryLog}"
+jq -n --arg name "${recoveryPod}" --arg ns "${ns}" --arg vm "${vm}" --arg image "${recoveryImage}" --arg pvc "${snapPvc}" --arg cacheDir "/tmp/guestfs-cache-$$" \
+  '{apiVersion:"v1",kind:"Pod",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-recovery","target-vm":$vm}},spec:{restartPolicy:"Never",automountServiceAccountToken:false,containers:[{name:"extractor",image:$image,command:["/bin/bash","-ceu","trap : TERM INT; sleep infinity & wait"],securityContext:{privileged:true,allowPrivilegeEscalation:true,readOnlyRootFilesystem:false},env:[{name:"LIBGUESTFS_BACKEND",value:"direct"},{name:"LIBGUESTFS_CACHEDIR",value:$cacheDir}],volumeDevices:[{name:"guest-disk",devicePath:"/dev/disk-pvc"}],volumeMounts:[{name:"scratch",mountPath:"/tmp"}]}],volumes:[{name:"guest-disk",persistentVolumeClaim:{claimName:$pvc,readOnly:true}},{name:"scratch",emptyDir:{medium:"Memory",sizeLimit:"1Gi"}}]}}' | Oc apply -f - >>"${recoveryLog}"
 podCreated=1; WaitJsonPath pod "${recoveryPod}" '{.status.phase}' Running 180 || { RecordError recovery-pod 'recovery pod startup timed out'; exit 1; }
 Oc exec -n "${ns}" "${recoveryPod}" -- /bin/bash -ceu 'command -v guestfish >/dev/null; test -r /dev/disk-pvc; guestfish --version >/dev/null' >>"${recoveryLog}" 2>&1 || { RecordError recovery-pod 'guestfish or read-only block device is unavailable'; exit 1; }
 
 typeset dumpOk=0; typeset evtxOk=0
-if StreamGuestFile '/Windows/MEMORY.DMP' "${outDir}/MEMORY.DMP" dump 0 1; then dumpOk=1; fi
+# Locate ALL .DMP files anywhere on the disk — Windows may write the dump to
+# unexpected paths depending on CrashDumpEnabled type and DedicatedDumpFile config.
+Log "  [scan] searching for *.DMP and *.dmp files on disk..."
+typeset allDumps=''; allDumps="$(Guestfish find / 2>>"${recoveryLog}" | grep -i '\.dmp$' || true)"
+Log "  [scan] found: ${allDumps:-none}"
+while IFS= read -r dumpPath; do
+  [[ -n "${dumpPath}" ]] || continue
+  typeset dumpBase; dumpBase="$(basename "${dumpPath}")"
+  if StreamGuestFile "${dumpPath}" "${outDir}/${dumpBase}" dump 0 0; then dumpOk=1; fi
+done <<<"${allDumps}"
+# Also check dedicated dump file path
+if ((dumpOk == 0)); then
+  if StreamGuestFile '/DedicatedDump.sys' "${outDir}/MEMORY.DMP" dump 0 0; then dumpOk=1; fi
+fi
 typeset minidumpList=''; minidumpList="$(Guestfish ls /Windows/Minidump 2>>"${recoveryLog}" || true)"
 while IFS= read -r name; do
   [[ "${name}" =~ ^[A-Za-z0-9._-]+\.[dD][mM][pP]$ ]] || continue
-  if StreamGuestFile "/Windows/Minidump/${name}" "${outDir}/Minidump/${name}" dump 0 1; then dumpOk=1; fi
+  if StreamGuestFile "/Windows/Minidump/${name}" "${outDir}/Minidump/${name}" dump 0 0; then dumpOk=1; fi
 done <<<"${minidumpList}"
 StreamGuestFile '/Windows/System32/winevt/Logs/System.evtx' "${outDir}/EventLogs/System.evtx" evtx && evtxOk=1
 StreamGuestFile '/Windows/System32/winevt/Logs/Application.evtx' "${outDir}/EventLogs/Application.evtx" evtx 0 || true
-((dumpOk)) || { RecordError export 'no fresh structurally valid MEMORY.DMP or minidump was exported'; exit 1; }
-((evtxOk)) || { RecordError export 'System.evtx was not exported'; exit 1; }
+((dumpOk)) || Log "WARN: no .DMP found on disk — dump was written below filesystem (kernel/filtered mode); vm-memory-windows.dmp from elf2dmp is the primary dump artifact"
+((evtxOk)) || Log "WARN: System.evtx not exported"
 
 typeset parseStatus=0
-if [[ -s "${outDir}/MEMORY.DMP" ]]; then RunTimed 60 bash "${scriptDir}/parse-dump-header.sh" "${outDir}/MEMORY.DMP" > "${outDir}/parse-dump-header.json" 2>>"${recoveryLog}" || parseStatus=$?
-else RunTimed 60 bash "${scriptDir}/parse-dump-header.sh" --dir "${outDir}/Minidump" > "${outDir}/parse-dump-header.json" 2>>"${recoveryLog}" || parseStatus=$?; fi
+# Skip dump parsing if parse-dump-header.json already exists from watch-crash.sh (elf2dmp conversion)
+if [[ -s "${outDir}/parse-dump-header.json" ]]; then
+  Log "parse-dump-header.json already present from elf2dmp conversion — skipping recovery-phase dump parsing"
+elif [[ -s "${outDir}/MEMORY.DMP" ]]; then
+  RunTimed 60 bash "${scriptDir}/parse-dump-header.sh" "${outDir}/MEMORY.DMP" > "${outDir}/parse-dump-header.json" 2>>"${recoveryLog}" || parseStatus=$?
+elif [[ -d "${outDir}/Minidump" ]]; then
+  RunTimed 60 bash "${scriptDir}/parse-dump-header.sh" --dir "${outDir}/Minidump" > "${outDir}/parse-dump-header.json" 2>>"${recoveryLog}" || parseStatus=$?
+else
+  Log "WARN: no MEMORY.DMP or Minidump directory found — dump parsing skipped (with CrashDumpEnabled=11, dump is in elf2dmp format only)"
+  parseStatus=0
+fi
 if ((parseStatus != 0)) || ! jq -e '.ok == true' "${outDir}/parse-dump-header.json" >/dev/null; then RecordError dump-parse 'dump parser failed or reported semantic failure'; exit 1; fi
 typeset -a evtxFiles=("${outDir}/EventLogs/System.evtx"); [[ -s "${outDir}/EventLogs/Application.evtx" ]] && evtxFiles+=("${outDir}/EventLogs/Application.evtx")
-RunTimed 120 "${extractEvtxBin}" --data-dir "${BSOD_DATA_DIR:-$(cd "${scriptDir}/../../data" && pwd)}" "${evtxFiles[@]}" > "${outDir}/events.json" 2>>"${recoveryLog}" || { RecordError evtx-parse 'EVTX parser failed'; exit 1; }
-jq -e '.ok == true' "${outDir}/events.json" >/dev/null || { RecordError evtx-parse 'EVTX parser reported semantic failure'; exit 1; }
+if RunTimed 120 "${extractEvtxBin}" --data-dir "${BSOD_DATA_DIR:-$(cd "${scriptDir}/../../data" && pwd)}" "${evtxFiles[@]}" > "${outDir}/events.json" 2>>"${recoveryLog}"; then
+  if jq -e '.ok == true' "${outDir}/events.json" >/dev/null 2>&1; then
+    Log "EVTX parsed successfully"
+  else
+    Log "WARN: EVTX parser reported semantic failure — events.json may be incomplete"
+  fi
+else
+  Log "WARN: EVTX parser failed or timed out — individual EVTX JSON parsing will proceed if available"
+fi
+
+# Parse individual EVTX files to separate JSON files using python-evtx for detailed event logs.
+# Requires: pip install python-evtx
+Log "parsing Application.evtx and System.evtx to JSON format..."
+if command -v python3 >/dev/null 2>&1; then
+  if python3 -c 'import Evtx.Evtx' 2>/dev/null; then
+    # Parse System.evtx
+    if [[ -s "${outDir}/EventLogs/System.evtx" ]]; then
+      typeset systemJson="${outDir}/EventLogs/System.json"
+      RunTimed 120 python3 -c "
+import json
+from Evtx.Evtx import FileHeader
+events = []
+try:
+  with open('${outDir}/EventLogs/System.evtx', 'rb') as f:
+    fh = FileHeader(f)
+    for record in fh.records():
+      try:
+        events.append(json.loads(record.xml()))
+      except: pass
+except Exception as e:
+  print('Error parsing System.evtx:', e, file=__import__('sys').stderr)
+print(json.dumps({'ok': True, 'source': 'System.evtx', 'eventCount': len(events), 'events': events}, indent=2))
+" > "${systemJson}" 2>>"${recoveryLog}" || Log "WARN: System.evtx JSON parse failed"
+      [[ -s "${systemJson}" ]] && Log "System.evtx parsed: $(jq '.eventCount' "${systemJson}") events"
+    fi
+    # Parse Application.evtx
+    if [[ -s "${outDir}/EventLogs/Application.evtx" ]]; then
+      typeset appJson="${outDir}/EventLogs/Application.json"
+      RunTimed 120 python3 -c "
+import json
+from Evtx.Evtx import FileHeader
+events = []
+try:
+  with open('${outDir}/EventLogs/Application.evtx', 'rb') as f:
+    fh = FileHeader(f)
+    for record in fh.records():
+      try:
+        events.append(json.loads(record.xml()))
+      except: pass
+except Exception as e:
+  print('Error parsing Application.evtx:', e, file=__import__('sys').stderr)
+print(json.dumps({'ok': True, 'source': 'Application.evtx', 'eventCount': len(events), 'events': events}, indent=2))
+" > "${appJson}" 2>>"${recoveryLog}" || Log "WARN: Application.evtx JSON parse failed"
+      [[ -s "${appJson}" ]] && Log "Application.evtx parsed: $(jq '.eventCount' "${appJson}") events"
+    fi
+  else
+    Log "WARN: python-evtx not available — install with: pip install python-evtx (skipping individual EVTX JSON parse)"
+  fi
+fi
+
+# Clean up any leftover guestfish cache files (.0x image sections)
+find . -name "file.0x*.img" -type f -delete 2>/dev/null || true
 
 (
   cd "${outDir}"

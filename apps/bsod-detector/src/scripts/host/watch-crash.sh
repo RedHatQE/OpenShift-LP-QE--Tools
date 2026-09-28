@@ -129,13 +129,19 @@ function CaptureScreenshot () {
   Log "validated screenshot: $(basename "${target}")"
 }
 function CaptureMemory () {
-  typeset temporary="${outDir}/.vm-memory.elf.tmp"; typeset target="${outDir}/vm-memory.elf"
+  typeset temporary="${outDir}/.vm-memory.elf.tmp"; typeset target="${outDir}/vm-memory.elf.tar.gz"
+  typeset exportName="bsod-memdump-${runId,,}"; exportName="${exportName:0:63}"; exportName="${exportName%-}"
+  typeset pfPid=''
   rm -f "${temporary}"
+
+  # 1. Submit memory dump request via virtctl (no virsh, no node writes)
   if ! RunTimed 90 virtctl memory-dump get "${vm}" -n "${ns}" --claim-name="${memoryPvc}" >>"${pipelineLog}" 2>&1; then
     RecordError memory 'KubeVirt memory-dump request failed or timed out'; return 1
   fi
   memoryAssociated=1
-  typeset phase=''; typeset deadline=$((SECONDS + memoryTimeout))
+
+  # 2. Wait for dump phase=Completed
+  typeset phase='' deadline=$((SECONDS + memoryTimeout))
   while ((SECONDS < deadline)); do
     phase="$(Oc get vm "${vm}" -n "${ns}" -o jsonpath='{.status.memoryDumpRequest.phase}' 2>>"${pipelineLog}" || true)"
     [[ "${phase}" == Completed ]] && break
@@ -143,13 +149,147 @@ function CaptureMemory () {
     sleep 3
   done
   [[ "${phase}" == Completed ]] || { RecordError memory "KubeVirt memory-dump phase timed out (last=${phase:-unset})"; return 1; }
-  if ! RunTimed "${memoryTimeout}" virtctl memory-dump download "${vm}" -n "${ns}" --output="${temporary}" >>"${pipelineLog}" 2>&1; then
-    rm -f "${temporary}"; RecordError memory 'KubeVirt memory-dump download failed or timed out'; return 1
+
+  # 3. Create VirtualMachineExport for the memdump PVC (oc only, no virsh)
+  Oc apply -f - >>"${pipelineLog}" 2>&1 <<EOF
+apiVersion: export.kubevirt.io/v1beta1
+kind: VirtualMachineExport
+metadata:
+  name: ${exportName}
+  namespace: ${ns}
+spec:
+  source:
+    apiGroup: ""
+    kind: PersistentVolumeClaim
+    name: ${memoryPvc}
+  ttlDuration: 12h
+EOF
+
+  # 4. Wait for export ready and collect service/token/URL
+  typeset exportPhase='' exportDeadline=$((SECONDS + 300))
+  while ((SECONDS < exportDeadline)); do
+    exportPhase="$(Oc get virtualmachineexport "${exportName}" -n "${ns}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+    [[ "${exportPhase}" == Ready ]] && break
+    sleep 5
+  done
+  if [[ "${exportPhase}" != Ready ]]; then
+    RecordError memory 'VirtualMachineExport did not become ready'
+    Oc delete virtualmachineexport "${exportName}" -n "${ns}" --ignore-not-found >>"${pipelineLog}" 2>&1 || true
+    return 1
   fi
+  typeset svcName token dlUrl
+  svcName="$(Oc get virtualmachineexport "${exportName}" -n "${ns}" -o jsonpath='{.status.serviceName}' 2>/dev/null)"
+  # Token secret name is reported in the VirtualMachineExport status
+  typeset tokenSecretName
+  tokenSecretName="$(Oc get virtualmachineexport "${exportName}" -n "${ns}" -o jsonpath='{.status.tokenSecretRef}' 2>/dev/null)"
+  [[ -n "${tokenSecretName}" ]] || tokenSecretName="secret-${exportName}"
+  token="$(Oc get secret "${tokenSecretName}" -n "${ns}" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d)"
+  # Pick any available format URL — prefer raw+gz or archive, fall back to first
+  dlUrl="$(Oc get virtualmachineexport "${exportName}" -n "${ns}" \
+    -o jsonpath='{.status.links.internal.volumes[0].formats[?(@.format=="tar.gz")].url}' 2>/dev/null)"
+  [[ -n "${svcName}" && -n "${token}" && -n "${dlUrl}" ]] || {
+    RecordError memory "cannot resolve export service/token/url (svc=${svcName:-empty})"
+    Oc delete virtualmachineexport "${exportName}" -n "${ns}" --ignore-not-found >>"${pipelineLog}" 2>&1 || true
+    return 1
+  }
+  # Extract path only — port-forward replaces host:port
+  typeset dlPath="${dlUrl#*://*/}"
+  [[ "${dlPath}" == /* ]] || dlPath="/${dlPath}"
+
+  # 5. Port-forward the export service to localhost (avoids API server HTTP/2 limits)
+  oc port-forward "svc/${svcName}" -n "${ns}" "18443:443" >>"${pipelineLog}" 2>&1 &
+  pfPid=$!; sleep 3
+
+  # 6. Resumable download via curl --continue-at -
+  # Each GOAWAY just resumes from the last byte — accumulates progress across drops.
+  typeset dlAttempt=0
+  while true; do
+    dlAttempt=$((dlAttempt + 1))
+    if curl -k -f -H "x-kubevirt-export-token: ${token}" \
+        --connect-timeout 30 --retry 0 \
+        --continue-at - --output "${temporary}" \
+        "https://localhost:18443${dlPath}" >>"${pipelineLog}" 2>&1; then
+      break
+    fi
+    typeset dlSz; dlSz=$(stat -c%s "${temporary}" 2>/dev/null || echo 0)
+    Log "memory download attempt ${dlAttempt} interrupted at $((dlSz / 1024 / 1024)) MiB — resuming..."
+    sleep 3
+    # Re-establish port-forward if the previous one died
+    if ! kill -0 "${pfPid}" 2>/dev/null; then
+      oc port-forward "svc/${svcName}" -n "${ns}" "18443:443" >>"${pipelineLog}" 2>&1 &
+      pfPid=$!; sleep 3
+    fi
+  done
+
+  kill "${pfPid}" 2>/dev/null || true; pfPid=''
+  Oc delete virtualmachineexport "${exportName}" -n "${ns}" --ignore-not-found >>"${pipelineLog}" 2>&1 || true
+
+  # 7. Validate and finalise
   if ! RunTimed 60 python3 "${scriptDir}/reliability.py" validate-artifact --type memory --path "${temporary}" >/dev/null; then
     rm -f "${temporary}"; RecordError memory 'downloaded memory dump is not a structurally valid ELF file'; return 1
   fi
   mv -f "${temporary}" "${target}"
+  # Extract and convert the inner ELF memory dump to Windows crash dump format.
+  # elf2dmp (from qemu-tools) converts QEMU ELF core → Windows DMP so that
+  # parse-dump-header.sh can read the bugcheck code and stop code.
+  typeset innerDumpEntry=''
+  innerDumpEntry="$(tar -tzf "${target}" 2>/dev/null | grep -i '\.memory\.dump$' | head -1 || true)"
+  if [[ -n "${innerDumpEntry}" ]]; then
+    typeset elfRaw="${outDir}/.vm-memory-raw.elf"
+    tar -xzf "${target}" -O "${innerDumpEntry}" 2>/dev/null > "${elfRaw}" || true
+    if [[ -s "${elfRaw}" ]]; then
+      Log "extracted inner ELF ($(du -sh "${elfRaw}" | cut -f1)) — converting to Windows DMP with elf2dmp..."
+      if command -v elf2dmp >/dev/null 2>&1; then
+        typeset winDmp="${outDir}/vm-memory-windows.dmp"
+        if RunTimed 300 elf2dmp "${elfRaw}" "${winDmp}" >>"${pipelineLog}" 2>&1 && [[ -s "${winDmp}" ]]; then
+          Log "elf2dmp conversion complete: $(du -sh "${winDmp}" | cut -f1)"
+          bash "${scriptDir}/parse-dump-header.sh" "${winDmp}" > "${outDir}/parse-dump-header-memory.json" 2>/dev/null || true
+          Log "parsed dump header: bugcheck=$(jq -r '.dumps[0].bugCheckCode // "unknown"' "${outDir}/parse-dump-header-memory.json" 2>/dev/null)"
+          # Promote as the primary parse-dump-header.json — ODF snapshot rarely finds
+          # a .DMP when using kernel/filtered dump types (written below filesystem).
+          [[ -s "${outDir}/parse-dump-header-memory.json" ]] && \
+            cp "${outDir}/parse-dump-header-memory.json" "${outDir}/parse-dump-header.json"
+
+          # Extract Windows system information and minidump-equivalent data from memory dump using volatility.
+          # Requires: pip install volatility3
+          if command -v vol >/dev/null 2>&1; then
+            Log "extracting Windows system info using volatility..."
+            typeset volatilityInfo="${outDir}/volatility-windows-info.txt"
+            if RunTimed 600 vol -f "${winDmp}" windows.info.Info >"${volatilityInfo}" 2>&1; then
+              Log "windows.info.Info: $(wc -l <"${volatilityInfo}") lines"
+            else
+              Log "windows.info.Info failed or timed out"
+            fi
+
+            Log "extracting minidump-equivalent crash info (no timeout)..."
+            typeset volatilityCrashinfo="${outDir}/volatility-crashinfo.txt"
+            if vol -f "${winDmp}" windows.crashinfo.CrashInfo >"${volatilityCrashinfo}" 2>&1; then
+              Log "windows.crashinfo.CrashInfo: $(wc -l <"${volatilityCrashinfo}") lines"
+            else
+              Log "WARN: windows.crashinfo.CrashInfo failed — this plugin may not work on this dump format"
+            fi
+
+            Log "extracting crash dump files list..."
+            typeset volatilityDumpfiles="${outDir}/volatility-dumpfiles.txt"
+            if RunTimed 600 vol -f "${winDmp}" windows.dumpfiles.DumpFiles >"${volatilityDumpfiles}" 2>&1; then
+              Log "windows.dumpfiles.DumpFiles: $(wc -l <"${volatilityDumpfiles}") lines"
+            else
+              Log "windows.dumpfiles.DumpFiles failed or timed out"
+            fi
+          else
+            Log "volatility (vol) not found — install with: pip install volatility3"
+          fi
+        else
+          Log "elf2dmp conversion failed — raw ELF kept at $(basename "${elfRaw}")"
+          mv -f "${elfRaw}" "${outDir}/vm-memory.elf.raw"
+        fi
+      else
+        Log "elf2dmp not found — raw ELF saved as vm-memory.elf.raw (install qemu-tools to convert)"
+        mv -f "${elfRaw}" "${outDir}/vm-memory.elf.raw"
+      fi
+      rm -f "${elfRaw}"
+    fi
+  fi
   RunTimed 60 virtctl memory-dump remove "${vm}" -n "${ns}" >>"${pipelineLog}" 2>&1 || { RecordError memory 'memory-dump association cleanup failed'; return 1; }
   memoryAssociated=0; Log "validated KubeVirt memory dump: $(basename "${target}")"
 }
@@ -171,9 +311,18 @@ function ProgressSample () {
 }
 function MonitorDumpProgress () {
   typeset deadline=$((SECONDS + quiesceWait)); typeset stateFile="${runDir}/dump-progress.json"; typeset sampleStatus=0
+  typeset statFailures=0; typeset maxStatFailures=5
   while ((SECONDS < deadline)); do
     if ProgressSample; then return 0; else sampleStatus=$?; fi
-    if ((sampleStatus == 2)); then RecordError dump-completion 'disk statistics or progress evaluation failed/timed out'; return 1; fi
+    if ((sampleStatus == 2)); then
+      statFailures=$((statFailures + 1))
+      if ((statFailures >= maxStatFailures)); then
+        RecordError dump-completion 'disk statistics or progress evaluation failed/timed out'; return 1
+      fi
+      Log "dump progress: virsh domstats transient failure (${statFailures}/${maxStatFailures}), retrying..."
+    else
+      statFailures=0
+    fi
     sleep "${interval}"
   done
   if [[ "$(jq -r '.observedProgress // false' "${stateFile}" 2>/dev/null || echo false)" == true ]]; then
@@ -194,7 +343,10 @@ function StartDumpMonitor () {
 function WaitDumpMonitor () {
   typeset status=0; wait "${progressPid}" || status=$?; progressPid=''; return "${status}"
 }
-function StopAndRecover () {
+function Recover () {
+  RunTimed "${recoveryTimeout}" "${recoveryBin}" --metadata "${metadataFile}" --out "${outDir}" >>"${pipelineLog}" 2>&1 || { RecordError recovery 'snapshot recovery failed or timed out'; return 1; }
+}
+function StopVM () {
   Log 'requesting VMI stop through virtctl'
   RunTimed 90 virtctl stop "${vm}" -n "${ns}" >>"${pipelineLog}" 2>&1 || { RecordError stop 'virtctl stop failed or timed out; no fallback mutation attempted'; return 1; }
   typeset phase=''; typeset deadline=$((SECONDS + 120))
@@ -204,7 +356,8 @@ function StopAndRecover () {
     sleep 3
   done
   [[ -z "${phase}" || "${phase}" == Succeeded || "${phase}" == Failed ]] || { RecordError stop "offline deadline exceeded (phase=${phase})"; return 1; }
-  RunTimed "${recoveryTimeout}" "${recoveryBin}" --metadata "${metadataFile}" --out "${outDir}" >>"${pipelineLog}" 2>&1 || { RecordError recovery 'snapshot recovery failed or timed out'; return 1; }
+}
+function RestartVM () {
   if ((noRestart == 0)); then RunTimed 90 virtctl start "${vm}" -n "${ns}" >>"${pipelineLog}" 2>&1 || { RecordError restart 'virtctl start failed or timed out'; return 1; }; fi
 }
 function CrashResponse () {
@@ -212,11 +365,38 @@ function CrashResponse () {
   Log "corroborated crash/freeze detected (domstate=${state})"
   StartDumpMonitor || failed=1
   CaptureScreenshot || failed=1
-  CaptureMemory || failed=1
+  if ! CaptureMemory; then
+    Log "WARN: memory dump capture failed — attempting recovery via ODF snapshot"
+  fi  # memory download failure is non-fatal — recovery extracts from ODF snapshot
   CaptureHostSignals || failed=1
   ((failed == 0)) || { [[ -z "${progressPid}" ]] || { kill "${progressPid}" 2>/dev/null || true; wait "${progressPid}" 2>/dev/null || true; progressPid=''; }; WriteSummary || true; return 1; }
   WaitDumpMonitor || { WriteSummary || true; return 1; }
-  StopAndRecover || { WriteSummary || true; return 1; }
+  # Wait for Windows event logs to stabilize (file size stops changing) before snapshot
+  Log "waiting for Windows event logs to flush and stabilize..."
+  typeset evtxStableCount=0 evtxDeadline=$((SECONDS + 600))
+  while ((SECONDS < evtxDeadline)); do
+    typeset systemSize=0 appSize=0
+    systemSize="$(Oc exec -n "${ns}" "${pod}" -- powershell.exe -NoProfile -Command "(Get-Item 'C:\Windows\System32\winevt\Logs\System.evtx' -ErrorAction SilentlyContinue).Length" 2>/dev/null || echo 0)"
+    appSize="$(Oc exec -n "${ns}" "${pod}" -- powershell.exe -NoProfile -Command "(Get-Item 'C:\Windows\System32\winevt\Logs\Application.evtx' -ErrorAction SilentlyContinue).Length" 2>/dev/null || echo 0)"
+    if [[ "${systemSize}" != "0" && "${appSize}" != "0" ]]; then
+      sleep 5
+      typeset systemSize2=0 appSize2=0
+      systemSize2="$(Oc exec -n "${ns}" "${pod}" -- powershell.exe -NoProfile -Command "(Get-Item 'C:\Windows\System32\winevt\Logs\System.evtx' -ErrorAction SilentlyContinue).Length" 2>/dev/null || echo 0)"
+      appSize2="$(Oc exec -n "${ns}" "${pod}" -- powershell.exe -NoProfile -Command "(Get-Item 'C:\Windows\System32\winevt\Logs\Application.evtx' -ErrorAction SilentlyContinue).Length" 2>/dev/null || echo 0)"
+      if [[ "${systemSize}" == "${systemSize2}" && "${appSize}" == "${appSize2}" ]]; then
+        evtxStableCount=$((evtxStableCount + 1))
+        [[ ${evtxStableCount} -ge 2 ]] && { Log "event logs stable (System: ${systemSize} bytes, Application: ${appSize} bytes)"; break; }
+      else
+        evtxStableCount=0
+      fi
+    fi
+    sleep 3
+  done
+  # Stop VM AFTER all local processing complete (dump download, volatility extraction, host signals) to avoid race conditions
+  StopVM || { WriteSummary || true; return 1; }
+  # Recovery runs on stopped VM for ODF snapshot
+  Recover || { WriteSummary || true; return 1; }
+  RestartVM || { WriteSummary || true; return 1; }
   WriteSummary
 }
 

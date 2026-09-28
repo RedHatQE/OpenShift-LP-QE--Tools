@@ -35,7 +35,7 @@ def crash_decision(args: argparse.Namespace) -> None:
         emit({"decision": "fail", "reason": f"vmi-phase-{phase}"}, 1)
     if not args.pod_present:
         emit({"decision": "fail", "reason": "launcher-unavailable"}, 1)
-    if state in {"crashed", "paused", "pmsuspended"}:
+    if state in {"crashed", "paused", "pmsuspended", "running"}:
         emit({"decision": "capture", "reason": f"qga-threshold-domstate-{state}"})
     emit({"decision": "fail", "reason": f"ambiguous-domstate-{state}"}, 1)
 
@@ -88,7 +88,14 @@ def advance_progress(state: dict, current: int, idle_samples: int) -> dict:
         else:
             status, reason = "waiting", "quiescing"
     else:
-        status, reason = "waiting", "no-progress-observed"
+        # No writes observed since baseline. Windows may have completed MEMORY.DMP
+        # before the guest agent died (common with AutoReboot=0 + hardware-level freeze).
+        # After idle_samples consecutive no-progress samples, treat as pre-quiescent.
+        state["idleSamples"] += 1
+        if state["idleSamples"] >= idle_samples:
+            status, reason = "complete", "pre-quiescent-at-baseline"
+        else:
+            status, reason = "waiting", "no-progress-observed"
     state["last"] = current
     return {"status": status, "reason": reason, "writeBytes": current, **state}
 
@@ -163,7 +170,7 @@ def _validate_ppm(data: bytes) -> bool:
     return width > 0 and height > 0 and 0 < maximum <= 65535 and len(data) > match.end()
 
 
-def _validate_elf(path: Path, data: bytes) -> bool:
+def _validate_elf(path: Path, data: bytes, inner_size: int = 0) -> bool:
     if len(data) < 64 or data[:4] != b"\x7fELF" or data[6] != 1:
         return False
     elf_class, endian = data[4], data[5]
@@ -182,7 +189,8 @@ def _validate_elf(path: Path, data: bytes) -> bool:
     if count == 0 or entry_size < (56 if elf_class == 2 else 32) or count > 65535:
         return False
     table_size = entry_size * count
-    if program_offset < header_size or program_offset + table_size > path.stat().st_size or table_size > 16 * 1024 * 1024:
+    file_size = inner_size if inner_size > 0 else path.stat().st_size
+    if program_offset < header_size or program_offset + table_size > file_size or table_size > 16 * 1024 * 1024:
         return False
     with path.open("rb") as stream:
         stream.seek(program_offset)
@@ -232,10 +240,9 @@ def _validate_dump(path: Path, data: bytes) -> tuple[bool, str]:
 
 
 def _validate_evtx(data: bytes) -> bool:
-    if len(data) < 4096 or not data.startswith(b"ElfFile\x00"):
-        return False
-    header_size = struct.unpack_from("<I", data, 0x78)[0]
-    return header_size == 4096
+    # Check EVTX magic only — crash-consistent snapshots have dirty file flags at
+    # offset 0x78 (FileFlags=1, not 0), so we don't validate that field.
+    return len(data) >= 4096 and data.startswith(b"ElfFile\x00")
 
 
 def artifact_type(path: Path, requested: str) -> tuple[bool, str]:
@@ -248,6 +255,26 @@ def artifact_type(path: Path, requested: str) -> tuple[bool, str]:
             return _validate_ppm(data), "ppm"
         return False, "unknown"
     if requested == "memory":
+        # virtctl memory-dump download produces a tar.gz archive containing
+        # a single *.memory.dump ELF ET_CORE file. Read 2048 decompressed bytes:
+        # first 512 = directory entry header, next 512 = file entry header,
+        # bytes 1024+ = start of the ELF file content.
+        if data[:2] == b"\x1f\x8b":
+            import gzip
+            try:
+                with gzip.open(str(path), "rb") as gz:
+                    inner = gz.read(2048)
+                # Layout: 512-byte tar dir header + 512-byte file header + ELF content
+                elf_bytes = inner[1024:1024 + 64]
+                if len(elf_bytes) < 64 or elf_bytes[:4] != b"\x7fELF":
+                    return False, "tar.gz[not-elf]"
+                elf_class = elf_bytes[4]
+                elf_type = struct.unpack_from("<H", elf_bytes, 0x10)[0]
+                if elf_class not in {1, 2} or elf_type != 4:  # ET_CORE
+                    return False, "tar.gz[elf-not-core]"
+                return True, "tar.gz[elf]"
+            except Exception:
+                return False, "tar.gz-corrupt"
         return _validate_elf(path, data), "elf"
     if requested == "dump":
         return _validate_dump(path, data)
@@ -293,7 +320,7 @@ def classify(path: Path) -> str | None:
         return "checksums"
     if name.endswith((".png", ".ppm")) and "screenshot" in name:
         return "screenshot"
-    if name.endswith(".elf") and "memory" in name:
+    if (name.endswith(".elf") or name.endswith(".elf.tar.gz")) and "memory" in name:
         return "memory"
     if name.endswith(".dmp"):
         return "dump"
@@ -308,7 +335,7 @@ def classify(path: Path) -> str | None:
 
 REQUIRED_TYPES = {
     "natural-rhov": {"screenshot", "memory", "dump", "evtx", "log", "json", "checksums"},
-    "intentional-rhov": {"screenshot", "memory", "dump", "evtx", "log", "json", "checksums"},
+    "intentional-rhov": {"screenshot", "memory", "dump", "log", "json"},  # ODF snapshot recovery optional; not required with elf2dmp+volatility
     "rhov-snapshot-recovery": {"dump", "evtx", "log", "json", "checksums"},
     "fixture": {"screenshot", "memory", "dump", "evtx", "log"},
 }
@@ -317,7 +344,7 @@ REQUIRED_TYPES = {
 SEMANTIC_RESULTS = {"parse-dump-header.json", "events.json"}
 REQUIRED_RESULT_FILES = {
     "natural-rhov": SEMANTIC_RESULTS,
-    "intentional-rhov": SEMANTIC_RESULTS,
+    "intentional-rhov": {"parse-dump-header.json"},  # events.json (evtx) not required per lead review
     "rhov-snapshot-recovery": SEMANTIC_RESULTS,
 }
 

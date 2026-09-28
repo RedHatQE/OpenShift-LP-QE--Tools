@@ -136,6 +136,17 @@ if (-not $VerifyOnly) {
         Fail 'configure-dumps.ps1 must run elevated (Administrator) to write CrashControl.' 3
     }
     if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+    # Pre-create DedicatedDumpFile sized to full physical RAM + 1MB — guarantees
+    # enough space for any dump type without depending on pagefile configuration.
+    if ($desired.Contains('DedicatedDumpFile') -and $desired['DedicatedDumpFile']) {
+        $dedicatedPath = [Environment]::ExpandEnvironmentVariables($desired['DedicatedDumpFile'])
+        if (-not (Test-Path $dedicatedPath)) {
+            $ramBytes = $null
+            try { $ramBytes = [int64](Get-CimInstance Win32_ComputerSystem -ErrorAction Stop).TotalPhysicalMemory } catch { }
+            $sizeBytes = if ($ramBytes) { $ramBytes + 1MB } else { 17179869184 }  # RAM+1MB or 16Gi fallback
+            & fsutil file createnew $dedicatedPath $sizeBytes | Out-Null
+        }
+    }
     foreach ($k in $desired.Keys) {
         $v = $desired[$k]
         if ($v -is [string]) {
