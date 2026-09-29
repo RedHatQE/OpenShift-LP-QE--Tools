@@ -11,11 +11,12 @@ typeset readyTimeout="${BSOD_READY_TIMEOUT:-300}"
 typeset preflightTimeout="${BSOD_PREFLIGHT_TIMEOUT:-300}"
 typeset scriptDir=''; scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 typeset appDir=''; appDir="$(cd "${scriptDir}/../../.." && pwd)"; typeset hostDir="${appDir}/src/scripts/host"
+typeset projectRoot=''; projectRoot="$(cd "${appDir}/.." && pwd)"
 typeset watcherPid=''; typeset runId=''; runId="$(date -u +%Y%m%dT%H%M%SZ)-intentional-$$-$RANDOM"
 typeset outDir="${evidenceRoot}/${runId}"; typeset metadataFile="${outDir}/recovery-metadata.json"; typeset readyFile="${outDir}/watcher-ready"
 
 function Die () { echo "trigger-bsod-intentional: ERROR: $*" >&2; exit 1; }
-function CleanupGuestfishCache () { find "${appDir}" -maxdepth 3 -name "file.0x*" -type f -delete 2>/dev/null || true; find /tmp -maxdepth 2 -name "file.0x*" -type f -delete 2>/dev/null || true; }
+function CleanupGuestfishCache () { find "${projectRoot}" -maxdepth 5 -name "file.0x*" -type f -delete 2>/dev/null || true; find /tmp -maxdepth 2 -name "file.0x*" -type f -delete 2>/dev/null || true; }
 function Cleanup () {
   if [[ -n "${watcherPid}" ]]; then kill "${watcherPid}" 2>/dev/null || true; wait "${watcherPid}" 2>/dev/null || true; watcherPid=''; fi
   CleanupGuestfishCache
