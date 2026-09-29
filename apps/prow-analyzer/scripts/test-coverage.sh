@@ -7,9 +7,7 @@
 # is deterministic without the race detector; covermode=set (per-statement) keeps
 # the 100% gate reproducible. Integration tests (-tags integration -race) are run
 # separately and are not part of the coverage number (see the Makefile).
-set -euxo pipefail
-# inherit_errexit needs bash >= 4.4 (CI); degrade gracefully on older bash (macOS 3.2)
-shopt -s inherit_errexit 2>/dev/null || true
+set -euxo pipefail; shopt -s inherit_errexit
 
 typeset scriptDir
 scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

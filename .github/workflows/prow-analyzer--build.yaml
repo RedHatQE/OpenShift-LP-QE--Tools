@@ -30,46 +30,19 @@ jobs:
       with:
         go-version: '1.22'
     
-    - name: Build CLI
+    # CI invokes the same Make targets developers run locally, so the two cannot
+    # diverge. The test--unit target embeds the 100% coverage gate.
+    - name: Build binaries
       working-directory: ./apps/prow-analyzer
-      run: go build -v ./cmd/prow-analyzer--cli
-
-    - name: Build Bot
-      working-directory: ./apps/prow-analyzer
-      run: go build -v ./cmd/prow-analyzer--bot
+      run: make build
 
     - name: Unit Tests with Coverage
       working-directory: ./apps/prow-analyzer
-      run: |
-        ( set -euxo pipefail; shopt -s inherit_errexit
-            # Unit tests only: deterministic, all external dependencies mocked, no
-            # goroutines. covermode=set makes coverage reproducible for the gate.
-            go test -v -tags unit -coverprofile=coverage.out -covermode=set ./pkg/...
-            go tool cover -func=coverage.out
-        true )
-
-    - name: Check Coverage Threshold
-      working-directory: ./apps/prow-analyzer
-      run: |
-        ( set -euxo pipefail; shopt -s inherit_errexit
-            typeset coverage
-            coverage=$(go tool cover -func=coverage.out | grep 'total:' | awk '{print $3}' | sed 's/%//')
-            typeset -r threshold=100.0
-            if (( $(echo "${coverage} < ${threshold}" | bc -l) )); then
-                echo "❌ Coverage ${coverage}% below threshold ${threshold}%"
-                exit 1
-            fi
-            echo "✅ Coverage ${coverage}% meets threshold ${threshold}%"
-        true )
+      run: make test--unit
 
     - name: Integration Tests
       working-directory: ./apps/prow-analyzer
-      run: |
-        ( set -euxo pipefail; shopt -s inherit_errexit
-            # Integration tests: real HTTP servers and the async Handle() path,
-            # run under the race detector. No coverage threshold is enforced here.
-            go test -v -tags integration -race ./pkg/...
-        true )
+      run: make test--integration
 
   container--build-and-push:
     needs: [ build ]

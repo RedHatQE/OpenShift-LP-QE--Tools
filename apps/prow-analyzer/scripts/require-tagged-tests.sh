@@ -7,9 +7,7 @@
 # failure so the CI/Make contract can trust that a tagged suite actually exists.
 #
 # Usage: require-tagged-tests.sh <build-tag> [packages] [minCount]
-set -euxo pipefail
-# inherit_errexit needs bash >= 4.4 (CI); degrade gracefully on older bash (macOS 3.2)
-shopt -s inherit_errexit 2>/dev/null || true
+set -euxo pipefail; shopt -s inherit_errexit
 
 typeset -r buildTag="${1:?usage: require-tagged-tests.sh <build-tag> [packages] [minCount]}"
 typeset -r pkgs="${2:-./pkg/...}"
