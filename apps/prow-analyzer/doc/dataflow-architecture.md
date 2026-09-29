@@ -111,9 +111,9 @@ flowchart LR
 | Kind | Name / location | Role | Sensitive? |
 |---|---|---|---|
 | **Source code repo** | `github.com/RedHatQE/OpenShift-LP-QE--Tools` (module path) | All agent code under `apps/prow-analyzer/` | No |
-| **Container image repo** | `quay.io/<your-org>/prow-analyzer-bot` (deployed tag: `<tag>`) | Built runtime image (both bot + CLI binaries) | No (but do not bake secrets) |
+| **Container image repo** | `images.paas.redhat.com/ieng/app/prow-analyzer` (deployed tag: `<tag>`) | Built runtime image (both bot + CLI binaries) | No (but do not bake secrets) |
 | **Deployment manifests** | `apps/prow-analyzer/deploy/openshift/`, `deploy/slack/` | K8s resources + Slack app manifest | No |
-| **Runtime config store** | Deployment **env vars** in ns `<your-namespace>` (env vars, not a ConfigMap) | `SHIP_HELP_MCP_URL`, `MONITORED_CHANNELS`, `PROMPT_TEMPLATE` | No |
+| **Runtime config store** | ConfigMap `prow-analyzer-config` in ns `<your-namespace>`, surfaced to the container as env vars via `configMapKeyRef` | `SHIP_HELP_MCP_URL` (`mcp-url`), `MONITORED_CHANNELS` (`monitored-channels`), `PROMPT_TEMPLATE` (`prompt-template`); `MONITOR_ALL` is a literal env value | No |
 | **Secrets store** | K8s Secret / env in ns `<your-namespace>` | `SHIP_HELP_MCP_TOKEN`, `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` | **Yes** |
 | **Ephemeral state** | In-memory only (MCP session ID, semaphore) | No database; nothing persisted by the bot | No |
 | **Logs** | Pod stdout (`oc logs`) | Timing + error + (proposed) HAP-redaction counts | Low; avoid logging payloads |
@@ -133,9 +133,10 @@ flowchart LR
 - **Persona:** the ship-help persona used at runtime is selected via the
   `SHIP_HELP_MCP_URL` (`/personas/<persona>/mcp`) and may differ from the
   `<persona>` default in the committed manifest — set it for your environment.
-- **Config source:** values can be supplied as **direct env vars** on the
-  deployment or via a ConfigMap; the committed manifest uses env vars and does
-  **not** ship a `prow-analyzer-config` ConfigMap.
+- **Config source:** the committed manifest ships a `prow-analyzer-config`
+  ConfigMap and surfaces its keys to the container as env vars via
+  `configMapKeyRef` (tokens come from the `prow-analyzer-secrets` Secret via
+  `secretKeyRef`). `MONITOR_ALL` is set as a literal env value on the Deployment.
 - **HAP guardrails** shown with an asterisk are **not yet in the deployed
   image** — they were in progress at the time of writing. Treat that node as
   "planned" until a rebuilt image is deployed.
