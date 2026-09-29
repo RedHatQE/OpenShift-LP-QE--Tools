@@ -8,7 +8,20 @@ on:
       - 'image/container/prow-analyzer/**'
       - '.github/workflows/prow-analyzer--build.yaml'
   pull_request:
+on:
+  push:
     branches: [ main, master ]
+    paths:
+      - 'apps/prow-analyzer/**'
+      - 'image/container/prow-analyzer/**'
+      - '.github/workflows/prow-analyzer--build.yaml'
+      
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'apps/prow-analyzer/**'
+      - 'image/container/prow-analyzer/**'
+      - '.github/workflows/prow-analyzer--build.yaml'
     paths:
       - 'apps/prow-analyzer/**'
       - 'image/container/prow-analyzer/**'
