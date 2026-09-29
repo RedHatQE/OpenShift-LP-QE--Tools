@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/audit"
@@ -61,6 +62,10 @@ type Analyzer struct {
 	sessionMtx  sync.Mutex
 	initMtx     sync.Mutex
 	initialized bool
+	// nextID hands out a unique JSON-RPC id per tools/call. The Analyzer and its
+	// single MCP session are shared across the handler's concurrent goroutines, so
+	// a fixed id would let the server correlate a response to the wrong request.
+	nextID      atomic.Int64
 	insecureTLS bool
 	debug       bool
 	jsonMarshal func(v interface{}) ([]byte, error)
@@ -278,10 +283,12 @@ func (a *Analyzer) doAnalysis(ctx context.Context, jobURL string, startTime time
 	// Build prompt using the configured template
 	prompt := strings.ReplaceAll(a.template, "{job_url}", jobURL)
 
-	// Call ship-help MCP tools/call method
+	// Call ship-help MCP tools/call method. Each call gets a unique id (the
+	// initialize request uses id 0, so this counter starts at 1) so concurrent
+	// requests over the shared session cannot receive each other's responses.
 	reqBody := MCPRequest{
 		JSONRPC: "2.0",
-		ID:      1,
+		ID:      int(a.nextID.Add(1)),
 		Method:  "tools/call",
 		Params: map[string]interface{}{
 			"name": "ask_persona",
