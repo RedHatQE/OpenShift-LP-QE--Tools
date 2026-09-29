@@ -9,7 +9,7 @@
 
 This guide is for everyone who interacts with the Prow Analyzer bot in Slack or
 runs the CLI. For deep implementation detail, see
-[`architecture.md`](architecture.md); for deployment, see
+[`reference.md`](reference.md); for deployment, see
 [`deployment.md`](deployment.md).
 
 ## Table of Contents
@@ -347,7 +347,7 @@ What actually gates access:
 
 Maintainers: the user-visible message is intentionally generic; the real error
 is logged with the `PROW-ANALYZER ERROR` / `PROW-ANALYZER` prefix. See the
-[Troubleshooting section of `architecture.md`](architecture.md#troubleshooting)
+[Troubleshooting section of `reference.md`](reference.md#troubleshooting)
 for the full error reference and log-diagnosis commands.
 
 ---

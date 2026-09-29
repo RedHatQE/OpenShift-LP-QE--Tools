@@ -1,8 +1,8 @@
-# Prow Analyzer -- Usage and Architecture
+# Prow Analyzer -- Developer & Operator Reference
 
-> **Scope of this document.** This is the combined *architecture and
-> deployment/operations reference*: system design, components, MCP protocol flow,
-> design decisions, configuration reference, build/deploy steps, and
+> **Scope of this document.** This is the combined *developer and operator
+> reference*: architecture (system design, components, MCP protocol flow, design
+> decisions), plus the configuration reference, usage, build/deploy steps, and
 > troubleshooting internals. It is written for developers and operators.
 >
 > Looking for how to *use* the tool (quick start, limitations, best practices,
@@ -516,7 +516,7 @@ apps/prow-analyzer/
     openshift/deployment.yaml          OpenShift deployment manifest
     slack/manifest.yaml                Slack app manifest
   doc/
-    architecture.md                    This file
+    reference.md                       This file (developer & operator reference)
     deployment.md                      Deployment quick-start guide
   Makefile                             Local build targets
   go.mod                              Go module definition

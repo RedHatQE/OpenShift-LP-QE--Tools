@@ -15,8 +15,8 @@ Automated Prow CI failure analysis using Red Hat's ship-help MCP (AI helpdesk).
   of every tool, API, function, and data source the agent can access.
 - [Data Flow & Architecture Diagram](doc/dataflow-architecture.md) — components,
   data flows, trust boundaries, and code/data repositories (Mermaid).
-- [Architecture & Usage](doc/architecture.md) — components, MCP protocol flow,
-  configuration, and deployment internals.
+- [Developer & Operator Reference](doc/reference.md) — components, MCP protocol
+  flow, configuration, and deployment internals.
 - [Deployment quick start](doc/deployment.md).
 
 ## Features

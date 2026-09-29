@@ -101,7 +101,7 @@ spec:
 - ⚠️ **Not yet in the running production image.** The live deployment
   (`quay.io/<your-org>/prow-analyzer-bot:<tag>` in ns
   `<your-namespace>`) predates this change. Rebuild and roll out (see
-  [architecture.md](architecture.md#updating-a-running-deployment) /
+  [reference.md](reference.md#updating-a-running-deployment) /
   [dataflow-architecture.md](dataflow-architecture.md)) to activate it.
 - ❓ **Centralized immutable storage:** **not verified.** Whether a
   `ClusterLogForwarder` to an immutable store exists for this cluster must be
