@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# RHOV snapshot extraction via NTFS. Metadata, storage identity, provenance, and image
-# contract are all established before the watcher is permitted to stop the VMI.
+# Extract crash artifacts from stopped guest disk via NTFS-3G mounting in privileged pod
+# Reads offline Windows filesystem to extract MEMORY.DMP, Minidump/*.dmp, System.evtx, Application.evtx
+# Runs AFTER watch-crash.sh stops the VM - performs offline forensics extraction
 set -euo pipefail; shopt -s inherit_errexit
 umask 077
 
+# Core paths and configuration
 typeset scriptDir=''; scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Input files: preflight metadata (from watch-crash.sh), output directory, optional extract-evtx binary
 typeset metadataFile=''; typeset outDir=''; typeset commandTimeout="${BSOD_COMMAND_TIMEOUT:-30}"
 typeset extractEvtxBin="${BSOD_EXTRACT_EVTX_BIN:-${scriptDir}/extract-evtx.py}"
 while (($#)); do
@@ -59,11 +62,14 @@ typeset volumeMode=''; volumeMode="$(jq -er .volumeMode "${metadataFile}")"; typ
 typeset armedEpoch=''; armedEpoch="$(jq -er .armedEpoch "${metadataFile}")"; typeset inventory=''; inventory="$(jq -c .preCrashInventory "${metadataFile}")"
 [[ "${recoveryImage}" =~ @sha256:[0-9a-fA-F]{64}$ && "$(jq -r .recoveryImageContract "${metadataFile}")" == bash+guestfish-v1 ]] || Die 'recovery image contract was not proven by preflight'
 
+# Logging and error tracking for this extraction phase
 typeset stageErrors="${outDir}/stage-errors.jsonl"; touch "${stageErrors}"; chmod 0600 "${stageErrors}"
 typeset extractionLog="${outDir}/extraction.log"; : > "${extractionLog}"; chmod 0600 "${extractionLog}"
+# Create unique extraction pod name to avoid collisions if multiple extractions run concurrently
 typeset suffix=''; suffix="$(date -u +%Y%m%d%H%M%S)-$$"; typeset extractionPod="bsod-${suffix}-extraction"
 typeset podCreated=0; typeset cleanupDone=0
 
+# Logging helper: prefixes with timestamp and tees to both stdout and log file
 function Log () { printf '[%s] %s\n' "$(date -u +%H:%M:%S)" "$*" | tee -a "${extractionLog}"; true; }
 function RecordError () {
   typeset stage="${1:?}"; shift
@@ -87,16 +93,22 @@ function WaitJsonPath () {
   while ((SECONDS < deadline)); do actual="$(Oc get "${resource}" "${name}" -n "${ns}" -o "jsonpath=${expression}" 2>/dev/null || true)"; [[ "${actual}" == "${expected}" ]] && return 0; sleep 3; done
   return 1
 }
+# Mount stopped guest disk as read-only NTFS filesystem inside extraction pod
+# Uses ntfs-3g (NTFS-3G driver) instead of guestfish (requires libvirt socket not available on K8s nodes)
 function MountNTFS () {
   Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu 'mkdir -p /mnt/windows && ntfs-3g -o ro /dev/disk-pvc /mnt/windows' >>"${extractionLog}" 2>&1
 }
+# Extract single file from mounted NTFS, validate structure, and preserve locally
+# Converts Windows path (C:\...) to Unix path (/mnt/windows/...) for reading
 function ReadNTFSFile () {
   typeset ntfsPath="${1:?}"; typeset localPath="${2:?}"; typeset artifactType="${3:?}"; typeset required="${4:-1}"
   typeset temporary="${localPath}.tmp"; mkdir -p "$(dirname "${localPath}")"; rm -f "${temporary}"
-  # Convert Windows path to NTFS path: C:\Windows\System32\file.txt -> /mnt/windows/Windows/System32/file.txt
+  # Windows paths C:\Windows\file.txt become /mnt/windows/Windows/file.txt after mount
   typeset unixPath="/mnt/windows/${ntfsPath#[Cc]:}"
+  # Read file from pod's mounted filesystem
   if ! Oc exec -n "${ns}" "${extractionPod}" -- cat "${unixPath}" > "${temporary}" 2>>"${extractionLog}"; then
     rm -f "${temporary}"
+    # Log as required artifact failure or optional artifact absence depending on 'required' flag
     if ((required)); then RecordError export "ntfs read failed: ${ntfsPath}"; else Log "optional artifact absent: ${ntfsPath}"; fi
     return 1
   fi
@@ -112,18 +124,23 @@ function FindNTFSFiles () {
   Oc exec -n "${ns}" "${extractionPod}" -- find /mnt/windows -iname "${pattern}" 2>>"${extractionLog}" | sed 's|^/mnt/windows||' || true
 }
 
+# Create extraction pod: privileged, with direct access to stopped guest disk PVC
+# Pod runs with privileged=true to allow NTFS-3G mounting and filesystem operations
 Log "creating extraction pod to mount disk directly (VM is stopped)"
 jq -n --arg name "${extractionPod}" --arg ns "${ns}" --arg vm "${vm}" --arg pvc "${guestPvc}" \
   '{apiVersion:"v1",kind:"Pod",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-extraction","target-vm":$vm}},spec:{restartPolicy:"Never",automountServiceAccountToken:false,containers:[{name:"extractor",image:"registry.access.redhat.com/ubi8:latest",command:["/bin/bash","-ceu","trap : TERM INT; sleep infinity & wait"],securityContext:{privileged:true,allowPrivilegeEscalation:true,readOnlyRootFilesystem:false},env:[{name:"LIBGUESTFS_CACHEDIR",value:"/dev/null"},{name:"TMPDIR",value:"/tmp"}],volumeDevices:[{name:"guest-disk",devicePath:"/dev/disk-pvc"}],volumeMounts:[{name:"scratch",mountPath:"/tmp"}]}],volumes:[{name:"guest-disk",persistentVolumeClaim:{claimName:$pvc,readOnly:true}},{name:"scratch",emptyDir:{medium:"Memory",sizeLimit:"2Gi"}}]}}' | Oc apply -f - >>"${extractionLog}"
 podCreated=1; WaitJsonPath pod "${extractionPod}" '{.status.phase}' Running 180 || { RecordError extraction-pod 'extraction pod startup timed out'; exit 1; }
+# Verify block device is readable and install NTFS tools (ntfs-3g for mounting, ntfsprogs for queries)
 Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu 'test -r /dev/disk-pvc && yum install -y ntfs-3g ntfsprogs >/dev/null 2>&1 && command -v ntfs-3g >/dev/null && command -v ntfsls >/dev/null' >>"${extractionLog}" 2>&1 || { RecordError extraction-pod 'ntfs-3g tools or block device is unavailable'; exit 1; }
 
+# Track which artifact types were successfully extracted (at least one dump and optionally event logs)
 typeset dumpOk=0; typeset evtxOk=0
 Log "mounting Windows NTFS filesystem..."
 MountNTFS || { RecordError extraction-pod 'failed to mount NTFS filesystem'; exit 1; }
 
-# Locate ALL .DMP files anywhere on C: drive — Windows may write the dump to
-# unexpected paths depending on CrashDumpEnabled type and DedicatedDumpFile config.
+# Search entire C: drive for dump files
+# Windows may write dumps to unexpected paths depending on CrashDumpEnabled registry settings and DedicatedDumpFile config
+# CrashDumpEnabled=1 writes C:\Windows\MEMORY.DMP; other values may write to different locations
 Log "searching for *.DMP files across entire C: drive..."
 typeset allDumps=''; allDumps="$(Oc exec -n "${ns}" "${extractionPod}" -- find /mnt/windows -iname '*.dmp' -type f 2>>"${extractionLog}" | sed 's|^/mnt/windows||' | sort -u || true)"
 if [[ -z "${allDumps}" ]]; then

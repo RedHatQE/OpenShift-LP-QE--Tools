@@ -1,18 +1,29 @@
 #!/usr/bin/env bash
-# RHOV crash watcher. It fails closed unless preflight, crash corroboration,
-# early disk progress, and durable memory captures all succeed.
+# RHOV crash watcher: detects guest BSOD, captures crash dumps, extracts forensics artifacts
+# Fails closed: requires successful preflight validation, crash detection, dump capture, and artifact extraction
 #
-# Memory Dump Artifacts:
+# Memory Dump Artifacts Generated:
 #   PRIMARY: vm-memory-windows.dmp (elf2dmp converted from KubeVirt ELF export)
-#           (Windows DMP format, ready for volatility forensics, no PDB downloads)
-#   BACKUP:  vm-memory-raw.elf (extracted from KubeVirt export, raw physical memory)
-#           (for developer re-analysis with matching PDB/elf2dmp offline)
-# Uses elf2dmp conversion for reliable DMP generation without Kubernetes libvirt issues.
+#            Ready for Windows volatility forensics (DMP format, no PDB downloads required)
+#   BACKUP:  vm-memory.elf.tar.gz (raw physical memory from KubeVirt export)
+#            For offline re-analysis by developers with elf2dmp and matching PDBs
+#   NATIVE:  MEMORY.DMP (if guest writes native dump to C:\Windows\MEMORY.DMP)
+#            Extracted via NTFS-3G read from guest disk after VM shutdown
+#
+# Artifact Extraction (from stopped guest disk via privileged pod):
+#   - MEMORY.DMP, Minidump/*.dmp (Windows memory dumps)
+#   - System.evtx, Application.evtx (Windows event logs)
+#   - parse-dump-header.json (dump metadata for forensics)
+#   - events.json (parsed event logs in JSON format)
+#
+# Architecture: Uses VirtualMachineExport (KubeVirt) for memory streaming (no libvirt socket needed)
 set -euo pipefail; shopt -s inherit_errexit
 umask 077
 
 typeset scriptDir=''; scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Core targets: namespace, VM name, output directory, metadata file from preflight
 typeset ns=''; typeset vm=''; typeset outArg=''; typeset outDir=''; typeset metadataFile=''; typeset runId=''
+# Crash detection tuning: ping interval (5s), miss threshold (2 misses = crash), quiesce time (15 min for dump), idle samples before quiesce
 typeset interval=5; typeset miss=2; typeset quiesceWait=900; typeset idleSamples=3
 typeset snapClass="${BSOD_SNAPSHOT_CLASS:-}"; typeset recoveryImage="${BSOD_RECOVERY_IMAGE:-}"
 typeset memoryPvc="${BSOD_MEMORY_DUMP_PVC:-}"; typeset diskTarget=''; typeset noRestart=0
@@ -116,37 +127,46 @@ stageErrors="${outDir}/stage-errors.jsonl"; : > "${stageErrors}"; chmod 0600 "${
 pipelineLog="${outDir}/watcher.log"; : > "${pipelineLog}"; chmod 0600 "${pipelineLog}"
 runDir="$(mktemp -d "${TMPDIR:-/tmp}/bsod-watcher.XXXXXX")"; pvpanicFile="${runDir}/pvpanic.current"
 
+# Check if guest is reachable via QEMU Guest Agent (QGA) - measures guest OS responsiveness
 function PingOk () { RunTimed 15 "${guestAgent[@]}" ping >/dev/null 2>&1; }
+# Get libvirt domain state (running, paused, crashed, etc) - measures hypervisor visibility
 function DomainState () { Oc exec -n "${ns}" "${pod}" -- virsh domstate "${dom}" 2>/dev/null | tr -d '[:space:]'; }
+# Write final evidence summary: manifest of all captured artifacts, success/failure status
 function WriteSummary () {
   RunTimed 60 python3 "${scriptDir}/reliability.py" write-summary --out "${outDir}" --stage-errors "${stageErrors}" \
     --mode "${summaryMode}" --vm "${vm}" --namespace "${ns}" --run-id "${runId}" --filename evidence-summary.json
 }
+# Capture BSOD screenshot for visual verification: uses virtctl VNC snapshot after 60s delay (VNC becomes responsive)
 function CaptureScreenshot () {
   typeset temporary="${outDir}/.bsod-screenshot.tmp"; typeset result=''; typeset format=''; typeset target=''
   rm -f "${temporary}"
+  # VNC takes time to become responsive after BSOD; 60s sleep in main loop ensures readiness
   if ! RunTimed "${captureTimeout}" virtctl vnc screenshot "${vm}" -n "${ns}" --file="${temporary}" >>"${pipelineLog}" 2>&1; then
     RecordError screenshot 'virtctl vnc screenshot failed or timed out'; return 1
   fi
+  # Validate screenshot structure (PNG format, parseable header)
   if ! result="$(RunTimed 30 python3 "${scriptDir}/reliability.py" validate-artifact --type screenshot --path "${temporary}")"; then
     rm -f "${temporary}"; RecordError screenshot 'screenshot is structurally invalid'; return 1
   fi
   format="$(jq -r .format <<<"${result}")"; target="${outDir}/bsod-screenshot.${format}"; mv -f "${temporary}" "${target}"
   Log "validated screenshot: $(basename "${target}")"
 }
+# Capture full guest physical memory via KubeVirt (no libvirt socket needed)
+# Steps: (1) initiate memory dump to PVC, (2) poll completion, (3) create export, (4) download via HTTP, (5) convert to Windows DMP format
 function CaptureMemory () {
   typeset temporary="${outDir}/.vm-memory.elf.tmp"; typeset target="${outDir}/vm-memory.elf.tar.gz"
+  # VirtualMachineExport name must be DNS subdomain-safe (63 chars max, no trailing dash)
   typeset exportName="bsod-memdump-${runId,,}"; exportName="${exportName:0:63}"; exportName="${exportName%-}"
   typeset pfPid=''
   rm -f "${temporary}"
 
-  # 1. Submit memory dump request via virtctl (no virsh, no node writes)
+  # Step 1: Submit memory dump request to KubeVirt - writes ELF format to memoryPvc
   if ! RunTimed 90 virtctl memory-dump get "${vm}" -n "${ns}" --claim-name="${memoryPvc}" >>"${pipelineLog}" 2>&1; then
     RecordError memory 'KubeVirt memory-dump request failed or timed out'; return 1
   fi
   memoryAssociated=1
 
-  # 2. Wait for dump phase=Completed
+  # Step 2: Wait for dump phase=Completed (polling memoryDumpRequest.phase in VM status)
   typeset phase='' deadline=$((SECONDS + memoryTimeout))
   while ((SECONDS < deadline)); do
     phase="$(Oc get vm "${vm}" -n "${ns}" -o jsonpath='{.status.memoryDumpRequest.phase}' 2>>"${pipelineLog}" || true)"
@@ -156,7 +176,7 @@ function CaptureMemory () {
   done
   [[ "${phase}" == Completed ]] || { RecordError memory "KubeVirt memory-dump phase timed out (last=${phase:-unset})"; return 1; }
 
-  # 3. Create VirtualMachineExport for the memdump PVC (oc only, no virsh)
+  # Step 3: Create VirtualMachineExport to stream the dumped PVC over HTTP (no direct node access)
   Oc apply -f - >>"${pipelineLog}" 2>&1 <<EOF
 apiVersion: export.kubevirt.io/v1beta1
 kind: VirtualMachineExport
