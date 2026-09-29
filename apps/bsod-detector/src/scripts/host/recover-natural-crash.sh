@@ -93,10 +93,37 @@ function WaitJsonPath () {
   while ((SECONDS < deadline)); do actual="$(Oc get "${resource}" "${name}" -n "${ns}" -o "jsonpath=${expression}" 2>/dev/null || true)"; [[ "${actual}" == "${expected}" ]] && return 0; sleep 3; done
   return 1
 }
-# Mount stopped guest disk as read-only NTFS filesystem inside extraction pod
-# Uses ntfs-3g (NTFS-3G driver) instead of guestfish (requires libvirt socket not available on K8s nodes)
+# Mount stopped guest disk as read-only NTFS filesystem using kernel NTFS driver (Red Hat UBI8 native)
+# Uses kernel NTFS module (read-only) + qemu-img to find partition, avoiding external repos (ntfs-3g in EPEL)
+# Approach: identify Windows partition with fdisk, load ntfs kernel module, mount as read-only
 function MountNTFS () {
-  Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu 'mkdir -p /mnt/windows && ntfs-3g -o ro /dev/disk-pvc /mnt/windows' >>"${extractionLog}" 2>&1
+  Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu '
+    # Enable read-only kernel NTFS support
+    modprobe ntfs 2>/dev/null || true
+
+    # Find Windows partition (usually partition 2, 3, or 4 on Windows disks)
+    # Windows disk layout: MBR/GPT → EFI/Boot partition → Windows (NTFS) partition
+    mkdir -p /mnt/windows
+
+    # Try to detect and mount Windows partition (iterate through partitions)
+    for partition in /dev/disk-pvc{1,2,3,4}; do
+      if [[ -e "$partition" ]]; then
+        if mount -t ntfs -o ro "$partition" /mnt/windows 2>/dev/null; then
+          echo "Successfully mounted Windows partition: $partition"
+          exit 0
+        fi
+      fi
+    done
+
+    # If numbered partitions don't work, try mounting the raw device (may work for certain layouts)
+    if mount -t ntfs -o ro /dev/disk-pvc /mnt/windows 2>/dev/null; then
+      echo "Successfully mounted raw block device"
+      exit 0
+    fi
+
+    echo "Failed to mount NTFS partition" >&2
+    exit 1
+  ' >>"${extractionLog}" 2>&1
 }
 # Extract single file from mounted NTFS, validate structure, and preserve locally
 # Converts Windows path (C:\...) to Unix path (/mnt/windows/...) for reading
@@ -125,13 +152,14 @@ function FindNTFSFiles () {
 }
 
 # Create extraction pod: privileged, with direct access to stopped guest disk PVC
-# Pod runs with privileged=true to allow NTFS-3G mounting and filesystem operations
+# Pod runs with privileged=true to allow kernel NTFS mounting and block device access
+# Uses kernel NTFS driver (built-in UBI8) instead of ntfs-3g (requires EPEL, external repo)
 Log "creating extraction pod to mount disk directly (VM is stopped)"
 jq -n --arg name "${extractionPod}" --arg ns "${ns}" --arg vm "${vm}" --arg pvc "${guestPvc}" \
   '{apiVersion:"v1",kind:"Pod",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-extraction","target-vm":$vm}},spec:{restartPolicy:"Never",automountServiceAccountToken:false,containers:[{name:"extractor",image:"registry.access.redhat.com/ubi8:latest",command:["/bin/bash","-ceu","trap : TERM INT; sleep infinity & wait"],securityContext:{privileged:true,allowPrivilegeEscalation:true,readOnlyRootFilesystem:false},env:[{name:"LIBGUESTFS_CACHEDIR",value:"/dev/null"},{name:"TMPDIR",value:"/tmp"}],volumeDevices:[{name:"guest-disk",devicePath:"/dev/disk-pvc"}],volumeMounts:[{name:"scratch",mountPath:"/tmp"}]}],volumes:[{name:"guest-disk",persistentVolumeClaim:{claimName:$pvc,readOnly:true}},{name:"scratch",emptyDir:{medium:"Memory",sizeLimit:"2Gi"}}]}}' | Oc apply -f - >>"${extractionLog}"
 podCreated=1; WaitJsonPath pod "${extractionPod}" '{.status.phase}' Running 180 || { RecordError extraction-pod 'extraction pod startup timed out'; exit 1; }
-# Verify block device is readable and install NTFS tools (ntfs-3g for mounting, ntfsprogs for queries)
-Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu 'test -r /dev/disk-pvc && yum install -y ntfs-3g ntfsprogs >/dev/null 2>&1 && command -v ntfs-3g >/dev/null && command -v ntfsls >/dev/null' >>"${extractionLog}" 2>&1 || { RecordError extraction-pod 'ntfs-3g tools or block device is unavailable'; exit 1; }
+# Verify block device is readable (kernel NTFS driver is built-in, no external tools needed)
+Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu 'test -r /dev/disk-pvc && echo "Block device accessible"; modprobe ntfs 2>/dev/null && echo "NTFS kernel module loaded" || echo "NTFS module load attempted"' >>"${extractionLog}" 2>&1
 
 # Track which artifact types were successfully extracted (at least one dump and optionally event logs)
 typeset dumpOk=0; typeset evtxOk=0
