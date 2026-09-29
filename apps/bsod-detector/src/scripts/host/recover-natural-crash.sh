@@ -232,7 +232,7 @@ fi
 
 # Clean up any leftover cache files (.0x image sections from guestfish or kernel operations)
 # These are disabled via LIBGUESTFS_CACHEDIR=/dev/null but clean up any that may have leaked
-find "${outDir}" -name "file.0x*.img" -o -name "file.0x*.dat" -o -name "file.0x*.vacb" 2>/dev/null | while read -r file; do
+find "${outDir}" /tmp -maxdepth 2 -name "file.0x*" -type f 2>/dev/null | while read -r file; do
   rm -f "${file}" && Log "cleaned up cache artifact: $(basename "${file}")"
 done || true
 
