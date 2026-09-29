@@ -2,7 +2,7 @@
 
 > System components, data flows, and the code/data repositories involved in the
 > Prow Analyzer AI system. Diagrams use Mermaid (renders on GitHub). For deeper
-> component detail see [architecture.md](architecture.md); for the full
+> component detail see [reference.md](reference.md); for the full
 > capability list see [capabilities-inventory.md](capabilities-inventory.md).
 
 ## 1. Component & Data-Flow Diagram
