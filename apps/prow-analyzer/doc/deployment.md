@@ -40,13 +40,23 @@ Post a Prow URL in your monitored channel and watch for bot response.
 
 ### Step 1: Build and Push Image
 
-```bash
-# Login to Quay
-podman login quay.io
+The Makefile builds `$(IMAGE_REGISTRY)/$(IMAGE_NAMESPACE)/$(IMAGE_NAME):$(IMAGE_TAG)`,
+which defaults to `images.paas.redhat.com/ieng/app/prow-analyzer:latest`. Log in to
+the **same registry** you build for, and note the exact reference you push — Step 3
+requires putting it in the manifest.
 
-# Build and push using Makefile (from repo root)
-make -C image/container/prow-analyzer build IMAGE_NAMESPACE=<your-org> IMAGE_TAG=v1.0.0
-make -C image/container/prow-analyzer push IMAGE_NAMESPACE=<your-org> IMAGE_TAG=v1.0.0
+```bash
+# Log in to the target registry (default: images.paas.redhat.com)
+podman login images.paas.redhat.com
+
+# Build and push with the Makefile defaults
+#   -> images.paas.redhat.com/ieng/app/prow-analyzer:latest
+make -C image/container/prow-analyzer build
+make -C image/container/prow-analyzer push
+
+# Or override any of IMAGE_REGISTRY / IMAGE_NAMESPACE / IMAGE_NAME / IMAGE_TAG, e.g.:
+#   -> images.paas.redhat.com/<your-namespace>/prow-analyzer:v1.0.0
+make -C image/container/prow-analyzer push IMAGE_NAMESPACE=<your-namespace> IMAGE_TAG=v1.0.0
 ```
 
 ### Step 2: Create Secrets
@@ -65,12 +75,21 @@ oc create secret generic prow-analyzer-secrets \
 
 ### Step 3: Update Configuration
 
-Edit `deploy/openshift/deployment.yaml`:
+`deploy/openshift/deployment.yaml` ships with placeholders that **must** be replaced
+before `oc apply`. Leaving them will either stop the pod from starting (placeholder
+image → `ImagePullBackOff`/`CrashLoopBackOff`) or stop it from reaching ship-help
+(placeholder MCP URL). Replace all three:
 
 ```yaml
-# Update monitored-channels in ConfigMap
-data:
-  monitored-channels: "C12345678,C87654321"  # Your actual channel IDs
+# Deployment (spec.template.spec.containers[0].image):
+# point at the exact image you pushed in Step 1
+    image: images.paas.redhat.com/ieng/app/prow-analyzer:latest
+
+# ConfigMap: your ship-help MCP endpoint
+  mcp-url: "https://<ship-help-mcp-host>/personas/<persona>/mcp"
+
+# ConfigMap: your actual channel IDs
+  monitored-channels: "C12345678,C87654321"
 ```
 
 ### Step 4: Deploy

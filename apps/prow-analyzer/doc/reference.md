@@ -389,7 +389,7 @@ Analysis queue is currently full. Please retry in a moment.
 
 - Go 1.22+ (for building from source)
 - podman (for container builds)
-- Access to quay.io (for pushing images)
+- Push access to the target registry (default: `images.paas.redhat.com`)
 - `oc` CLI (for OpenShift deployment)
 - Ship-help MCP token (from the ship-help support channel on Slack)
 - Slack app with Socket Mode enabled
@@ -430,7 +430,8 @@ Test by posting a Prow URL in the monitored channel.
 ```bash
 cd image/container/prow-analyzer
 
-podman login quay.io
+# Log in to the target registry (default: images.paas.redhat.com)
+podman login images.paas.redhat.com
 
 # --platform linux/amd64 is required when building on Mac ARM
 make push BUILDFLAGS="--platform linux/amd64"
@@ -439,7 +440,7 @@ make push BUILDFLAGS="--platform linux/amd64"
 make push BUILDFLAGS="--platform linux/amd64" IMAGE_TAG=v1.1.0
 ```
 
-The image pushes to `quay.io/<IMAGE_NAMESPACE>/prow-analyzer-bot:<IMAGE_TAG>`. The default namespace is set in the Makefile.
+The image pushes to `$(IMAGE_REGISTRY)/$(IMAGE_NAMESPACE)/$(IMAGE_NAME):$(IMAGE_TAG)`, which defaults to `images.paas.redhat.com/ieng/app/prow-analyzer:latest`. Override `IMAGE_REGISTRY`, `IMAGE_NAMESPACE`, `IMAGE_NAME`, or `IMAGE_TAG` on the `make` command line as needed, and note the exact reference — Step 3 puts it in the manifest.
 
 **Step 2: Create secrets in the target namespace.**
 
@@ -453,11 +454,15 @@ oc create secret generic prow-analyzer-secrets \
 
 **Step 3: Update the deployment manifest.**
 
-Edit `deploy/openshift/deployment.yaml`:
+Edit `deploy/openshift/deployment.yaml`. The manifest ships with placeholders that
+**must** be replaced before `oc apply`, or the pod will not start (placeholder image
+→ `ImagePullBackOff`/`CrashLoopBackOff`) or will not reach ship-help (placeholder MCP
+URL):
 
 - Set `namespace` on all resources to your target namespace.
+- Set the container `image` field to the exact reference you pushed in Step 1 (default: `images.paas.redhat.com/ieng/app/prow-analyzer:latest`).
+- Set `mcp-url` in the ConfigMap to your ship-help MCP endpoint.
 - Set `monitored-channels` in the ConfigMap to your actual channel IDs.
-- Set the container `image` field to your registry path (e.g., `quay.io/<your-org>/prow-analyzer-bot:latest`).
 
 **Step 4: Deploy.**
 
@@ -489,7 +494,7 @@ oc rollout restart deployment/prow-analyzer-bot -n <your-namespace>
 
 # Or update to a new tag
 oc set image deployment/prow-analyzer-bot -n <your-namespace> \
-  container=quay.io/<namespace>/prow-analyzer-bot:<new-tag>
+  bot=images.paas.redhat.com/ieng/app/prow-analyzer:<new-tag>
 ```
 
 ---

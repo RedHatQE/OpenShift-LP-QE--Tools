@@ -21,7 +21,7 @@ metadata:
   namespace: prow-analyzer
 data:
   monitored-channels: "C12345678,C87654321"  # Replace with actual channel IDs
-  mcp-url: "https://<ship-help-mcp-host>/personas/<persona>/mcp"
+  mcp-url: "https://<ship-help-mcp-host>/personas/<persona>/mcp"  # Replace with your ship-help MCP endpoint
   prompt-template: "Analyze this Prow CI failure in detail. Provide: (1) Root cause, (2) Related Jira issues, (3) Recurring pattern analysis, (4) Recommended actions. URL: {job_url}"
 ---
 apiVersion: apps/v1
@@ -43,7 +43,9 @@ spec:
     spec:
       containers:
       - name: bot
-        image: quay.io/<your-org>/prow-analyzer-bot:v1.0.0
+        # Replace with the image you built and pushed in Step 1
+        # (Makefile default: images.paas.redhat.com/ieng/app/prow-analyzer:latest).
+        image: images.paas.redhat.com/ieng/app/prow-analyzer:latest
         command: ["/usr/bin/prow-analyzer--bot"]
         securityContext:
           runAsNonRoot: true
