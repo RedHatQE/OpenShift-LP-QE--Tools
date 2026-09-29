@@ -44,9 +44,6 @@
   - [Bot Not Responding](#bot-not-responding)
   - [Exec Format Error](#exec-format-error)
   - [Queue Full](#queue-full)
-- [Known Issues](#known-issues)
-  - [Deployment command / binary-name mismatch](#deployment-command--binary-name-mismatch)
-  - [PROMPT_TEMPLATE env var is not consumed](#prompt_template-env-var-is-not-consumed)
 
 ---
 
@@ -251,16 +248,26 @@ If step 2 returns `HTTP 404` with `{"error":{"message":"Session not found"}}`, t
 
 ### Environment Variables
 
-| Variable                   | Required | Used By  | Description                                          |
-|----------------------------|----------|----------|------------------------------------------------------|
-| `SHIP_HELP_MCP_URL`        | Yes      | CLI, Bot | Ship-help MCP endpoint URL                           |
-| `SHIP_HELP_MCP_TOKEN`      | Yes      | CLI, Bot | Bearer token for MCP authentication                  |
-| `SLACK_BOT_TOKEN`          | Bot only | Bot      | Slack bot token (`xoxb-...`)                         |
-| `SLACK_APP_TOKEN`          | Bot only | Bot      | Slack app-level token for Socket Mode (`xapp-...`)   |
-| `MONITORED_CHANNELS`       | Bot only | Bot      | Comma-separated Slack channel IDs to monitor         |
-| `TLS_INSECURE_SKIP_VERIFY` | No       | CLI, Bot | Set to `"true"` to skip TLS certificate verification |
+| Variable                   | Required | Used By  | Description                                                                                   |
+|----------------------------|----------|----------|-----------------------------------------------------------------------------------------------|
+| `SHIP_HELP_MCP_URL`        | Yes      | CLI, Bot | Ship-help MCP endpoint URL                                                                     |
+| `SHIP_HELP_MCP_TOKEN`      | Yes      | CLI, Bot | Bearer token for MCP authentication                                                            |
+| `SLACK_BOT_TOKEN`          | Bot only | Bot      | Slack bot token (`xoxb-...`)                                                                   |
+| `SLACK_APP_TOKEN`          | Bot only | Bot      | Slack app-level token for Socket Mode (`xapp-...`)                                             |
+| `MONITORED_CHANNELS`       | Bot only | Bot      | Comma-separated Slack channel IDs to monitor                                                   |
+| `ALLOWED_BOT_IDS`          | No       | Bot      | Comma-separated bot IDs (`B...`) whose Prow URLs are analyzed; the bot always ignores its own  |
+| `MONITOR_ALL`              | No       | Bot      | `"true"` monitors every joined channel instead of only `MONITORED_CHANNELS` (default `false`)  |
+| `PROMPT_TEMPLATE`          | No       | Bot      | Analysis prompt template with a `{job_url}` placeholder (default: built-in detailed prompt)    |
+| `SLACK_DEBUG`              | No       | Bot      | `"true"` enables verbose Slack SDK / Socket Mode debug logging (default `false`)               |
+| `MCP_DEBUG`                | No       | CLI, Bot | `"true"` enables verbose MCP SSE logging incl. response payload previews (default `false`)     |
+| `MCP_TIMEOUT_SECONDS`      | No       | CLI, Bot | MCP HTTP client timeout in seconds; caps the whole request incl. SSE read (default `1200`)     |
+| `TLS_INSECURE_SKIP_VERIFY` | No       | CLI, Bot | Set to `"true"` to skip TLS certificate verification                                           |
 
-All environment variables can be overridden by the corresponding command-line flag.
+For the **bot**, every variable above has a corresponding flag that overrides it
+(see [Bot Flags](#bot-flags)). The **CLI** exposes flags only for `--mcp-url`,
+`--token`, and `--prompt`; the other variables it honors — `MCP_DEBUG`,
+`MCP_TIMEOUT_SECONDS`, and `TLS_INSECURE_SKIP_VERIFY` — are env-only there.
+`PROMPT_TEMPLATE` is read only by the bot; the CLI's prompt comes from `--prompt`.
 
 ### CLI Flags
 
@@ -274,6 +281,9 @@ prow-analyzer--cli [flags] analyze <prow-url>
 
 Exactly two positional arguments are required: the command (`analyze`) and the Prow job URL.
 
+The CLI has no flags for `MCP_DEBUG`, `MCP_TIMEOUT_SECONDS`, or
+`TLS_INSECURE_SKIP_VERIFY`; set those via environment variables when needed.
+
 ### Bot Flags
 
 ```
@@ -284,8 +294,21 @@ prow-analyzer--bot [flags]
   -mcp-url       Ship-help MCP URL (default: $SHIP_HELP_MCP_URL)
   -mcp-token     Ship-help MCP token (default: $SHIP_HELP_MCP_TOKEN)
   -channels      Comma-separated channel IDs (default: $MONITORED_CHANNELS)
-  -prompt        Analysis prompt template (default: detailed template requesting
-                 root cause, Jira issues, recurring patterns, and recommended actions)
+  -allowed-bots  Comma-separated bot IDs (B...) whose Prow URLs are analyzed
+                 (default: $ALLOWED_BOT_IDS)
+  -prompt        Analysis prompt template with a {job_url} placeholder
+                 (default: $PROMPT_TEMPLATE, else a built-in detailed template
+                 requesting root cause, Jira issues, recurring patterns, and
+                 recommended actions)
+  -monitor-all   Monitor every channel the bot is a member of instead of only
+                 -channels (default: $MONITOR_ALL, else false). Fail-closed:
+                 without this and with no -channels, no channel is monitored
+  -slack-debug   Verbose Slack SDK / Socket Mode debug logging
+                 (default: $SLACK_DEBUG, else false)
+  -mcp-debug     Verbose MCP SSE logging incl. response payload previews
+                 (default: $MCP_DEBUG, else false; off for data minimization)
+  -tls-insecure  Skip TLS certificate verification for MCP/Prow requests
+                 (default: $TLS_INSECURE_SKIP_VERIFY, else false)
 ```
 
 ### Prompt Template
@@ -297,9 +320,14 @@ The prompt is a string with a `{job_url}` placeholder that is replaced with the 
 3. Recurring pattern analysis
 4. Recommended actions
 
-Customize via the `-prompt` command-line flag.
+Customize via the `-prompt` command-line flag, or — for the bot — the
+`PROMPT_TEMPLATE` environment variable.
 
-> **Note:** The bot's `-prompt` flag defaults to a hardcoded string literal; it does **not** read an environment variable. The `PROMPT_TEMPLATE` env var / `prompt-template` ConfigMap key wired up in `deploy/openshift/deployment.yaml` is therefore **not currently consumed** by the bot. To change the deployed prompt today, pass `-prompt` via the container `args`. See [Known Issues](#known-issues) for details.
+> **Note:** The bot resolves its prompt as `-prompt` flag → `PROMPT_TEMPLATE` env
+> var → built-in default, so the `prompt-template` ConfigMap key wired to
+> `PROMPT_TEMPLATE` in `deploy/openshift/deployment.yaml` takes effect on the
+> deployed bot. The CLI's prompt comes only from its `-prompt` flag (it does not
+> read `PROMPT_TEMPLATE`).
 
 ### Recognized Prow URL Patterns
 
@@ -654,39 +682,3 @@ All 5 concurrent analysis slots are occupied. Wait for in-progress analyses to c
 ```go
 semaphore: make(chan struct{}, 5),  // increase this value
 ```
-
----
-
-## Known Issues
-
-These are gaps between the committed configuration and the code as of this writing. They do not affect the CLI or a locally-run bot invoked with explicit flags, but they will bite an OpenShift deployment made straight from the manifest.
-
-### Deployment `command` / binary-name mismatch
-
-`deploy/openshift/deployment.yaml` overrides the image entrypoint with:
-
-```yaml
-command: ["/usr/bin/prow-analyzer-bot"]   # single dash
-```
-
-The Dockerfile installs the binary as `/usr/bin/prow-analyzer--bot` (**double** dash) and sets it as the `ENTRYPOINT`. As written, the `command` override points at a path that does not exist, so the container fails to start (CrashLoopBackOff). The liveness probe has the same problem: `pgrep prow-analyzer-bot` will not match the running process named `prow-analyzer--bot`.
-
-**Fix options (pick one):**
-
-- Remove the `command:` line entirely and let the Dockerfile `ENTRYPOINT` run, and change the probe to `pgrep prow-analyzer--bot` (or `pgrep -f prow-analyzer--bot`).
-- Or rename the binary to `prow-analyzer-bot` consistently in the Dockerfile, Makefile output, and probe.
-
-### `PROMPT_TEMPLATE` env var is not consumed
-
-The deployment sets `PROMPT_TEMPLATE` from the `prompt-template` ConfigMap key, but `cmd/prow-analyzer--bot/main.go` defines the prompt flag as:
-
-```go
-prompt = flag.String("prompt", "Analyze this Prow CI failure in detail. ...", "Analysis prompt template")
-```
-
-The default is a string literal, not `os.Getenv("PROMPT_TEMPLATE")`, and nothing else reads the env var. Editing the ConfigMap therefore has no effect on the deployed bot's prompt.
-
-**Fix options (pick one):**
-
-- Change the flag default to `os.Getenv("PROMPT_TEMPLATE")` (with a fallback literal), matching the pattern used for the other bot flags.
-- Or pass the prompt explicitly through the container `args` in the deployment (`args: ["-prompt", "$(PROMPT_TEMPLATE)"]`).
