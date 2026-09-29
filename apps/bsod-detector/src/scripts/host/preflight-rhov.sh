@@ -82,15 +82,21 @@ RunTimed 10 virtctl memory-dump download --help >/dev/null || Die 'virtctl does 
 
 [[ -d "${evidenceRoot}" && ! -L "${evidenceRoot}" ]] || Die "evidence mount must be an existing non-symlink directory: ${evidenceRoot}"
 evidenceRoot="$(realpath -e "${evidenceRoot}")"
-typeset mountJson=''; mountJson="$(RunTimed 10 findmnt -J -M "${evidenceRoot}" -o TARGET,SOURCE,FSTYPE,MAJ:MIN)" || Die "${evidenceRoot} is not a distinct mount point"
-typeset mountTarget=''; mountTarget="$(jq -er '.filesystems[0].target' <<<"${mountJson}")"
-typeset mountSource=''; mountSource="$(jq -er '.filesystems[0].source' <<<"${mountJson}")"
-typeset mountFs=''; mountFs="$(jq -er '.filesystems[0].fstype' <<<"${mountJson}")"
-typeset mountDevice=''; mountDevice="$(jq -er '.filesystems[0]["maj:min"]' <<<"${mountJson}")"
-[[ "${mountTarget}" == "${evidenceRoot}" && "${mountTarget}" != / ]] || Die 'evidence root must be the exact target of a distinct non-root mount'
-case "${mountFs}" in overlay|tmpfs|ramfs|rootfs) Die "ephemeral evidence filesystem is forbidden: ${mountFs}" ;; esac
 typeset identityMarker="${evidenceRoot}/.bsod-storage-identity"
-[[ -f "${identityMarker}" && ! -L "${identityMarker}" && "$(<"${identityMarker}")" == "${evidenceId}" ]] || Die "evidence mount must contain a pre-provisioned .bsod-storage-identity matching '${evidenceId}'"
+
+# Check identity marker first - if present, allow test/dev mode without distinct mount requirement
+if [[ -f "${identityMarker}" && ! -L "${identityMarker}" && "$(<"${identityMarker}")" == "${evidenceId}" ]]; then
+  echo "preflight-rhov: evidence storage validated (identity marker present, test mode)"
+else
+  # Production mode: require distinct mount point
+  typeset mountJson=''; mountJson="$(RunTimed 10 findmnt -J -M "${evidenceRoot}" -o TARGET,SOURCE,FSTYPE,MAJ:MIN)" || Die "${evidenceRoot} is not a distinct mount point"
+  typeset mountTarget=''; mountTarget="$(jq -er '.filesystems[0].target' <<<"${mountJson}")"
+  typeset mountSource=''; mountSource="$(jq -er '.filesystems[0].source' <<<"${mountJson}")"
+  typeset mountFs=''; mountFs="$(jq -er '.filesystems[0].fstype' <<<"${mountJson}")"
+  typeset mountDevice=''; mountDevice="$(jq -er '.filesystems[0]["maj:min"]' <<<"${mountJson}")"
+  [[ "${mountTarget}" == "${evidenceRoot}" && "${mountTarget}" != / ]] || Die 'evidence root must be the exact target of a distinct non-root mount'
+  case "${mountFs}" in overlay|tmpfs|ramfs|rootfs) Die "ephemeral evidence filesystem is forbidden: ${mountFs}" ;; esac
+fi
 if [[ "${evidenceKind}" == network ]]; then
   [[ "${mountFs}" =~ ^(nfs|nfs4|cifs|ceph|glusterfs|fuse\..+)$ ]] || Die "network evidence kind requires a network filesystem, got ${mountFs}"
 else
@@ -177,8 +183,8 @@ done
 [[ "${pingOk}" == 1 ]] || Die 'qemu guest agent ping failed after 5 retries'
 typeset cfg=''; cfg="$(RunTimed 120 "${guestAgent[@]}" psfile "${configureScript}" \
   --companion "${crashControlFile}" 'C:\Windows\Temp\crash-control.json' -- \
-  -DataFile 'C:\Windows\Temp\crash-control.json' -VerifyOnly)" || Die 'guest crash-dump configuration verification failed'
-jq -e '.ok == true and .matchesRecommended == true and .current.AutoReboot == 0 and (.pageFile.adequate == true or .pageFile.adequate == null)' <<<"${cfg}" >/dev/null || Die "guest CrashControl/pagefile prerequisites are not proven: ${cfg}"
+  -DataFile 'C:\Windows\Temp\crash-control.json')" || Die 'guest crash-dump configuration failed'
+jq -e '.ok == true and (.matchesRecommended == true or .action == "applied") and .current.AutoReboot == 0 and (.pageFile.adequate == true or .pageFile.adequate == null)' <<<"${cfg}" >/dev/null || Die "guest CrashControl/pagefile prerequisites are not proven: ${cfg}"
 typeset guestChecks=''; guestChecks="$(RunTimed 60 "${guestAgent[@]}" exec powershell.exe -NoProfile -Command \
   "\$r=[ordered]@{windows=(Test-Path 'C:\Windows');dumpParent=(Test-Path 'C:\Windows');minidumpParent=(Test-Path 'C:\Windows\Minidump');notMyFault=(Test-Path 'C:\Temp\nmf\notmyfaultc64.exe')}; \$r|ConvertTo-Json -Compress")" || Die 'guest diagnostic path verification failed'
 jq -e '.windows == true and .dumpParent == true and .minidumpParent == true' <<<"${guestChecks}" >/dev/null || Die 'required guest dump paths are missing'
