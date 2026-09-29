@@ -3,7 +3,7 @@
 ## Prerequisites
 
 1. **Ship-help MCP Token**
-   - Get from #ship-users in Slack
+   - Get from the ship-help support channel in Slack
    - Or reuse existing token from ship-help-bot
 
 2. **Slack App** (for bot only)
@@ -20,7 +20,7 @@
 
 ```bash
 # Set environment variables
-export SHIP_HELP_MCP_URL="https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp"
+export SHIP_HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
 export SHIP_HELP_MCP_TOKEN="$(cat /path/to/token.txt | tr -d '\n')"
 export SLACK_BOT_TOKEN="xoxb-..."
 export SLACK_APP_TOKEN="xapp-..."

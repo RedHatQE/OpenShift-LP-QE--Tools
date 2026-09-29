@@ -28,7 +28,7 @@ Automated Prow CI failure analysis using Red Hat's ship-help MCP (AI helpdesk).
   - GitHub repositories and PRs
   - Build logs and artifacts
   - Test results and history
-  - Firewatch automated triage
+  - automated known-issue triage
   - Slack team discussions
   - Internal documentation
   - Historical failure patterns
@@ -45,12 +45,12 @@ export SHIP_HELP_MCP_TOKEN="<your-token>"
 ./prow-analyzer--cli analyze <prow-url>
 ```
 
-**Note:** Analysis takes 2-4 minutes as ship-help searches across 9+ data sources (Jira, GitHub, Firewatch, build logs, etc.).
+**Note:** Analysis takes 2-4 minutes as ship-help searches across 9+ data sources (Jira, GitHub, an internal triage system, build logs, etc.).
 
 Example:
 
 ```bash
-export SHIP_HELP_MCP_URL="https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp"
+export SHIP_HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
 export SHIP_HELP_MCP_TOKEN="eyJhbGc..."
 ./prow-analyzer--cli analyze https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-stolostron-policy-collection-main-ocp4.22-interop-opp-aws/2066255424226594816
 ```
@@ -79,15 +79,15 @@ The bot monitors configured Slack channels and automatically analyzes any Prow U
 ### Local Development
 
 ```bash
-git clone https://github.com/oramraz/prow-analyzer.git
-cd prow-analyzer
+git clone https://github.com/RedHatQE/OpenShift-LP-QE--Tools.git
+cd OpenShift-LP-QE--Tools/apps/prow-analyzer
 go mod download
 
 # Build CLI
 go build ./cmd/prow-analyzer--cli
 
 # Configure environment (required)
-export SHIP_HELP_MCP_URL="https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp"
+export SHIP_HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
 export SHIP_HELP_MCP_TOKEN="your-token-here"
 
 # Run CLI
@@ -126,7 +126,7 @@ oc apply -f ../../apps/prow-analyzer/deploy/openshift/deployment.yaml
 ### Getting Tokens
 
 **Ship-help MCP Token:**
-- Contact #ship-users in Slack or
+- Contact the ship-help support channel in Slack or
 - Use existing token from ship-help-bot access
 
 **Slack Tokens:**
@@ -199,7 +199,6 @@ Analysis completed in 78.6s • Powered by ship-help MCP
 Based on the working implementation from:
 - openshift/ci-tools PR #5251 (analyzer code)
 - openshift/release PR #80559 (configuration)
-- Credit to @chaclark1974 for original Slack integration design
 
 ## License
 

@@ -21,7 +21,7 @@ metadata:
   namespace: prow-analyzer
 data:
   monitored-channels: "C12345678,C87654321"  # Replace with actual channel IDs
-  mcp-url: "https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp"
+  mcp-url: "https://<ship-help-mcp-host>/personas/<persona>/mcp"
   prompt-template: "Analyze this Prow CI failure in detail. Provide: (1) Root cause, (2) Related Jira issues, (3) Recurring pattern analysis, (4) Recommended actions. URL: {job_url}"
 ---
 apiVersion: apps/v1
@@ -43,8 +43,8 @@ spec:
     spec:
       containers:
       - name: bot
-        image: quay.io/oramraz/prow-analyzer-bot:v1.0.0
-        command: ["/usr/bin/prow-analyzer-bot"]
+        image: quay.io/<your-org>/prow-analyzer-bot:v1.0.0
+        command: ["/usr/bin/prow-analyzer--bot"]
         securityContext:
           runAsNonRoot: true
           runAsUser: 1000
@@ -80,6 +80,10 @@ spec:
             configMapKeyRef:
               name: prow-analyzer-config
               key: monitored-channels
+        # Fail-closed by default: with an empty MONITORED_CHANNELS the bot monitors
+        # nothing unless MONITOR_ALL is set to "true" (monitors every joined channel).
+        - name: MONITOR_ALL
+          value: "false"
         - name: PROMPT_TEMPLATE
           valueFrom:
             configMapKeyRef:
@@ -97,6 +101,6 @@ spec:
             command:
             - /bin/sh
             - -c
-            - pgrep prow-analyzer-bot
+            - pgrep -f /usr/bin/prow-analyzer--bot
           initialDelaySeconds: 30
           periodSeconds: 30

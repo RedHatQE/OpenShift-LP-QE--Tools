@@ -62,6 +62,7 @@ type Analyzer struct {
 	initMtx     sync.Mutex
 	initialized bool
 	insecureTLS bool
+	debug       bool
 	jsonMarshal func(v interface{}) ([]byte, error)
 	newRequest  func(ctx context.Context, method, url string, body io.Reader) (*http.Request, error)
 }
@@ -105,6 +106,15 @@ func WithInsecureSkipVerify(insecure bool) AnalyzerOption {
 	return func(a *Analyzer) { a.insecureTLS = insecure }
 }
 
+// WithDebug enables verbose logging of the MCP SSE stream that includes payload
+// content (a preview of each data line and the full text of non-data lines). It
+// is an explicit opt-in because SSE data lines carry the (potentially internal)
+// MCP response; when disabled (the default), only safe metadata (line and byte
+// counts) is logged. It overrides the MCP_DEBUG env var default.
+func WithDebug(debug bool) AnalyzerOption {
+	return func(a *Analyzer) { a.debug = debug }
+}
+
 // NewAnalyzer creates a new Analyzer instance
 func NewAnalyzer(mcpURL, token, promptTemplate string, opts ...AnalyzerOption) *Analyzer {
 	a := &Analyzer{
@@ -114,6 +124,7 @@ func NewAnalyzer(mcpURL, token, promptTemplate string, opts ...AnalyzerOption) *
 		jsonMarshal: json.Marshal,
 		newRequest:  http.NewRequestWithContext,
 		insecureTLS: os.Getenv("TLS_INSECURE_SKIP_VERIFY") == "true",
+		debug:       os.Getenv("MCP_DEBUG") == "true",
 	}
 	for _, opt := range opts {
 		opt(a)
@@ -326,7 +337,7 @@ func (a *Analyzer) doAnalysis(ctx context.Context, jobURL string, startTime time
 
 	// Read SSE stream line by line, skipping pings and comments
 	sseStart := time.Now()
-	sseData, err := readSSEData(resp.Body)
+	sseData, err := readSSEData(resp.Body, a.debug)
 	if err != nil {
 		return nil, fmt.Errorf("read SSE stream: %w", err)
 	}
@@ -576,7 +587,13 @@ func (a *Analyzer) initializeSession(ctx context.Context) error {
 
 // readSSEData reads an SSE stream line by line, skipping comment/ping lines,
 // and returns the first "data:" payload containing JSON.
-func readSSEData(r io.Reader) (string, error) {
+//
+// Logging is data-minimized by default: it records only safe metadata (line and
+// byte counts), never payload content, because SSE data lines carry the MCP
+// response (potentially internal job/analysis content). The payload preview and
+// the full text of non-data lines are logged only when debug is enabled — an
+// explicit opt-in (WithDebug / MCP_DEBUG).
+func readSSEData(r io.Reader, debug bool) (string, error) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 1024*1024), 10*1024*1024)
 	lineCount := 0
@@ -587,19 +604,27 @@ func readSSEData(r io.Reader) (string, error) {
 		if line == "" {
 			continue
 		}
-		// Log SSE comments/pings for debugging
+		// Log SSE comments/pings for debugging (no payload content)
 		if strings.HasPrefix(line, ":") {
 			fmt.Printf("PROW-ANALYZER SSE: ping received (line %d)\n", lineCount)
 			continue
 		}
 		if data, found := strings.CutPrefix(line, "data:"); found {
 			data = strings.TrimSpace(data)
-			fmt.Printf("PROW-ANALYZER SSE: data line received (line %d, %d bytes, starts=%q)\n", lineCount, len(data), data[:min(len(data), 40)])
+			// Safe metadata always; payload preview only under explicit debug opt-in.
+			if debug {
+				fmt.Printf("PROW-ANALYZER SSE: data line received (line %d, %d bytes, starts=%q)\n", lineCount, len(data), data[:min(len(data), 40)])
+			} else {
+				fmt.Printf("PROW-ANALYZER SSE: data line received (line %d, %d bytes)\n", lineCount, len(data))
+			}
 			if len(data) > 0 {
 				return data, nil
 			}
+		} else if debug {
+			// Non-data lines may carry stream content, so log their text only under debug.
+			fmt.Printf("PROW-ANALYZER SSE: other line received (line %d, %d bytes): %s\n", lineCount, len(line), line)
 		} else {
-			fmt.Printf("PROW-ANALYZER SSE: other line received (line %d): %s\n", lineCount, line)
+			fmt.Printf("PROW-ANALYZER SSE: other line received (line %d, %d bytes)\n", lineCount, len(line))
 		}
 	}
 	if err := scanner.Err(); err != nil {

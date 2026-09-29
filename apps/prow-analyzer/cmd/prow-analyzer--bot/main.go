@@ -28,6 +28,20 @@ func envBool(key string, def bool) bool {
 	return def
 }
 
+// envStr reads a string environment variable, returning def when it is unset or
+// empty.
+func envStr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+// defaultPrompt is the built-in analysis prompt template used when neither the
+// --prompt flag nor the PROMPT_TEMPLATE env var is set. "{job_url}" is replaced
+// with the Prow job URL at analysis time.
+const defaultPrompt = "Analyze this Prow CI failure in detail. Provide: (1) Root cause, (2) Related Jira issues, (3) Recurring pattern analysis, (4) Recommended actions. URL: {job_url}"
+
 func main() {
 	var (
 		slackToken  = flag.String("slack-token", os.Getenv("SLACK_BOT_TOKEN"), "Slack bot token")
@@ -36,8 +50,10 @@ func main() {
 		mcpToken    = flag.String("mcp-token", os.Getenv("SHIP_HELP_MCP_TOKEN"), "Ship-help MCP token")
 		channels    = flag.String("channels", os.Getenv("MONITORED_CHANNELS"), "Comma-separated list of channel IDs to monitor")
 		allowedBots = flag.String("allowed-bots", os.Getenv("ALLOWED_BOT_IDS"), "Comma-separated list of bot IDs (B...) whose Prow URLs should be analyzed")
-		prompt      = flag.String("prompt", "Analyze this Prow CI failure in detail. Provide: (1) Root cause, (2) Related Jira issues, (3) Recurring pattern analysis, (4) Recommended actions. URL: {job_url}", "Analysis prompt template")
+		prompt      = flag.String("prompt", envStr("PROMPT_TEMPLATE", defaultPrompt), "Analysis prompt template with a {job_url} placeholder (or set PROMPT_TEMPLATE)")
+		monitorAll  = flag.Bool("monitor-all", envBool("MONITOR_ALL", false), "Monitor every channel the bot is a member of instead of only --channels (or set MONITOR_ALL=true). Fail-closed: without this and with no --channels, no channel is monitored")
 		slackDebug  = flag.Bool("slack-debug", envBool("SLACK_DEBUG", false), "Enable verbose Slack SDK and Socket Mode debug logging (or set SLACK_DEBUG)")
+		mcpDebug    = flag.Bool("mcp-debug", envBool("MCP_DEBUG", false), "Enable verbose MCP SSE logging that includes response payload previews (or set MCP_DEBUG). Off by default for data minimization")
 		tlsInsecure = flag.Bool("tls-insecure", envBool("TLS_INSECURE_SKIP_VERIFY", false), "Skip TLS certificate verification for MCP/Prow HTTP requests (or set TLS_INSECURE_SKIP_VERIFY)")
 	)
 
@@ -57,8 +73,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Parse monitored channels. This is optional: when empty, the bot monitors
-	// every channel it is a member of, so inviting it to a channel is enough.
+	// Parse monitored channels. Fail-closed: when empty and --monitor-all is not
+	// set, the bot monitors nothing. Set MONITOR_ALL=true to opt into monitoring
+	// every channel the bot is a member of.
 	var monitoredChannels []string
 	if *channels != "" {
 		for _, ch := range strings.Split(*channels, ",") {
@@ -80,9 +97,13 @@ func main() {
 	}
 
 	slog.Info("Starting prow-analyzer-bot")
-	if len(monitoredChannels) == 0 {
-		slog.Info("No channels configured; monitoring all channels the bot is a member of")
-	} else {
+	switch {
+	case *monitorAll:
+		slog.Warn("MONITOR_ALL enabled: monitoring EVERY channel the bot is a member of; messages from all such channels may be forwarded to ship-help under shared service credentials",
+			"channels_configured", len(monitoredChannels))
+	case len(monitoredChannels) == 0:
+		slog.Warn("No channels configured and MONITOR_ALL not set: fail-closed, the bot will not monitor any channel. Set MONITORED_CHANNELS or MONITOR_ALL=true")
+	default:
 		slog.Info("Monitoring channels", "channels", monitoredChannels)
 	}
 	if len(allowedBotIDs) > 0 {
@@ -99,7 +120,10 @@ func main() {
 
 	// Determine this bot's own bot ID so its own messages are never analyzed
 	// (loop prevention), even when bot allow-listing is enabled.
-	handlerOpts := []handler.Option{handler.WithAllowedBotIDs(allowedBotIDs)}
+	handlerOpts := []handler.Option{
+		handler.WithAllowedBotIDs(allowedBotIDs),
+		handler.WithMonitorAll(*monitorAll),
+	}
 	if authResp, err := slackClient.AuthTest(); err != nil {
 		slog.Warn("AuthTest failed; self bot ID unknown (own messages still ignored via allow-list)", "error", err)
 	} else {
@@ -107,7 +131,10 @@ func main() {
 	}
 
 	// Create analyzer
-	a := analyzer.NewAnalyzer(*mcpURL, *mcpToken, *prompt, analyzer.WithInsecureSkipVerify(*tlsInsecure))
+	a := analyzer.NewAnalyzer(*mcpURL, *mcpToken, *prompt,
+		analyzer.WithInsecureSkipVerify(*tlsInsecure),
+		analyzer.WithDebug(*mcpDebug),
+	)
 
 	// Create handler
 	h := handler.New(slackClient, a, monitoredChannels, handlerOpts...)

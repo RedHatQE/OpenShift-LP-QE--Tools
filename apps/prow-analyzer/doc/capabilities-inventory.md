@@ -19,7 +19,7 @@ ship-help**, not in this agent.
 |---|---|
 | **Writes (the only side effect)** | Posts an in-thread message to a Slack channel it is a member of. |
 | **Reads (direct)** | Slack channel message text (to detect Prow URLs). |
-| **Reads (indirect, via ship-help)** | Jira, GitHub, build logs, test results, Firewatch, Slack discussions, internal docs, historical patterns (see below). |
+| **Reads (indirect, via ship-help)** | Jira, GitHub, build logs, test results, an internal triage system, Slack discussions, internal docs, historical patterns (see below). |
 | **Not permitted** | Any write to Jira/GitHub/CI; code execution; web browsing; tools other than the single MCP `ask_persona` call. |
 
 ---
@@ -119,7 +119,7 @@ service credentials, **not** by the requesting user.
 | GitHub repositories and PRs | Code/PR context |
 | Build logs and artifacts | Failure detail |
 | Test results and history | Failure/flake context |
-| Firewatch automated triage | Known-issue correlation |
+| automated known-issue triage | Known-issue correlation |
 | Slack team discussions | Prior discussion context |
 | Internal documentation | Guidance/runbooks |
 | Historical failure patterns | Recurring-pattern analysis |

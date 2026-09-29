@@ -11,7 +11,7 @@ Every interaction emits three correlated audit events (linked by
 | Requirement | Event | Emitted from | Key fields |
 |---|---|---|---|
 | **Interaction trace** — the user prompt / system trigger | `interaction_received` | `handler.Handle` (Slack), `cli/main` (CLI) | `interaction_id`, `source` (`slack`/`cli`), `actor` (Slack user ID / OS user), `channel`, `trigger` (the Prow URL) |
-| **Tools / data sources queried** | `tool_query` (one per query) | `analyzer.initializeSession`, `analyzer.doAnalysis` | `interaction_id`, `target` (`ship-help-mcp`), `operation` (`initialize` / `tools/call`), `tool` (`ask_persona`), `persona` (e.g. `ship_public`) |
+| **Tools / data sources queried** | `tool_query` (one per query) | `analyzer.initializeSession`, `analyzer.doAnalysis` | `interaction_id`, `target` (`ship-help-mcp`), `operation` (`initialize` / `tools/call`), `tool` (`ask_persona`), `persona` (e.g. `<persona>`) |
 | **AI action / outcome** | `interaction_outcome` | `handler.analyzeAndRespond`, `cli/main` | `interaction_id`, `status` (`success`/`failed`/`delivery_failed`/`rejected`), `duration_ms`, `response_chars`, `response_sha256`, `error`/`reason` |
 
 All events are single-line JSON tagged `"log_type":"audit"`,
@@ -21,8 +21,8 @@ All events are single-line JSON tagged `"log_type":"audit"`,
 
 ```json
 {"time":"…","msg":"interaction_received","log_type":"audit","event":"interaction_received","interaction_id":"C123/1712.45","source":"slack","actor":"U0ABC","channel":"C123","trigger":"https://prow.ci.openshift.org/view/gs/…"}
-{"time":"…","msg":"tool_query","log_type":"audit","event":"tool_query","interaction_id":"C123/1712.45","target":"ship-help-mcp","operation":"initialize","persona":"ship_public"}
-{"time":"…","msg":"tool_query","log_type":"audit","event":"tool_query","interaction_id":"C123/1712.45","target":"ship-help-mcp","operation":"tools/call","tool":"ask_persona","persona":"ship_public"}
+{"time":"…","msg":"tool_query","log_type":"audit","event":"tool_query","interaction_id":"C123/1712.45","target":"ship-help-mcp","operation":"initialize","persona":"<persona>"}
+{"time":"…","msg":"tool_query","log_type":"audit","event":"tool_query","interaction_id":"C123/1712.45","target":"ship-help-mcp","operation":"tools/call","tool":"ask_persona","persona":"<persona>"}
 {"time":"…","msg":"interaction_outcome","log_type":"audit","event":"interaction_outcome","interaction_id":"C123/1712.45","status":"success","duration_ms":142331,"response_chars":2210,"response_sha256":"9f2c…"}
 ```
 
@@ -39,6 +39,11 @@ oc logs -n <ns> -l app=prow-analyzer-bot | grep '"log_type":"audit"' | grep '"in
   `response_sha256`) — **not** the response text — so it can prove *what happened*
   without persisting potentially sensitive content. The `trigger` field stores the
   Prow URL only. (Aligns with the "no personal/customer data" policy.)
+- **Error redaction:** on `failed`/`delivery_failed` outcomes the `error` field is
+  a **coarse category** (e.g. `mcp_http_error`, `timeout`, `session_not_found`),
+  not the raw backend error, because raw errors can embed internal content (an MCP
+  HTTP error carries the response body verbatim). The full error still reaches the
+  operational logs for debugging. See `audit.RedactError`.
 - **Coverage:** success, backend failure, Slack delivery failure, and queue-full
   rejection are all recorded as outcomes.
 - **Implementation:** `pkg/audit` (dedicated JSON `slog` logger to stdout).
@@ -94,8 +99,8 @@ spec:
   into the Slack handler, analyzer, and CLI) and unit-tested. It is **active as
   soon as the updated image is deployed**.
 - ⚠️ **Not yet in the running production image.** The live deployment
-  (`quay.io/chaclark/prow-analyzer-bot:debug-timing-2` in ns
-  `mpex-prod--runtime-int`) predates this change. Rebuild and roll out (see
+  (`quay.io/<your-org>/prow-analyzer-bot:<tag>` in ns
+  `<your-namespace>`) predates this change. Rebuild and roll out (see
   [architecture.md](architecture.md#updating-a-running-deployment) /
   [dataflow-architecture.md](dataflow-architecture.md)) to activate it.
 - ❓ **Centralized immutable storage:** **not verified.** Whether a

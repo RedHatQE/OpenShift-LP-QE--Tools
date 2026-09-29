@@ -1,9 +1,13 @@
 # Prow Analyzer -- Usage and Architecture
 
+> **Scope of this document.** This is the combined *architecture and
+> deployment/operations reference*: system design, components, MCP protocol flow,
+> design decisions, configuration reference, build/deploy steps, and
+> troubleshooting internals. It is written for developers and operators.
+>
 > Looking for how to *use* the tool (quick start, limitations, best practices,
 > review/undo, data handling, RBAC, contacts)? See the
-> **[User Guide](user-guide.md)**. This document covers architecture and
-> deployment internals.
+> **[User Guide](user-guide.md)** instead.
 
 ## Table of Contents
 
@@ -48,7 +52,7 @@
 
 ## Overview
 
-Prow Analyzer automates the analysis of Prow CI job failures by querying Red Hat's ship-help MCP (AI helpdesk). Ship-help has access to Jira issues, GitHub repositories, build logs, test results, Firewatch triage data, Slack discussions, internal documentation, and historical failure patterns.
+Prow Analyzer automates the analysis of Prow CI job failures by querying Red Hat's ship-help MCP (AI helpdesk). Ship-help has access to Jira issues, GitHub repositories, build logs, test results, known-issue triage data, Slack discussions, internal documentation, and historical failure patterns.
 
 The project ships two binaries:
 
@@ -64,47 +68,48 @@ Analysis typically takes 2-4 minutes as ship-help searches across 9+ data source
 ### System Diagram
 
 ```
-                         +---------------------+
-                         |   Slack Workspace    |
-                         |  (Socket Mode WSS)   |
-                         +----------+----------+
-                                    |
-                           message events
-                                    |
-                                    v
-+-----------------------------------+-----------------------------------+
-|                         prow-analyzer--bot                            |
-|                                                                       |
-|  cmd/prow-analyzer--bot/main.go                                       |
-|  +-- Parses flags / env vars                                          |
-|  +-- Creates Slack socket-mode client                                 |
-|  +-- Routes EventsAPI callbacks to handler                            |
-|                                                                       |
-|  pkg/slack/handler/                                                   |
-|  +-- Filters: callback type, message type, bot msgs, channel ACL      |
-|  +-- Extracts Prow URL from message text                              |
-|  +-- Semaphore-gated async dispatch (max 5 concurrent)                |
-|  +-- Posts analysis result (or error) as thread reply                  |
-|                                                                       |
-|  pkg/analyzer/                                                        |
-|  +-- MCP session lifecycle (initialize, cache, invalidate, recover)   |
-|  +-- JSON-RPC over SSE request/response                               |
-|  +-- Prow URL regex extraction                                        |
-|  +-- Slack response formatting                                        |
-+-----------------------------------+-----------------------------------+
-                                    |
-                           JSON-RPC / SSE
-                                    |
-                                    v
-                         +---------------------+
-                         |   ship-help MCP      |
-                         |   (AI helpdesk)      |
-                         +---------------------+
-                                    |
-                    +---------------+---------------+
-                    |       |       |       |       |
-                  Jira   GitHub  Build   Fire-   Slack
-                 issues   PRs    logs   watch  discussions
+                       +----------------------+
+                       |   Slack Workspace    |
+                       |  (Socket Mode WSS)   |
+                       +-----------+----------+
+                                   |
+                            message events
+                                   |
+                                   v
++----------------------------------+----------------------------------+
+|                                                                     |
+|                         prow-analyzer--bot                          |
+|                                                                     |
+|  cmd/prow-analyzer--bot/main.go                                     |
+|  +-- Parses flags / env vars                                        |
+|  +-- Creates Slack socket-mode client                               |
+|  +-- Routes EventsAPI callbacks to handler                          |
+|                                                                     |
+|  pkg/slack/handler/                                                 |
+|  +-- Filters: callback type, message type, bot msgs, channel ACL    |
+|  +-- Extracts Prow URL from message text                            |
+|  +-- Semaphore-gated async dispatch (max 5 concurrent)              |
+|  +-- Posts analysis result (or error) as thread reply               |
+|                                                                     |
+|  pkg/analyzer/                                                      |
+|  +-- MCP session lifecycle (initialize, cache, invalidate, recover) |
+|  +-- JSON-RPC over SSE request/response                             |
+|  +-- Prow URL regex extraction                                      |
+|  +-- Slack response formatting                                      |
++----------------------------------+----------------------------------+
+                                   |
+                            JSON-RPC / SSE
+                                   |
+                                   v
+                       +----------------------+
+                       |    ship-help MCP     |
+                       |    (AI helpdesk)     |
+                       +----------------------+
+                                   |
+               +---------+---------+---------+-----------+
+               |         |         |         |           |
+             Jira     GitHub     Build    Known-       Slack
+            issues      PRs      logs     issues    discussions
 ```
 
 ### Components
@@ -246,14 +251,14 @@ If step 2 returns `HTTP 404` with `{"error":{"message":"Session not found"}}`, t
 
 ### Environment Variables
 
-| Variable | Required | Used By | Description |
-|---|---|---|---|
-| `SHIP_HELP_MCP_URL` | Yes | CLI, Bot | Ship-help MCP endpoint URL |
-| `SHIP_HELP_MCP_TOKEN` | Yes | CLI, Bot | Bearer token for MCP authentication |
-| `SLACK_BOT_TOKEN` | Bot only | Bot | Slack bot token (`xoxb-...`) |
-| `SLACK_APP_TOKEN` | Bot only | Bot | Slack app-level token for Socket Mode (`xapp-...`) |
-| `MONITORED_CHANNELS` | Bot only | Bot | Comma-separated Slack channel IDs to monitor |
-| `TLS_INSECURE_SKIP_VERIFY` | No | CLI, Bot | Set to `"true"` to skip TLS certificate verification |
+| Variable                   | Required | Used By  | Description                                          |
+|----------------------------|----------|----------|------------------------------------------------------|
+| `SHIP_HELP_MCP_URL`        | Yes      | CLI, Bot | Ship-help MCP endpoint URL                           |
+| `SHIP_HELP_MCP_TOKEN`      | Yes      | CLI, Bot | Bearer token for MCP authentication                  |
+| `SLACK_BOT_TOKEN`          | Bot only | Bot      | Slack bot token (`xoxb-...`)                         |
+| `SLACK_APP_TOKEN`          | Bot only | Bot      | Slack app-level token for Socket Mode (`xapp-...`)   |
+| `MONITORED_CHANNELS`       | Bot only | Bot      | Comma-separated Slack channel IDs to monitor         |
+| `TLS_INSECURE_SKIP_VERIFY` | No       | CLI, Bot | Set to `"true"` to skip TLS certificate verification |
 
 All environment variables can be overridden by the corresponding command-line flag.
 
@@ -318,7 +323,7 @@ Extraction correctly handles:
 ### CLI
 
 ```bash
-export SHIP_HELP_MCP_URL="https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp"
+export SHIP_HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
 export SHIP_HELP_MCP_TOKEN="eyJhbGc..."
 
 ./prow-analyzer--cli analyze https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-stolostron-policy-collection-main-ocp4.22-interop-opp-aws/2066255424226594816
@@ -386,7 +391,7 @@ Analysis queue is currently full. Please retry in a moment.
 - podman (for container builds)
 - Access to quay.io (for pushing images)
 - `oc` CLI (for OpenShift deployment)
-- Ship-help MCP token (from `#ship-users` on Slack)
+- Ship-help MCP token (from the ship-help support channel on Slack)
 - Slack app with Socket Mode enabled
 
 ### Slack App Setup
@@ -405,7 +410,7 @@ Analysis queue is currently full. Please retry in a moment.
 ### Option 1: Run Locally
 
 ```bash
-export SHIP_HELP_MCP_URL="https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp"
+export SHIP_HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
 export SHIP_HELP_MCP_TOKEN="$(cat /path/to/token.txt | tr -d '\n')"
 export SLACK_BOT_TOKEN="xoxb-..."
 export SLACK_APP_TOKEN="xapp-..."
@@ -452,7 +457,7 @@ Edit `deploy/openshift/deployment.yaml`:
 
 - Set `namespace` on all resources to your target namespace.
 - Set `monitored-channels` in the ConfigMap to your actual channel IDs.
-- Set the container `image` field to your registry path (e.g., `quay.io/chaclark/prow-analyzer-bot:latest`).
+- Set the container `image` field to your registry path (e.g., `quay.io/<your-org>/prow-analyzer-bot:latest`).
 
 **Step 4: Deploy.**
 
@@ -559,11 +564,11 @@ Test coverage areas:
 
 ### Dependencies
 
-| Dependency | Version | Purpose |
-|---|---|---|
-| `github.com/slack-go/slack` | v0.14.0 | Slack API client and Socket Mode |
-| `github.com/gorilla/websocket` | v1.5.0 | WebSocket support (transitive via slack-go) |
-| Go standard library | 1.22+ | HTTP, JSON, SSE, TLS, regex, concurrency |
+| Dependency                     | Version | Purpose                                     |
+|--------------------------------|---------|---------------------------------------------|
+| `github.com/slack-go/slack`    | v0.14.0 | Slack API client and Socket Mode            |
+| `github.com/gorilla/websocket` | v1.5.0  | WebSocket support (transitive via slack-go) |
+| Go standard library            | 1.22+   | HTTP, JSON, SSE, TLS, regex, concurrency    |
 
 ### Container Image
 
@@ -596,19 +601,19 @@ oc logs -n <namespace> -l app=prow-analyzer-bot | grep "PROW-ANALYZER"
 
 ### Error Reference
 
-| Log message | Cause | Fix |
-|---|---|---|
-| `initialize session: init request failed (HTTP 401)` | Invalid or expired MCP token | Get a new token from `#ship-users` |
-| `initialize session: init request failed (HTTP 403)` | Token lacks permissions | Contact ship-help admins |
-| `initialize session: send init request: <network error>` | MCP URL unreachable | Check network/DNS, verify `SHIP_HELP_MCP_URL` |
-| `initialize session: no session ID in response` | MCP server didn't return `Mcp-Session-Id` header | Server-side issue -- contact ship-help team |
-| `HTTP 404: ... Session not found` | Stale session after timeout | Auto-recovered by session retry (if this persists, the recovery logic isn't deployed) |
-| `read SSE stream: reading stream: context deadline exceeded` | Analysis exceeded 600s HTTP client timeout | Retry; if persistent, ship-help MCP may be overloaded |
-| `send request: <network error>` | Network error during analysis request | Check connectivity to MCP endpoint |
-| `marshal request: ...` | Internal error serializing JSON | Should not occur in normal operation -- file a bug |
-| `no content in response` | MCP returned empty result | Retry; may indicate a ship-help processing error |
-| `MCP error <code>: <message>` | Ship-help returned a JSON-RPC error | Check the error message; may need to adjust the prompt |
-| `parse response: ...` | MCP returned invalid JSON in SSE stream | Server-side issue -- contact ship-help team |
+| Log message                                                  | Cause                                            | Fix                                                                                   |
+|--------------------------------------------------------------|--------------------------------------------------|---------------------------------------------------------------------------------------|
+| `initialize session: init request failed (HTTP 401)`         | Invalid or expired MCP token                     | Get a new token from the ship-help support channel                                    |
+| `initialize session: init request failed (HTTP 403)`         | Token lacks permissions                          | Contact ship-help admins                                                              |
+| `initialize session: send init request: <network error>`     | MCP URL unreachable                              | Check network/DNS, verify `SHIP_HELP_MCP_URL`                                         |
+| `initialize session: no session ID in response`              | MCP server didn't return `Mcp-Session-Id` header | Server-side issue -- contact ship-help team                                           |
+| `HTTP 404: ... Session not found`                            | Stale session after timeout                      | Auto-recovered by session retry (if this persists, the recovery logic isn't deployed) |
+| `read SSE stream: reading stream: context deadline exceeded` | Analysis exceeded 600s HTTP client timeout       | Retry; if persistent, ship-help MCP may be overloaded                                 |
+| `send request: <network error>`                              | Network error during analysis request            | Check connectivity to MCP endpoint                                                    |
+| `marshal request: ...`                                       | Internal error serializing JSON                  | Should not occur in normal operation -- file a bug                                    |
+| `no content in response`                                     | MCP returned empty result                        | Retry; may indicate a ship-help processing error                                      |
+| `MCP error <code>: <message>`                                | Ship-help returned a JSON-RPC error              | Check the error message; may need to adjust the prompt                                |
+| `parse response: ...`                                        | MCP returned invalid JSON in SSE stream          | Server-side issue -- contact ship-help team                                           |
 
 ### Bot Not Responding
 

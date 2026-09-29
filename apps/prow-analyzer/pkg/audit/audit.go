@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"os"
+	"strings"
 )
 
 type ctxKey int
@@ -81,6 +82,35 @@ func Outcome(ctx context.Context, status string, attrs ...any) {
 	}
 	args = append(args, attrs...)
 	logger.Log(ctx, slog.LevelInfo, "interaction_outcome", args...)
+}
+
+// RedactError maps an error to a coarse, payload-free category safe to persist in
+// the immutable audit trail. Raw backend error strings can embed internal job or
+// response content (e.g. an MCP HTTP error carries the response body verbatim), so
+// the audit trail records only the category; the full error still reaches the
+// operational logs for debugging. It returns "" for a nil error.
+func RedactError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "Session not found"):
+		return "session_not_found"
+	case strings.Contains(msg, "context deadline exceeded"),
+		strings.Contains(msg, "Client.Timeout"),
+		strings.Contains(msg, "timeout"):
+		return "timeout"
+	case strings.Contains(msg, "MCP error"):
+		return "mcp_protocol_error"
+	case strings.Contains(msg, "HTTP "):
+		return "mcp_http_error"
+	case strings.Contains(msg, "no content"),
+		strings.Contains(msg, "no JSON data"):
+		return "empty_response"
+	default:
+		return "analysis_error"
+	}
 }
 
 // Hash returns a short SHA-256 hex digest, used to fingerprint response content
