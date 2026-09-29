@@ -51,9 +51,9 @@ typeset armedEpoch=''; armedEpoch="$(jq -er .armedEpoch "${metadataFile}")"; typ
 [[ "${recoveryImage}" =~ @sha256:[0-9a-fA-F]{64}$ && "$(jq -r .recoveryImageContract "${metadataFile}")" == bash+guestfish-v1 ]] || Die 'recovery image contract was not proven by preflight'
 
 typeset stageErrors="${outDir}/stage-errors.jsonl"; touch "${stageErrors}"; chmod 0600 "${stageErrors}"
-typeset recoveryLog="${outDir}/recovery.log"; : > "${recoveryLog}"; chmod 0600 "${recoveryLog}"
-typeset suffix=''; suffix="$(date -u +%Y%m%d%H%M%S)-$$"; typeset snapName="bsod-${suffix}"; typeset snapPvc="${snapName}-pvc"; typeset recoveryPod="${snapName}-extract"
-typeset snapshotCreated=0; typeset pvcCreated=0; typeset podCreated=0; typeset cleanupDone=0
+typeset extractionLog="${outDir}/extraction.log"; : > "${extractionLog}"; chmod 0600 "${extractionLog}"
+typeset suffix=''; suffix="$(date -u +%Y%m%d%H%M%S)-$$"; typeset extractionPod="bsod-${suffix}-extraction"
+typeset podCreated=0; typeset cleanupDone=0
 
 function Log () { printf '[%s] %s\n' "$(date -u +%H:%M:%S)" "$*" | tee -a "${recoveryLog}"; true; }
 function RecordError () {
@@ -64,9 +64,7 @@ function RecordError () {
 function Cleanup () {
   ((cleanupDone == 0)) || return 0
   cleanupDone=1; typeset failed=0
-  if ((podCreated)); then RunTimed 70 oc --request-timeout=65s delete pod "${recoveryPod}" -n "${ns}" --ignore-not-found --wait=true --timeout=60s >>"${recoveryLog}" 2>&1 || { RecordError cleanup "failed to delete recovery pod ${recoveryPod}"; failed=1; }; podCreated=0; fi
-  if ((pvcCreated)); then RunTimed 70 oc --request-timeout=65s delete pvc "${snapPvc}" -n "${ns}" --ignore-not-found --wait=true --timeout=60s >>"${recoveryLog}" 2>&1 || { RecordError cleanup "failed to delete recovery PVC ${snapPvc}"; failed=1; }; pvcCreated=0; fi
-  if ((snapshotCreated)); then RunTimed 70 oc --request-timeout=65s delete volumesnapshot "${snapName}" -n "${ns}" --ignore-not-found --wait=true --timeout=60s >>"${recoveryLog}" 2>&1 || { RecordError cleanup "failed to delete VolumeSnapshot ${snapName}"; failed=1; }; snapshotCreated=0; fi
+  if ((podCreated)); then RunTimed 70 oc --request-timeout=65s delete pod "${extractionPod}" -n "${ns}" --ignore-not-found --wait=true --timeout=60s >>"${extractionLog}" 2>&1 || { RecordError cleanup "failed to delete extraction pod ${extractionPod}"; failed=1; }; podCreated=0; fi
   return "${failed}"
 }
 function OnSignal () { typeset status="${1:?}"; RecordError interrupted "received signal; exiting with status ${status}"; exit "${status}"; }
@@ -81,14 +79,14 @@ function WaitJsonPath () {
   return 1
 }
 function MountNTFS () {
-  Oc exec -n "${ns}" "${recoveryPod}" -- /bin/bash -ceu 'mkdir -p /mnt/windows && ntfs-3g -o ro /dev/disk-pvc /mnt/windows' >>"${recoveryLog}" 2>&1
+  Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu 'mkdir -p /mnt/windows && ntfs-3g -o ro /dev/disk-pvc /mnt/windows' >>"${recoveryLog}" 2>&1
 }
 function ReadNTFSFile () {
   typeset ntfsPath="${1:?}"; typeset localPath="${2:?}"; typeset artifactType="${3:?}"; typeset required="${4:-1}"
   typeset temporary="${localPath}.tmp"; mkdir -p "$(dirname "${localPath}")"; rm -f "${temporary}"
   # Convert Windows path to NTFS path: C:\Windows\System32\file.txt -> /mnt/windows/Windows/System32/file.txt
   typeset unixPath="/mnt/windows/${ntfsPath#[Cc]:}"
-  if ! Oc exec -n "${ns}" "${recoveryPod}" -- cat "${unixPath}" > "${temporary}" 2>>"${recoveryLog}"; then
+  if ! Oc exec -n "${ns}" "${extractionPod}" -- cat "${unixPath}" > "${temporary}" 2>>"${recoveryLog}"; then
     rm -f "${temporary}"
     if ((required)); then RecordError export "ntfs read failed: ${ntfsPath}"; else Log "optional artifact absent: ${ntfsPath}"; fi
     return 1
@@ -102,20 +100,14 @@ function ReadNTFSFile () {
 }
 function FindNTFSFiles () {
   typeset pattern="${1:?}"
-  Oc exec -n "${ns}" "${recoveryPod}" -- find /mnt/windows -iname "${pattern}" 2>>"${recoveryLog}" | sed 's|^/mnt/windows||' || true
+  Oc exec -n "${ns}" "${extractionPod}" -- find /mnt/windows -iname "${pattern}" 2>>"${recoveryLog}" | sed 's|^/mnt/windows||' || true
 }
 
-Log "creating VolumeSnapshot ${ns}/${snapName} from mapped system-disk PVC ${guestPvc}"
-jq -n --arg name "${snapName}" --arg ns "${ns}" --arg vm "${vm}" --arg class "${snapClass}" --arg pvc "${guestPvc}" \
-  '{apiVersion:"snapshot.storage.k8s.io/v1",kind:"VolumeSnapshot",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-recovery","target-vm":$vm}},spec:{volumeSnapshotClassName:$class,source:{persistentVolumeClaimName:$pvc}}}' | Oc apply -f - >>"${recoveryLog}"
-snapshotCreated=1; WaitJsonPath volumesnapshot "${snapName}" '{.status.readyToUse}' true 180 || { RecordError snapshot 'VolumeSnapshot readiness timed out'; exit 1; }
-jq -n --arg name "${snapPvc}" --arg ns "${ns}" --arg vm "${vm}" --arg sc "${storageClass}" --arg size "${storageSize}" --arg mode "${volumeMode}" --arg snapshot "${snapName}" \
-  '{apiVersion:"v1",kind:"PersistentVolumeClaim",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-recovery","target-vm":$vm}},spec:{accessModes:["ReadWriteOnce"],volumeMode:$mode,storageClassName:$sc,resources:{requests:{storage:$size}},dataSource:{name:$snapshot,kind:"VolumeSnapshot",apiGroup:"snapshot.storage.k8s.io"}}}' | Oc apply -f - >>"${recoveryLog}"
-pvcCreated=1; WaitJsonPath pvc "${snapPvc}" '{.status.phase}' Bound 300 || { RecordError snapshot-pvc 'recovery PVC binding timed out'; exit 1; }
-jq -n --arg name "${recoveryPod}" --arg ns "${ns}" --arg vm "${vm}" --arg pvc "${snapPvc}" \
-  '{apiVersion:"v1",kind:"Pod",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-recovery","target-vm":$vm}},spec:{restartPolicy:"Never",automountServiceAccountToken:false,containers:[{name:"extractor",image:"registry.access.redhat.com/ubi8:latest",command:["/bin/bash","-ceu","trap : TERM INT; sleep infinity & wait"],securityContext:{privileged:true,allowPrivilegeEscalation:true,readOnlyRootFilesystem:false},env:[{name:"LIBGUESTFS_CACHEDIR",value:"/dev/null"},{name:"TMPDIR",value:"/tmp"}],volumeDevices:[{name:"guest-disk",devicePath:"/dev/disk-pvc"}],volumeMounts:[{name:"scratch",mountPath:"/tmp"}]}],volumes:[{name:"guest-disk",persistentVolumeClaim:{claimName:$pvc,readOnly:false}},{name:"scratch",emptyDir:{medium:"Memory",sizeLimit:"2Gi"}}]}}' | Oc apply -f - >>"${recoveryLog}"
-podCreated=1; WaitJsonPath pod "${recoveryPod}" '{.status.phase}' Running 180 || { RecordError recovery-pod 'recovery pod startup timed out'; exit 1; }
-Oc exec -n "${ns}" "${recoveryPod}" -- /bin/bash -ceu 'test -r /dev/disk-pvc && yum install -y ntfs-3g ntfsprogs >/dev/null 2>&1 && command -v ntfs-3g >/dev/null && command -v ntfsls >/dev/null' >>"${recoveryLog}" 2>&1 || { RecordError recovery-pod 'ntfs-3g tools or block device is unavailable'; exit 1; }
+Log "creating extraction pod to mount disk directly (VM is stopped)"
+jq -n --arg name "${extractionPod}" --arg ns "${ns}" --arg vm "${vm}" --arg pvc "${guestPvc}" \
+  '{apiVersion:"v1",kind:"Pod",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-extraction","target-vm":$vm}},spec:{restartPolicy:"Never",automountServiceAccountToken:false,containers:[{name:"extractor",image:"registry.access.redhat.com/ubi8:latest",command:["/bin/bash","-ceu","trap : TERM INT; sleep infinity & wait"],securityContext:{privileged:true,allowPrivilegeEscalation:true,readOnlyRootFilesystem:false},env:[{name:"LIBGUESTFS_CACHEDIR",value:"/dev/null"},{name:"TMPDIR",value:"/tmp"}],volumeDevices:[{name:"guest-disk",devicePath:"/dev/disk-pvc"}],volumeMounts:[{name:"scratch",mountPath:"/tmp"}]}],volumes:[{name:"guest-disk",persistentVolumeClaim:{claimName:$pvc,readOnly:true}},{name:"scratch",emptyDir:{medium:"Memory",sizeLimit:"2Gi"}}]}}' | Oc apply -f - >>"${recoveryLog}"
+podCreated=1; WaitJsonPath pod "${extractionPod}" '{.status.phase}' Running 180 || { RecordError extraction-pod 'extraction pod startup timed out'; exit 1; }
+Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu 'test -r /dev/disk-pvc && yum install -y ntfs-3g ntfsprogs >/dev/null 2>&1 && command -v ntfs-3g >/dev/null && command -v ntfsls >/dev/null' >>"${recoveryLog}" 2>&1 || { RecordError extraction-pod 'ntfs-3g tools or block device is unavailable'; exit 1; }
 
 typeset dumpOk=0; typeset evtxOk=0
 Log "mounting Windows NTFS filesystem..."
