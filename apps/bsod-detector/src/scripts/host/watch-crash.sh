@@ -373,6 +373,8 @@ function Recover () {
 function CrashResponse () {
   typeset state="${1:?}"; typeset failed=0
   Log "corroborated crash/freeze detected (domstate=${state})"
+  Log "waiting 60 seconds for VNC to become responsive..."
+  sleep 60
   StartDumpMonitor || failed=1
   CaptureScreenshot || failed=1
   if ! CaptureMemory; then

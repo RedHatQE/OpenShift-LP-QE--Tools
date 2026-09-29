@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# RHOV snapshot recovery. Metadata, storage identity, provenance, and image
+# RHOV snapshot extraction via NTFS. Metadata, storage identity, provenance, and image
 # contract are all established before the watcher is permitted to stop the VMI.
 set -euo pipefail; shopt -s inherit_errexit
 umask 077
@@ -38,10 +38,10 @@ typeset identityMarker="${expectedTarget}/.bsod-storage-identity"
 [[ -f "${identityMarker}" && ! -L "${identityMarker}" && "$(<"${identityMarker}")" == "${storageId}" ]] || Die 'evidence storage identity marker is missing or changed'
 
 # Unique run directories may already contain watcher-owned captures, but never
-# recovery-owned artifacts. Refuse instead of overwriting possible stale data.
+# extraction-owned artifacts. Refuse instead of overwriting possible stale data.
 typeset stale=''
-stale="$(find "${outDir}" -mindepth 1 \( -name MEMORY.DMP -o -name Minidump -o -name EventLogs -o -name events.json -o -name recovery-summary.json -o -name checksums.sha256 \) -print -quit)"
-[[ -z "${stale}" ]] || Die "pre-existing recovery artifact rejected: ${stale}"
+stale="$(find "${outDir}" -mindepth 1 \( -name MEMORY.DMP -o -name Minidump -o -name EventLogs -o -name events.json -o -name extraction-summary.json -o -name checksums.sha256 \) -print -quit)"
+[[ -z "${stale}" ]] || Die "pre-existing extraction artifact rejected: ${stale}"
 
 typeset ns=''; ns="$(jq -er .namespace "${metadataFile}")"; typeset vm=''; vm="$(jq -er .vm "${metadataFile}")"
 typeset guestPvc=''; guestPvc="$(jq -er .guestPvc "${metadataFile}")"; typeset snapClass=''; snapClass="$(jq -er .snapshotClass "${metadataFile}")"
@@ -55,7 +55,7 @@ typeset extractionLog="${outDir}/extraction.log"; : > "${extractionLog}"; chmod 
 typeset suffix=''; suffix="$(date -u +%Y%m%d%H%M%S)-$$"; typeset extractionPod="bsod-${suffix}-extraction"
 typeset podCreated=0; typeset cleanupDone=0
 
-function Log () { printf '[%s] %s\n' "$(date -u +%H:%M:%S)" "$*" | tee -a "${recoveryLog}"; true; }
+function Log () { printf '[%s] %s\n' "$(date -u +%H:%M:%S)" "$*" | tee -a "${extractionLog}"; true; }
 function RecordError () {
   typeset stage="${1:?}"; shift
   jq -cn --arg stage "${stage}" --arg error "$*" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{stage:$stage,error:$error,at:$at}' >> "${stageErrors}"
@@ -79,14 +79,14 @@ function WaitJsonPath () {
   return 1
 }
 function MountNTFS () {
-  Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu 'mkdir -p /mnt/windows && ntfs-3g -o ro /dev/disk-pvc /mnt/windows' >>"${recoveryLog}" 2>&1
+  Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu 'mkdir -p /mnt/windows && ntfs-3g -o ro /dev/disk-pvc /mnt/windows' >>"${extractionLog}" 2>&1
 }
 function ReadNTFSFile () {
   typeset ntfsPath="${1:?}"; typeset localPath="${2:?}"; typeset artifactType="${3:?}"; typeset required="${4:-1}"
   typeset temporary="${localPath}.tmp"; mkdir -p "$(dirname "${localPath}")"; rm -f "${temporary}"
   # Convert Windows path to NTFS path: C:\Windows\System32\file.txt -> /mnt/windows/Windows/System32/file.txt
   typeset unixPath="/mnt/windows/${ntfsPath#[Cc]:}"
-  if ! Oc exec -n "${ns}" "${extractionPod}" -- cat "${unixPath}" > "${temporary}" 2>>"${recoveryLog}"; then
+  if ! Oc exec -n "${ns}" "${extractionPod}" -- cat "${unixPath}" > "${temporary}" 2>>"${extractionLog}"; then
     rm -f "${temporary}"
     if ((required)); then RecordError export "ntfs read failed: ${ntfsPath}"; else Log "optional artifact absent: ${ntfsPath}"; fi
     return 1
@@ -100,27 +100,35 @@ function ReadNTFSFile () {
 }
 function FindNTFSFiles () {
   typeset pattern="${1:?}"
-  Oc exec -n "${ns}" "${extractionPod}" -- find /mnt/windows -iname "${pattern}" 2>>"${recoveryLog}" | sed 's|^/mnt/windows||' || true
+  Oc exec -n "${ns}" "${extractionPod}" -- find /mnt/windows -iname "${pattern}" 2>>"${extractionLog}" | sed 's|^/mnt/windows||' || true
 }
 
 Log "creating extraction pod to mount disk directly (VM is stopped)"
 jq -n --arg name "${extractionPod}" --arg ns "${ns}" --arg vm "${vm}" --arg pvc "${guestPvc}" \
-  '{apiVersion:"v1",kind:"Pod",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-extraction","target-vm":$vm}},spec:{restartPolicy:"Never",automountServiceAccountToken:false,containers:[{name:"extractor",image:"registry.access.redhat.com/ubi8:latest",command:["/bin/bash","-ceu","trap : TERM INT; sleep infinity & wait"],securityContext:{privileged:true,allowPrivilegeEscalation:true,readOnlyRootFilesystem:false},env:[{name:"LIBGUESTFS_CACHEDIR",value:"/dev/null"},{name:"TMPDIR",value:"/tmp"}],volumeDevices:[{name:"guest-disk",devicePath:"/dev/disk-pvc"}],volumeMounts:[{name:"scratch",mountPath:"/tmp"}]}],volumes:[{name:"guest-disk",persistentVolumeClaim:{claimName:$pvc,readOnly:true}},{name:"scratch",emptyDir:{medium:"Memory",sizeLimit:"2Gi"}}]}}' | Oc apply -f - >>"${recoveryLog}"
+  '{apiVersion:"v1",kind:"Pod",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-extraction","target-vm":$vm}},spec:{restartPolicy:"Never",automountServiceAccountToken:false,containers:[{name:"extractor",image:"registry.access.redhat.com/ubi8:latest",command:["/bin/bash","-ceu","trap : TERM INT; sleep infinity & wait"],securityContext:{privileged:true,allowPrivilegeEscalation:true,readOnlyRootFilesystem:false},env:[{name:"LIBGUESTFS_CACHEDIR",value:"/dev/null"},{name:"TMPDIR",value:"/tmp"}],volumeDevices:[{name:"guest-disk",devicePath:"/dev/disk-pvc"}],volumeMounts:[{name:"scratch",mountPath:"/tmp"}]}],volumes:[{name:"guest-disk",persistentVolumeClaim:{claimName:$pvc,readOnly:true}},{name:"scratch",emptyDir:{medium:"Memory",sizeLimit:"2Gi"}}]}}' | Oc apply -f - >>"${extractionLog}"
 podCreated=1; WaitJsonPath pod "${extractionPod}" '{.status.phase}' Running 180 || { RecordError extraction-pod 'extraction pod startup timed out'; exit 1; }
-Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu 'test -r /dev/disk-pvc && yum install -y ntfs-3g ntfsprogs >/dev/null 2>&1 && command -v ntfs-3g >/dev/null && command -v ntfsls >/dev/null' >>"${recoveryLog}" 2>&1 || { RecordError extraction-pod 'ntfs-3g tools or block device is unavailable'; exit 1; }
+Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu 'test -r /dev/disk-pvc && yum install -y ntfs-3g ntfsprogs >/dev/null 2>&1 && command -v ntfs-3g >/dev/null && command -v ntfsls >/dev/null' >>"${extractionLog}" 2>&1 || { RecordError extraction-pod 'ntfs-3g tools or block device is unavailable'; exit 1; }
 
 typeset dumpOk=0; typeset evtxOk=0
 Log "mounting Windows NTFS filesystem..."
-MountNTFS || { RecordError recovery-pod 'failed to mount NTFS filesystem'; exit 1; }
+MountNTFS || { RecordError extraction-pod 'failed to mount NTFS filesystem'; exit 1; }
 
-# Locate ALL .DMP files anywhere on the disk — Windows may write the dump to
+# Locate ALL .DMP files anywhere on C: drive — Windows may write the dump to
 # unexpected paths depending on CrashDumpEnabled type and DedicatedDumpFile config.
-Log "searching for *.DMP files on disk..."
-typeset allDumps=''; allDumps="$(FindNTFSFiles '*.dmp')"
-Log "found: ${allDumps:-none}"
+Log "searching for *.DMP files across entire C: drive..."
+typeset allDumps=''; allDumps="$(Oc exec -n "${ns}" "${extractionPod}" -- find /mnt/windows -iname '*.dmp' -type f 2>>"${extractionLog}" | sed 's|^/mnt/windows||' | sort -u || true)"
+if [[ -z "${allDumps}" ]]; then
+  Log "no .DMP files found in recursive search"
+else
+  Log "found dumps:"
+  while IFS= read -r dumpPath; do
+    [[ -n "${dumpPath}" ]] && Log "  - ${dumpPath}"
+  done <<<"${allDumps}"
+fi
 while IFS= read -r dumpPath; do
   [[ -n "${dumpPath}" ]] || continue
   typeset dumpBase; dumpBase="$(basename "${dumpPath}")"
+  Log "extracting: ${dumpPath}"
   if ReadNTFSFile "${dumpPath}" "${outDir}/${dumpBase}" dump 0 0; then dumpOk=1; fi
 done <<<"${allDumps}"
 # Also check standard MEMORY.DMP path
@@ -128,7 +136,7 @@ if ((dumpOk == 0)); then
   if ReadNTFSFile 'C:\Windows\MEMORY.DMP' "${outDir}/MEMORY.DMP" dump 0 0; then dumpOk=1; fi
 fi
 # Check for minidumps
-typeset minidumpList=''; minidumpList="$(Oc exec -n "${ns}" "${recoveryPod}" -- find /mnt/windows/Windows/Minidump -iname '*.dmp' 2>>"${recoveryLog}" | sed 's|^/mnt/windows||' || true)"
+typeset minidumpList=''; minidumpList="$(Oc exec -n "${ns}" "${extractionPod}" -- find /mnt/windows/Windows/Minidump -iname '*.dmp' 2>>"${extractionLog}" | sed 's|^/mnt/windows||' || true)"
 while IFS= read -r dumpPath; do
   [[ -n "${dumpPath}" ]] || continue
   typeset dumpBase; dumpBase="$(basename "${dumpPath}")"
@@ -142,18 +150,18 @@ ReadNTFSFile 'C:\Windows\System32\winevt\Logs\Application.evtx' "${outDir}/Event
 typeset parseStatus=0
 # Skip dump parsing if parse-dump-header.json already exists from watch-crash.sh (elf2dmp conversion)
 if [[ -s "${outDir}/parse-dump-header.json" ]]; then
-  Log "parse-dump-header.json already present from elf2dmp conversion — skipping recovery-phase dump parsing"
+  Log "parse-dump-header.json already present from elf2dmp conversion — skipping extraction-phase dump parsing"
 elif [[ -s "${outDir}/MEMORY.DMP" ]]; then
-  RunTimed 60 bash "${scriptDir}/parse-dump-header.sh" "${outDir}/MEMORY.DMP" > "${outDir}/parse-dump-header.json" 2>>"${recoveryLog}" || parseStatus=$?
+  RunTimed 60 bash "${scriptDir}/parse-dump-header.sh" "${outDir}/MEMORY.DMP" > "${outDir}/parse-dump-header.json" 2>>"${extractionLog}" || parseStatus=$?
 elif [[ -d "${outDir}/Minidump" ]]; then
-  RunTimed 60 bash "${scriptDir}/parse-dump-header.sh" --dir "${outDir}/Minidump" > "${outDir}/parse-dump-header.json" 2>>"${recoveryLog}" || parseStatus=$?
+  RunTimed 60 bash "${scriptDir}/parse-dump-header.sh" --dir "${outDir}/Minidump" > "${outDir}/parse-dump-header.json" 2>>"${extractionLog}" || parseStatus=$?
 else
   Log "WARN: no MEMORY.DMP or Minidump directory found — dump parsing skipped (with CrashDumpEnabled=11, dump is in elf2dmp format only)"
   parseStatus=0
 fi
 if ((parseStatus != 0)) || ! jq -e '.ok == true' "${outDir}/parse-dump-header.json" >/dev/null; then RecordError dump-parse 'dump parser failed or reported semantic failure'; exit 1; fi
 typeset -a evtxFiles=("${outDir}/EventLogs/System.evtx"); [[ -s "${outDir}/EventLogs/Application.evtx" ]] && evtxFiles+=("${outDir}/EventLogs/Application.evtx")
-if RunTimed 120 "${extractEvtxBin}" --data-dir "${BSOD_DATA_DIR:-$(cd "${scriptDir}/../../data" && pwd)}" "${evtxFiles[@]}" > "${outDir}/events.json" 2>>"${recoveryLog}"; then
+if RunTimed 120 "${extractEvtxBin}" --data-dir "${BSOD_DATA_DIR:-$(cd "${scriptDir}/../../data" && pwd)}" "${evtxFiles[@]}" > "${outDir}/events.json" 2>>"${extractionLog}"; then
   if jq -e '.ok == true' "${outDir}/events.json" >/dev/null 2>&1; then
     Log "EVTX parsed successfully"
   else
@@ -185,7 +193,7 @@ try:
 except Exception as e:
   print('Error parsing System.evtx:', e, file=__import__('sys').stderr)
 print(json.dumps({'ok': True, 'source': 'System.evtx', 'eventCount': len(events), 'events': events}, indent=2))
-" > "${systemJson}" 2>>"${recoveryLog}" || Log "WARN: System.evtx JSON parse failed"
+" > "${systemJson}" 2>>"${extractionLog}" || Log "WARN: System.evtx JSON parse failed"
       [[ -s "${systemJson}" ]] && Log "System.evtx parsed: $(jq '.eventCount' "${systemJson}") events"
     fi
     # Parse Application.evtx
@@ -205,7 +213,7 @@ try:
 except Exception as e:
   print('Error parsing Application.evtx:', e, file=__import__('sys').stderr)
 print(json.dumps({'ok': True, 'source': 'Application.evtx', 'eventCount': len(events), 'events': events}, indent=2))
-" > "${appJson}" 2>>"${recoveryLog}" || Log "WARN: Application.evtx JSON parse failed"
+" > "${appJson}" 2>>"${extractionLog}" || Log "WARN: Application.evtx JSON parse failed"
       [[ -s "${appJson}" ]] && Log "Application.evtx parsed: $(jq '.eventCount' "${appJson}") events"
     fi
   else
@@ -228,6 +236,6 @@ done || true
 typeset cleanupStatus=0; Cleanup || cleanupStatus=$?
 typeset summaryStatus=0
 RunTimed 60 python3 "${scriptDir}/reliability.py" write-summary --out "${outDir}" --stage-errors "${stageErrors}" \
-  --mode rhov-snapshot-recovery --vm "${vm}" --namespace "${ns}" --run-id "${runId}" --filename recovery-summary.json >/dev/null || summaryStatus=$?
+  --mode rhov-snapshot-extraction --vm "${vm}" --namespace "${ns}" --run-id "${runId}" --filename extraction-summary.json >/dev/null || summaryStatus=$?
 ((cleanupStatus == 0 && summaryStatus == 0)) || exit 1
-Log 'snapshot recovery exported and validated all recovery-owned artifact classes'
+Log 'snapshot extraction exported and validated all extraction-owned artifact classes'

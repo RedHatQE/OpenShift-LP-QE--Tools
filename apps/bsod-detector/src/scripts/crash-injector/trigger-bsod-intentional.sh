@@ -15,7 +15,12 @@ typeset watcherPid=''; typeset runId=''; runId="$(date -u +%Y%m%dT%H%M%SZ)-inten
 typeset outDir="${evidenceRoot}/${runId}"; typeset metadataFile="${outDir}/recovery-metadata.json"; typeset readyFile="${outDir}/watcher-ready"
 
 function Die () { echo "trigger-bsod-intentional: ERROR: $*" >&2; exit 1; }
-function Cleanup () { if [[ -n "${watcherPid}" ]]; then kill "${watcherPid}" 2>/dev/null || true; wait "${watcherPid}" 2>/dev/null || true; watcherPid=''; fi; true; }
+function CleanupGuestfishCache () { find "${appDir}" -maxdepth 3 -name "file.0x*" -type f -delete 2>/dev/null || true; }
+function Cleanup () {
+  if [[ -n "${watcherPid}" ]]; then kill "${watcherPid}" 2>/dev/null || true; wait "${watcherPid}" 2>/dev/null || true; watcherPid=''; fi
+  CleanupGuestfishCache
+  true
+}
 function OnSignal () { typeset status="${1:?}"; exit "${status}"; }
 trap Cleanup EXIT
 trap 'OnSignal 130' INT
@@ -25,6 +30,9 @@ trap 'OnSignal 143' TERM
 [[ -n "${evidenceRoot}" ]] || Die 'EVIDENCE_DIR must identify the validated persistent mount'
 [[ "${readyTimeout}" =~ ^[1-9][0-9]*$ && "${preflightTimeout}" =~ ^[1-9][0-9]*$ ]] || Die 'watch/ready/preflight timeouts must be positive integers'
 case "${crashType}" in 0x01|0x02|0x03|0x04|0x05|0x06|0x07|0x08|0x09) ;; *) Die "unsupported NotMyFault crash type '${crashType}'" ;; esac
+
+echo "trigger-bsod-intentional: cleaning up any leftover guestfish cache files (file.0x*)..."
+CleanupGuestfishCache
 
 mkdir "${outDir}" || Die "cannot create unique run directory ${outDir}"
 timeout --signal=TERM --kill-after=5 1800 "${hostDir}/preflight-rhov.sh" --ns "${ns}" --vm "${vm}" --out "${outDir}" --metadata "${metadataFile}" --run-id "${runId}" \

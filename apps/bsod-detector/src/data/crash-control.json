@@ -11,9 +11,9 @@
     "filtered":  { "CrashDumpEnabled": 11, "description": "Variable size. Filters out VM host/guest memory overhead, making offline extraction faster than full complete dumps on high-RAM servers." }
   },
   "recommended": {
-    "crashDumpType": "automatic",
+    "crashDumpType": "complete",
     "values": {
-      "CrashDumpEnabled": 7,
+      "CrashDumpEnabled": 1,
       "AlwaysKeepMemoryDump": 1,
       "Overwrite": 1,
       "LogEvent": 1,
@@ -21,7 +21,7 @@
       "MinidumpDir": "%SystemRoot%\\Minidump",
       "DumpFile": "%SystemRoot%\\MEMORY.DMP"
     },
-    "notes": "CrashDumpEnabled=7 (automatic dump) writes kernel memory dump and lets OS manage page-file sizing (Win8+). AutoReboot=0 keeps VM frozen for offline snapshot extraction. Extraction via NTFS-3G in recovery pod provides: MEMORY.DMP (kernel dump), Minidump/*.dmp files, System.evtx, and Application.evtx. No PDB download or elf2dmp conversion needed. Simpler than type 1 and requires less disk space."
+    "notes": "CrashDumpEnabled=1 (complete dump) writes entire physical memory as native WinDbg DMP format. Guarantees MEMORY.DMP at C:\\Windows\\MEMORY.DMP. AutoReboot=0 keeps VM frozen for offline extraction. Extraction via NTFS-3G in recovery pod provides: MEMORY.DMP, Minidump/*.dmp files, System.evtx, and Application.evtx. Requires page file >= RAM size (+1MB). Primary artifact for forensics analysis."
   },
   "pageFile": {
     "path": "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",

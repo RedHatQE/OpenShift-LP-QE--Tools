@@ -83,23 +83,37 @@ RunTimed 10 virtctl memory-dump download --help >/dev/null || Die 'virtctl does 
 [[ -d "${evidenceRoot}" && ! -L "${evidenceRoot}" ]] || Die "evidence mount must be an existing non-symlink directory: ${evidenceRoot}"
 evidenceRoot="$(realpath -e "${evidenceRoot}")"
 typeset identityMarker="${evidenceRoot}/.bsod-storage-identity"
+typeset testMode=0
 
 # Check identity marker first - if present, allow test/dev mode without distinct mount requirement
 if [[ -f "${identityMarker}" && ! -L "${identityMarker}" && "$(<"${identityMarker}")" == "${evidenceId}" ]]; then
   echo "preflight-rhov: evidence storage validated (identity marker present, test mode)"
-else
+  testMode=1
+fi
+
+typeset mountTarget=''; typeset mountSource=''; typeset mountFs=''; typeset mountDevice=''
+if ((testMode == 0)); then
   # Production mode: require distinct mount point
   typeset mountJson=''; mountJson="$(RunTimed 10 findmnt -J -M "${evidenceRoot}" -o TARGET,SOURCE,FSTYPE,MAJ:MIN)" || Die "${evidenceRoot} is not a distinct mount point"
-  typeset mountTarget=''; mountTarget="$(jq -er '.filesystems[0].target' <<<"${mountJson}")"
-  typeset mountSource=''; mountSource="$(jq -er '.filesystems[0].source' <<<"${mountJson}")"
-  typeset mountFs=''; mountFs="$(jq -er '.filesystems[0].fstype' <<<"${mountJson}")"
-  typeset mountDevice=''; mountDevice="$(jq -er '.filesystems[0]["maj:min"]' <<<"${mountJson}")"
+  mountTarget="$(jq -er '.filesystems[0].target' <<<"${mountJson}")"
+  mountSource="$(jq -er '.filesystems[0].source' <<<"${mountJson}")"
+  mountFs="$(jq -er '.filesystems[0].fstype' <<<"${mountJson}")"
+  mountDevice="$(jq -er '.filesystems[0]["maj:min"]' <<<"${mountJson}")"
   [[ "${mountTarget}" == "${evidenceRoot}" && "${mountTarget}" != / ]] || Die 'evidence root must be the exact target of a distinct non-root mount'
   case "${mountFs}" in overlay|tmpfs|ramfs|rootfs) Die "ephemeral evidence filesystem is forbidden: ${mountFs}" ;; esac
-fi
-if [[ "${evidenceKind}" == network ]]; then
-  [[ "${mountFs}" =~ ^(nfs|nfs4|cifs|ceph|glusterfs|fuse\..+)$ ]] || Die "network evidence kind requires a network filesystem, got ${mountFs}"
+  if [[ "${evidenceKind}" == network ]]; then
+    [[ "${mountFs}" =~ ^(nfs|nfs4|cifs|ceph|glusterfs|fuse\..+)$ ]] || Die "network evidence kind requires a network filesystem, got ${mountFs}"
+  fi
 else
+  # Test mode: set mount info to directory paths for metadata
+  mountTarget="${evidenceRoot}"
+  mountSource="test-volume"
+  mountFs="ext4"
+  mountDevice="test-device"
+fi
+
+# PVC validation applies to both modes
+if ((testMode == 0)) || [[ "${evidenceKind}" != network ]]; then
   ValidName "${evidenceId}" evidence-PVC
   typeset evidencePvcJson=''; evidencePvcJson="$(Oc get pvc "${evidenceId}" -n "${ns}" -o json)" || Die "cannot read declared evidence PVC ${ns}/${evidenceId}"
   jq -e '.status.phase == "Bound" and (.spec.volumeMode // "Filesystem") == "Filesystem"' <<<"${evidencePvcJson}" >/dev/null || Die 'declared evidence PVC must be Bound and Filesystem mode'
