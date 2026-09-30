@@ -136,7 +136,9 @@ flowchart LR
 - **Config source:** the committed manifest ships a `prow-analyzer-config`
   ConfigMap and surfaces its keys to the container as env vars via
   `configMapKeyRef` (tokens come from the `prow-analyzer-secrets` Secret via
-  `secretKeyRef`). `MONITOR_ALL` is set as a literal env value on the Deployment.
+  `secretKeyRef`; that Secret is created out-of-band, not shipped in the manifest,
+  so `oc apply` can't overwrite real tokens with placeholders). `MONITOR_ALL` is
+  set as a literal env value on the Deployment.
 - **HAP guardrails** shown with an asterisk are **not yet in the deployed
   image** — they were in progress at the time of writing. Treat that node as
   "planned" until a rebuilt image is deployed.

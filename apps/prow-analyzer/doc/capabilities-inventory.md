@@ -47,7 +47,7 @@ All model-driven behavior lives in the ship-help persona, not here.
 
 | API | Direction | Auth | Operations used | Notes |
 |---|---|---|---|---|
-| **ship-help MCP** (`SHIP_HELP_MCP_URL`) | Outbound | `Authorization: Bearer <SHIP_HELP_MCP_TOKEN>` + `Mcp-Session-Id` | `initialize` (protocol `2024-11-05`), `tools/call` → `ask_persona` | JSON-RPC 2.0; response is an SSE stream. Auto-recovers a stale session and retries once. 600s client timeout. |
+| **ship-help MCP** (`SHIP_HELP_MCP_URL`) | Outbound | `Authorization: Bearer <SHIP_HELP_MCP_TOKEN>` + `Mcp-Session-Id` | `initialize` (protocol `2024-11-05`), `tools/call` → `ask_persona` | JSON-RPC 2.0; response is an SSE stream. Auto-recovers a stale session and retries once. 1,200s (20-min) default client timeout, `MCP_TIMEOUT_SECONDS`. |
 | **Slack Web API** | Outbound | `SLACK_BOT_TOKEN` (`xoxb-…`) | `chat.postMessage` (via `chat:write`) | Posts analysis, error, and "queue full" replies in-thread. |
 | **Slack Socket Mode** | Outbound WebSocket (WSS) | `SLACK_APP_TOKEN` (`xapp-…`) | Receives Events API callbacks; `Ack()` | No public ingress; outbound-only. |
 

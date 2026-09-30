@@ -3,17 +3,14 @@ kind: Namespace
 metadata:
   name: prow-analyzer
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: prow-analyzer-secrets
-  namespace: prow-analyzer
-type: Opaque
-stringData:
-  ship-help-token: "YOUR_SHIP_HELP_TOKEN_HERE"
-  slack-bot-token: "YOUR_SLACK_BOT_TOKEN_HERE"
-  slack-app-token: "YOUR_SLACK_APP_TOKEN_HERE"
----
+# NOTE: the prow-analyzer-secrets Secret is intentionally NOT defined in this
+# manifest. Create it out-of-band with real tokens BEFORE `oc apply`, e.g.:
+#   oc create secret generic prow-analyzer-secrets -n prow-analyzer \
+#     --from-literal=ship-help-token=... \
+#     --from-literal=slack-bot-token=xoxb-... \
+#     --from-literal=slack-app-token=xapp-...
+# (see doc/deployment.md, Step 2). Shipping placeholder token values here would
+# overwrite the real Secret with invalid tokens on every `oc apply`.
 apiVersion: v1
 kind: ConfigMap
 metadata:

@@ -105,8 +105,14 @@ cd ../../image/container/prow-analyzer
 make build IMAGE_TAG=v1.0.0
 make push IMAGE_TAG=v1.0.0
 
-# Update secrets in apps/prow-analyzer/deploy/openshift/deployment.yaml
-# Then deploy:
+# Create the Secret out-of-band (it is NOT in the manifest, so oc apply
+# cannot overwrite real tokens with placeholders):
+oc create secret generic prow-analyzer-secrets -n prow-analyzer \
+  --from-literal=ship-help-token="YOUR_TOKEN_HERE" \
+  --from-literal=slack-bot-token="xoxb-..." \
+  --from-literal=slack-app-token="xapp-..."
+
+# Edit the image/mcp-url/monitored-channels placeholders in the manifest, then deploy:
 oc apply -f ../../apps/prow-analyzer/deploy/openshift/deployment.yaml
 ```
 

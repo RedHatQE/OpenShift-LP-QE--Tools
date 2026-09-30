@@ -133,7 +133,7 @@ The core MCP client. Key responsibilities:
 
 - **Response formatting** -- `FormatSlackResponse` wraps the analysis text in Slack mrkdwn with a header and duration footer. Guards against nil results.
 
-- **HTTP client** -- Uses `http.Client` with a 600-second timeout. Optionally skips TLS verification when `TLS_INSECURE_SKIP_VERIFY=true`. The client is injected via the `HTTPDoer` interface to enable testing.
+- **HTTP client** -- Uses `http.Client` with a 1,200-second (20-minute) default timeout, overridable via `MCP_TIMEOUT_SECONDS`. Optionally skips TLS verification when `TLS_INSECURE_SKIP_VERIFY=true`. The client is injected via the `HTTPDoer` interface to enable testing.
 
 - **Dependency injection** -- `jsonMarshal` and `newRequest` functions are injected fields, allowing tests to exercise error paths that are otherwise unreachable (e.g., `json.Marshal` failure, `http.NewRequestWithContext` failure).
 
@@ -154,18 +154,21 @@ If all filters pass, the handler attempts to acquire a semaphore slot (buffered 
 **Container image** (`image/container/prow-analyzer/`)
 
 Multi-stage Dockerfile:
-- Builder: `rhel-9-golang-1.25-openshift-4.22` -- vendors dependencies and compiles both binaries.
-- Runtime: `base-rhel9` -- copies binaries to `/usr/bin/`, runs as UID 1000.
+- Builder: `registry.access.redhat.com/ubi9/go-toolset:1.22` -- vendors dependencies and compiles both binaries.
+- Runtime: `registry.access.redhat.com/ubi9/ubi:latest` -- copies binaries to `/usr/bin/`, runs as UID 1000.
+
+Both stages use publicly pullable Red Hat base images (`registry.access.redhat.com`, no auth) because the image is built by GitHub Actions, which has no `registry.ci.openshift.org` credentials.
 
 The Makefile supports `build`, `push`, and `clean` targets with configurable `IMAGE_REGISTRY`, `IMAGE_NAMESPACE`, `IMAGE_NAME`, and `IMAGE_TAG`. The `BUILDFLAGS` variable passes flags to `podman build` (e.g., `--platform linux/amd64`).
 
 **OpenShift deployment** (`deploy/openshift/deployment.yaml`)
 
-Defines four resources in a single file:
+Defines three resources in a single file:
 - `Namespace` (default: `prow-analyzer`)
-- `Secret` (`prow-analyzer-secrets`) -- ship-help token, Slack bot token, Slack app token
 - `ConfigMap` (`prow-analyzer-config`) -- MCP URL, monitored channels, prompt template
 - `Deployment` (`prow-analyzer-bot`) -- single replica, non-root security context, liveness probe via `pgrep`, resource limits (128-512Mi memory, 100-500m CPU)
+
+The `prow-analyzer-secrets` Secret (ship-help token, Slack bot token, Slack app token) is **not** in this manifest — create it out-of-band (Step 2 below) so `oc apply` never overwrites real tokens with placeholders.
 
 **Slack app manifest** (`deploy/slack/manifest.yaml`)
 
@@ -236,7 +239,7 @@ If step 2 returns `HTTP 404` with `{"error":{"message":"Session not found"}}`, t
 
 **Async analysis.** Each analysis runs in a goroutine spawned by the handler. The Slack event is acknowledged immediately so the 3-second Socket Mode ack deadline is never hit. The goroutine posts the result (or error) as a thread reply when complete.
 
-**Session recovery.** MCP sessions can expire on the server side, particularly after the 600-second HTTP client timeout kills a long-running SSE stream. Without recovery, the bot would return "Session not found" errors indefinitely until restarted. The retry-once approach handles this transparently.
+**Session recovery.** MCP sessions can expire on the server side, particularly after the 1,200-second (20-minute) HTTP client timeout kills a long-running SSE stream. Without recovery, the bot would return "Session not found" errors indefinitely until restarted. The retry-once approach handles this transparently.
 
 **Bot message filtering.** All messages with a non-empty `BotID` are ignored. This prevents infinite loops where the bot's own thread replies (which contain Prow URLs in the analysis) trigger new analyses.
 
@@ -445,7 +448,7 @@ export SLACK_APP_TOKEN="xapp-..."
 export MONITORED_CHANNELS="C12345678"
 
 cd apps/prow-analyzer
-make build-bot
+make build--bot
 ./prow-analyzer--bot
 ```
 
@@ -472,6 +475,9 @@ The image pushes to `$(IMAGE_REGISTRY)/$(IMAGE_NAMESPACE)/$(IMAGE_NAME):$(IMAGE_
 
 **Step 2: Create secrets in the target namespace.**
 
+This is the only place the Secret is created; the manifest applied in Step 4 omits
+it, so run this first.
+
 ```bash
 oc create secret generic prow-analyzer-secrets \
   --from-literal=ship-help-token="YOUR_TOKEN_HERE" \
@@ -493,6 +499,10 @@ URL):
 - Set `monitored-channels` in the ConfigMap to your actual channel IDs.
 
 **Step 4: Deploy.**
+
+The manifest creates the Namespace, ConfigMap, and Deployment — not the Secret,
+which was created in Step 2 and is kept out of the manifest so re-applying never
+clobbers your tokens.
 
 ```bash
 oc apply -f deploy/openshift/deployment.yaml
@@ -568,8 +578,8 @@ cd apps/prow-analyzer
 make build
 
 # Build individually
-make build-cli
-make build-bot
+make build--cli
+make build--bot
 
 # Clean build artifacts
 make clean
@@ -581,8 +591,8 @@ make clean
 # Run all tests with race detector
 make test
 
-# Run with coverage enforcement
-make test-coverage
+# Run unit tests with the embedded 100% coverage gate
+make test--unit
 
 # Run specific tests
 go test -v -run TestAnalyzeFailure ./pkg/analyzer/
@@ -607,8 +617,10 @@ Test coverage areas:
 
 The Dockerfile uses a multi-stage build:
 
-1. **Builder stage** (`registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22`) -- copies source, vendors dependencies (`go mod vendor`), and compiles both binaries.
-2. **Runtime stage** (`registry.ci.openshift.org/ocp/4.22:base-rhel9`) -- copies binaries to `/usr/bin/`, sets user to `1000:1000`, sets entrypoint to `prow-analyzer--bot`.
+1. **Builder stage** (`registry.access.redhat.com/ubi9/go-toolset:1.22`) -- copies source, vendors dependencies (`go mod vendor`), and compiles both binaries with `CGO_ENABLED=0`.
+2. **Runtime stage** (`registry.access.redhat.com/ubi9/ubi:latest`) -- copies binaries to `/usr/bin/`, sets user to `1000:1000`, sets entrypoint to `prow-analyzer--bot`.
+
+Both stages use publicly pullable `registry.access.redhat.com` base images (no authentication), since the image is built by GitHub Actions, which has no credentials for `registry.ci.openshift.org`.
 
 Both binaries are included in the image. The CLI can be invoked inside the container as `/usr/bin/prow-analyzer--cli`.
 
@@ -641,7 +653,7 @@ oc logs -n <namespace> -l app=prow-analyzer-bot | grep "PROW-ANALYZER"
 | `initialize session: send init request: <network error>`     | MCP URL unreachable                              | Check network/DNS, verify `SHIP_HELP_MCP_URL`                                         |
 | `initialize session: no session ID in response`              | MCP server didn't return `Mcp-Session-Id` header | Server-side issue -- contact ship-help team                                           |
 | `HTTP 404: ... Session not found`                            | Stale session after timeout                      | Auto-recovered by session retry (if this persists, the recovery logic isn't deployed) |
-| `read SSE stream: reading stream: context deadline exceeded` | Analysis exceeded 600s HTTP client timeout       | Retry; if persistent, ship-help MCP may be overloaded                                 |
+| `read SSE stream: reading stream: context deadline exceeded` | Analysis exceeded the 1,200s HTTP client timeout | Retry; if persistent, ship-help MCP may be overloaded                                 |
 | `send request: <network error>`                              | Network error during analysis request            | Check connectivity to MCP endpoint                                                    |
 | `marshal request: ...`                                       | Internal error serializing JSON                  | Should not occur in normal operation -- file a bug                                    |
 | `no content in response`                                     | MCP returned empty result                        | Retry; may indicate a ship-help processing error                                      |

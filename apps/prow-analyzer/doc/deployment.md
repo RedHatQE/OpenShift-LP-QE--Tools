@@ -61,6 +61,10 @@ make -C image/container/prow-analyzer push IMAGE_NAMESPACE=<your-namespace> IMAG
 
 ### Step 2: Create Secrets
 
+This is the **only** place the Secret is created. The applied manifest in Step 4
+deliberately omits `prow-analyzer-secrets` so `oc apply` cannot overwrite these
+real tokens with placeholders — so run this step before Step 4.
+
 ```bash
 # Create namespace
 oc create namespace prow-analyzer
@@ -93,6 +97,11 @@ image → `ImagePullBackOff`/`CrashLoopBackOff`) or stop it from reaching ship-h
 ```
 
 ### Step 4: Deploy
+
+The manifest defines the Namespace, ConfigMap, and Deployment — but **not** the
+Secret. `prow-analyzer-secrets` is created once in Step 2 with your real tokens and
+is intentionally kept out of this manifest, so re-applying it never clobbers those
+tokens with placeholders. Ensure Step 2 has run first.
 
 ```bash
 oc apply -f deploy/openshift/deployment.yaml

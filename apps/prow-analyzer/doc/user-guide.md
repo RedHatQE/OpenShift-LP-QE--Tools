@@ -218,7 +218,7 @@ happens **inside ship-help**, not in this agent.
 - **Infra/flake failures** (node not ready, image pull, quota) -- may be
   misattributed to test code, or vice versa.
 - **Brand-new failure signatures** with no history -- weaker pattern analysis.
-- **Very large logs / long-running analyses** -- can approach the 600s timeout
+- **Very large logs / long-running analyses** -- can approach the 1,200s (20-min) timeout
   and fail; retry once before escalating.
 - **Multiple URLs in one message** -- only the first recognized URL is analyzed.
 - **Bursty channels** -- expect "queue full" during spikes; retry shortly.
@@ -342,7 +342,7 @@ What actually gates access:
 | CLI: `init request failed (HTTP 401)` | Invalid/expired MCP token | Get a new token from the ship-help support channel. |
 | CLI: `init request failed (HTTP 403)` | Token lacks permissions | Contact ship-help admins via the ship-help support channel. |
 | CLI: `send init request: <network error>` | MCP URL unreachable | Check VPN/network/DNS and `SHIP_HELP_MCP_URL`. |
-| `context deadline exceeded` | Analysis exceeded the 600s timeout | Retry; if persistent, ship-help may be overloaded. |
+| `context deadline exceeded` | Analysis exceeded the 1,200s timeout | Retry; if persistent, ship-help may be overloaded. |
 | Analysis is thin or vague | Logs expired, or novel failure with no history | Check the Prow artifacts still exist; add human context and retry. |
 
 Maintainers: the user-visible message is intentionally generic; the real error
