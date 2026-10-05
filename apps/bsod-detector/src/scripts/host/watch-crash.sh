@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # RHOV crash watcher: detects guest BSOD, captures crash dumps, extracts forensics artifacts
 # Fails closed: requires successful preflight validation, crash detection, dump capture, and artifact extraction
+set -euxo pipefail; shopt -s inherit_errexit
 #
 # Memory Dump Artifacts Generated:
 #   PRIMARY: vm-memory-windows.dmp (elf2dmp converted from KubeVirt ELF export)
@@ -20,8 +21,9 @@
 set -euo pipefail; shopt -s inherit_errexit
 umask 077
 
+# Determine script directory for helper script resolution
 typeset scriptDir=''; scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Core targets: namespace, VM name, output directory, metadata file from preflight
+# Core targets: cluster namespace, VM name, output directory, metadata file from preflight
 typeset ns=''; typeset vm=''; typeset outArg=''; typeset outDir=''; typeset metadataFile=''; typeset runId=''
 # Crash detection tuning: ping interval (5s), miss threshold (2 misses = crash), quiesce time (15 min for dump), idle samples before quiesce
 typeset interval=5; typeset miss=2; typeset quiesceWait=900; typeset idleSamples=3
@@ -38,10 +40,16 @@ typeset -a guestAgent=(python3 "${scriptDir}/guest-agent.py")
 [[ -z "${BSOD_GUEST_AGENT_BIN:-}" ]] || guestAgent=("${BSOD_GUEST_AGENT_BIN}")
 typeset hostSignalsBin="${BSOD_HOST_SIGNALS_BIN:-${scriptDir}/collect-host-signals.sh}"
 
+# Helper function definitions
+# Die — print a fatal error to stderr and exit.
 function Die () { echo "watch-crash: ERROR: $*" >&2; exit 1; }
+# RunTimed — execute command with timeout: TERM after <seconds>, force KILL after 5 more seconds
 function RunTimed () { typeset seconds="${1:?}"; shift; timeout --signal=TERM --kill-after=5 "${seconds}" "$@"; }
+# Oc — run kubectl with configured timeout and request timeout
 function Oc () { RunTimed "${commandTimeout}" oc --request-timeout="${commandTimeout}s" "$@"; }
+# Log — print timestamped message to both stdout and pipeline log file
 function Log () { printf '[%s] %s\n' "$(date -u +%H:%M:%S)" "$*" | tee -a "${pipelineLog}"; true; }
+# RecordError — append error entry to stage-errors JSONL file and log to stdout
 function RecordError () {
   typeset stage="${1:?}"; shift
   jq -cn --arg stage "${stage}" --arg error "$*" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -65,6 +73,7 @@ trap Cleanup EXIT
 trap 'OnSignal 130' INT
 trap 'OnSignal 143' TERM
 
+# Parse command-line arguments: cluster targets, crash detection tuning, storage, and modes
 while (($#)); do
   case "$1" in
     --ns) ns="${2:?}"; shift 2 ;;
@@ -93,17 +102,22 @@ while (($#)); do
   esac
 done
 
+# Validate required arguments and timeout values
 [[ -n "${ns}" && -n "${vm}" && -n "${outArg}" ]] || Die '--ns, --vm, and --out are required'
 command -v setsid >/dev/null 2>&1 || Die "required local tool 'setsid' is not installed"
 for value in "${interval}" "${miss}" "${quiesceWait}" "${idleSamples}" "${commandTimeout}" "${armedTimeout}"; do
   [[ "${value}" =~ ^[1-9][0-9]*$ ]] || Die 'all timeout/count values must be positive integers'
 done
 
+# Load or initialize run metadata
+# If preflight metadata provided, load configuration from it; else run preflight to generate it
 if [[ -n "${metadataFile}" ]]; then
+  # Using metadata from prior preflight run: load and validate it matches current targets
   [[ -r "${metadataFile}" && -n "${runId}" ]] || Die '--metadata requires a readable file and --run-id'
   outDir="$(jq -er .outputDir "${metadataFile}")"
   [[ "$(realpath -m "${outArg}")" == "${outDir}" && "$(jq -r .runId "${metadataFile}")" == "${runId}" ]] || Die 'preflight metadata does not identify this run output'
 else
+  # Running preflight inline: generate metadata and validated configuration
   [[ -n "${evidenceRoot}" ]] || evidenceRoot="${outArg}"
   runId="${runId:-$(date -u +%Y%m%dT%H%M%SZ)-$$-$RANDOM}"
   outDir="$(realpath -m "${evidenceRoot}")/${runId}"
@@ -116,20 +130,24 @@ else
   RunTimed "${preflightTimeout}" "${scriptDir}/preflight-rhov.sh" "${preflightArgs[@]}" || Die 'preflight failed or timed out'
 fi
 
+# Extract validated configuration from metadata
 typeset pod=''; pod="$(jq -er .launcherPod "${metadataFile}")"
 typeset dom=''; dom="$(jq -er .domain "${metadataFile}")"
 typeset node=''; node="$(jq -r .node "${metadataFile}")"
 diskTarget="$(jq -er .diskTarget "${metadataFile}")"; memoryPvc="$(jq -er .memoryDumpPvc "${metadataFile}")"
 [[ "$(jq -r .namespace "${metadataFile}")" == "${ns}" && "$(jq -r .vm "${metadataFile}")" == "${vm}" ]] || Die 'metadata target does not match watcher target'
 export GA_NS="${ns}" GA_VM="${vm}" GA_POD="${pod}" GA_DOM="${dom}"
+
+# Initialize output directory and log files
 mkdir -p "${outDir}"; chmod 0700 "${outDir}"
 stageErrors="${outDir}/stage-errors.jsonl"; : > "${stageErrors}"; chmod 0600 "${stageErrors}"
 pipelineLog="${outDir}/watcher.log"; : > "${pipelineLog}"; chmod 0600 "${pipelineLog}"
 runDir="$(mktemp -d "${TMPDIR:-/tmp}/bsod-watcher.XXXXXX")"; pvpanicFile="${runDir}/pvpanic.current"
 
-# Check if guest is reachable via QEMU Guest Agent (QGA) - measures guest OS responsiveness
+# Inline guest connectivity test functions
+# PingOk — check if guest is reachable via QEMU Guest Agent (QGA); measures guest OS responsiveness
 function PingOk () { RunTimed 15 "${guestAgent[@]}" ping >/dev/null 2>&1; }
-# Get libvirt domain state (running, paused, crashed, etc) - measures hypervisor visibility
+# DomainState — get libvirt domain state (running, paused, crashed, etc); measures hypervisor visibility
 function DomainState () { Oc exec -n "${ns}" "${pod}" -- virsh domstate "${dom}" 2>/dev/null | tr -d '[:space:]'; }
 # Write final evidence summary: manifest of all captured artifacts, success/failure status
 function WriteSummary () {

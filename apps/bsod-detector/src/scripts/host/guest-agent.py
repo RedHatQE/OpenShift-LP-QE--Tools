@@ -2,11 +2,12 @@
 """guest-agent.py -- drive a KubeVirt Windows guest via the qemu-guest-agent.
 
 WHY
-    On a KubeVirt/OpenShift cluster there is no passt SSH to the VM. The guest is
-    reachable through the qemu-guest-agent, which is spoken by `virsh` inside the
-    VM's virt-launcher pod. This wraps that RPC so the BSOD pipeline (stage toolkit,
-    trigger a crash, collect dumps, pull evidence) can run with no SSH and no
-    credentials -- guest-exec runs as `nt authority\\system` (fully elevated).
+    On a KubeVirt/OpenShift cluster there is no direct SSH to the VM without additional
+    network configuration. The guest is reachable through the qemu-guest-agent, which
+    is spoken by `virsh` inside the VM's virt-launcher pod. This wraps that RPC so the
+    BSOD pipeline (stage toolkit, trigger a crash, collect dumps, pull evidence) can
+    run with no SSH and no credentials -- guest-exec runs as `nt authority\\system`
+    (fully elevated).
 
 HOW IT REACHES THE GUEST
     oc exec -n <ns> <virt-launcher-pod> -- \\
@@ -56,7 +57,7 @@ _resolved = False
 
 
 def _oc(args):
-    """Run `oc <args>` and return stripped stdout, or '' on failure."""
+    """Execute OpenShift CLI command and return output or empty string on failure."""
     try:
         r = subprocess.run(
             ["oc", "--request-timeout=20s"] + args,
@@ -68,6 +69,7 @@ def _oc(args):
 
 
 def _resolve_pod(ns, vm):
+    """Find the virt-launcher pod for a given VM in a namespace."""
     for line in _oc(["get", "pod", "-n", ns, "-o", "name"]).splitlines():
         name = line.split("/", 1)[-1]
         if name.startswith(f"virt-launcher-{vm}-"):
@@ -76,8 +78,7 @@ def _resolve_pod(ns, vm):
 
 
 def resolve_target():
-    """Fill in NS/VM/DOM/POD from the cluster so nothing has to be hardcoded.
-    Explicit env vars always win; only the missing pieces are looked up."""
+    """Auto-detect and populate namespace, VM, domain name, and pod from the cluster; explicit env vars take precedence."""
     global NS, VM, POD, DOM, _resolved
     if _resolved:
         return
@@ -111,7 +112,7 @@ def resolve_target():
 
 
 def agent(cmd_obj, timeout=300):
-    """Send one qemu-agent-command and return its 'return' payload."""
+    """Send a QEMU agent command via virsh and return the response payload."""
     resolve_target()
     payload = json.dumps(cmd_obj)
     try:
@@ -134,8 +135,7 @@ def agent(cmd_obj, timeout=300):
 
 
 def guest_exec(path, args=None, wait=True, poll_timeout=600):
-    """Run a program in the guest. wait=False returns immediately (use when the
-    command is expected to crash the guest, e.g. a BSOD trigger)."""
+    """Execute a program in the guest VM and optionally wait for completion; returns PID, exit code, stdout, and stderr."""
     r = agent({"execute": "guest-exec", "arguments": {
         "path": path, "arg": args or [], "capture-output": True}}, timeout=300)
     pid = r["pid"]
@@ -161,12 +161,7 @@ def guest_exec(path, args=None, wait=True, poll_timeout=600):
 
 
 def guest_exec_crash(path, args=None, poll_timeout=45):
-    """Start an intentional crash command and make its outcome explicit.
-
-    A reported guest exit is authoritative and its status is propagated.  A
-    transport loss after QGA confirmed process creation is the only successful
-    detached outcome; the armed watcher must still corroborate the crash.
-    """
+    """Execute a crash-inducing program and capture its outcome (exit, timeout, or transport loss indicating crash)."""
     launched = agent({"execute": "guest-exec", "arguments": {
         "path": path, "arg": args or [], "capture-output": True,
     }}, timeout=20)
@@ -189,8 +184,7 @@ def guest_exec_crash(path, args=None, poll_timeout=45):
 
 
 def guest_put(local, guestpath):
-    """Upload a local file to the guest via guest-file-write (1.5MB base64 chunks).
-    Supports files up to 2GB+ with optimized chunk sizing for QMP limits."""
+    """Upload a local file to the guest VM using optimized base64-encoded chunks."""
     with open(local, "rb") as fh:
         data = fh.read()
     file_size = len(data)
@@ -214,14 +208,7 @@ def guest_put(local, guestpath):
 
 
 def guest_get(guestpath, local, chunk=3500 * 1024, auto_compress=True):
-    """Download a guest file with intelligent compression for large files.
-
-    Uses 3.5MB chunks (safe margin from 4MB QMP limit). For files >100MB,
-    automatically compresses on guest using gzip, transfers compressed file,
-    then decompresses on host. This reduces transfer time by ~7x for typical
-    MEMORY.DMP files (555MB → 77MB).
-
-    Seek-based + per-chunk retries ensure truncated responses don't desync."""
+    """Download a guest VM file with automatic compression for large files; uses seek-based retries for reliability."""
 
     # For large files, compress on guest first
     compressed_on_guest = False
@@ -306,7 +293,7 @@ def guest_get(guestpath, local, chunk=3500 * 1024, auto_compress=True):
 
 
 def _print_exec_result(result):
-    """Print captured guest output and return the guest process exit status."""
+    """Output guest command results (stdout, stderr) and return the process exit code."""
     if result.get("stdout"):
         sys.stdout.write(result["stdout"] + ("" if result["stdout"].endswith("\n") else "\n"))
     if result.get("stderr"):
@@ -322,7 +309,7 @@ def _print_exec_result(result):
 
 
 def _psfile_args(arguments):
-    """Parse generic companion uploads before the PowerShell argument separator."""
+    """Parse and separate companion file uploads from PowerShell script arguments."""
     if arguments and arguments[0] not in {"--companion", "--"}:
         return [], arguments
     companions = []
@@ -340,6 +327,17 @@ def _psfile_args(arguments):
 
 
 def main():
+    """Parse and dispatch commands to interact with the guest VM.
+
+    Commands:
+      ping                                - Test guest connectivity
+      exec <program> [args...]            - Run a program and wait for output
+      exec-nowait <program> [args...]     - Run a program without waiting
+      exec-crash <program> [args...]      - Run a crash-inducing program
+      put <local> <guestpath>             - Upload a file to the guest
+      get <guestpath> <local>             - Download a file from the guest
+      psfile <script> [--companion ...]   - Upload and run a PowerShell script
+    """
     if len(sys.argv) < 2:
         print(__doc__); sys.exit(2)
     cmd = sys.argv[1]

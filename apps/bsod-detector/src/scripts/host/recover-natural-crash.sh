@@ -2,14 +2,16 @@
 # Extract crash artifacts from stopped guest disk via NTFS-3G mounting in privileged pod
 # Reads offline Windows filesystem to extract MEMORY.DMP, Minidump/*.dmp, System.evtx, Application.evtx
 # Runs AFTER watch-crash.sh stops the VM - performs offline forensics extraction
-set -euo pipefail; shopt -s inherit_errexit
+set -euxo pipefail; shopt -s inherit_errexit
 umask 077
 
-# Core paths and configuration
+# Determine script directory for helper script resolution
 typeset scriptDir=''; scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Input files: preflight metadata (from watch-crash.sh), output directory, optional extract-evtx binary
 typeset metadataFile=''; typeset outDir=''; typeset commandTimeout="${BSOD_COMMAND_TIMEOUT:-30}"
 typeset extractEvtxBin="${BSOD_EXTRACT_EVTX_BIN:-${scriptDir}/extract-evtx.py}"
+
+# Parse command-line arguments: metadata file and output directory
 while (($#)); do
   case "$1" in
     --metadata) metadataFile="${2:?}"; shift 2 ;;
@@ -20,15 +22,23 @@ while (($#)); do
 done
 [[ -r "${metadataFile}" && -n "${outDir}" ]] || { echo 'recover-natural-crash: --metadata and --out are required' >&2; exit 2; }
 
+# Helper function definitions
+# Die — print a fatal error to stderr and exit.
 function Die () { echo "recover-natural-crash: ERROR: $*" >&2; exit 1; }
+# RunTimed — execute command with timeout: TERM after <seconds>, force KILL after 5 more seconds
 function RunTimed () { typeset seconds="${1:?}"; shift; timeout --signal=TERM --kill-after=5 "${seconds}" "$@"; }
+# Oc — run kubectl with configured timeout and request timeout
 function Oc () { RunTimed "${commandTimeout}" oc --request-timeout="${commandTimeout}s" "$@"; }
+# Verify all required local tools are available
 for tool in oc jq python3 sha256sum findmnt timeout realpath; do command -v "${tool}" >/dev/null 2>&1 || Die "required tool missing: ${tool}"; done
 
+# Validate run directory and preflight metadata integrity
 typeset runId=''; runId="$(jq -er .runId "${metadataFile}")"
 typeset expectedOut=''; expectedOut="$(jq -er .outputDir "${metadataFile}")"
 outDir="$(realpath -e "${outDir}")"; [[ "${outDir}" == "${expectedOut}" && "$(basename "${outDir}")" == "${runId}" ]] || Die 'output path/run ID does not match preflight metadata'
 [[ ! -L "${outDir}" ]] || Die 'output path must not be a symlink'
+
+# Validate evidence storage mount: must be a persistent volume (not tmpfs, etc)
 typeset expectedTarget=''; expectedTarget="$(jq -er .evidenceMount.target "${metadataFile}")"
 typeset testMode=0
 case "$(jq -r .evidenceMount.kind "${metadataFile}")" in pvc|network|csi) ;; *) Die 'metadata does not prove persistent evidence volume kind' ;; esac
@@ -42,6 +52,7 @@ if [[ -f "${identityMarker}" && ! -L "${identityMarker}" && "$(<"${identityMarke
   testMode=1
 fi
 
+# Production mode: verify evidence mount hasn't changed since preflight
 if ((testMode == 0)); then
   typeset mountJson=''; mountJson="$(RunTimed 10 findmnt -J -M "${expectedTarget}" -o TARGET,SOURCE,FSTYPE,MAJ:MIN)" || Die 'validated evidence mount is no longer mounted'
   typeset actualMount=''; actualMount="$(jq -c '.filesystems[0] | {target:.target,source:.source,fsType:.fstype,device:.["maj:min"]}' <<<"${mountJson}")"
@@ -49,36 +60,44 @@ if ((testMode == 0)); then
   [[ "${actualMount}" == "${expectedMount}" ]] || Die "evidence mount identity changed: expected ${expectedMount}, got ${actualMount}"
 fi
 
-# Unique run directories may already contain watcher-owned captures, but never
-# extraction-owned artifacts. Refuse instead of overwriting possible stale data.
+# Refuse to overwrite possible stale data from previous extraction attempts
+# Run directories may contain watcher-owned captures, but never extraction-owned artifacts
 typeset stale=''
 stale="$(find "${outDir}" -mindepth 1 \( -name MEMORY.DMP -o -name Minidump -o -name EventLogs -o -name events.json -o -name extraction-summary.json -o -name checksums.sha256 \) -print -quit)"
 [[ -z "${stale}" ]] || Die "pre-existing extraction artifact rejected: ${stale}"
 
+# Extract target cluster, VM, and storage configuration from metadata
 typeset ns=''; ns="$(jq -er .namespace "${metadataFile}")"; typeset vm=''; vm="$(jq -er .vm "${metadataFile}")"
 typeset guestPvc=''; guestPvc="$(jq -er .guestPvc "${metadataFile}")"; typeset snapClass=''; snapClass="$(jq -er .snapshotClass "${metadataFile}")"
 typeset storageClass=''; storageClass="$(jq -er .storageClass "${metadataFile}")"; typeset storageSize=''; storageSize="$(jq -er .storageSize "${metadataFile}")"
 typeset volumeMode=''; volumeMode="$(jq -er .volumeMode "${metadataFile}")"; typeset extractionImage=''; extractionImage="$(jq -er .recoveryImage "${metadataFile}")"
 typeset armedEpoch=''; armedEpoch="$(jq -er .armedEpoch "${metadataFile}")"; typeset inventory=''; inventory="$(jq -c .preCrashInventory "${metadataFile}")"
+
+# Verify extraction image was proven by preflight (digest-pinned, contract "bash+guestfish-v1")
 [[ "${extractionImage}" =~ @sha256:[0-9a-fA-F]{64}$ && "$(jq -r .recoveryImageContract "${metadataFile}")" == bash+guestfish-v1 ]] || Die 'extraction image contract was not proven by preflight'
 
-# Logging and error tracking for this extraction phase
+# Initialize logging and error tracking for this extraction phase
 typeset stageErrors="${outDir}/stage-errors.jsonl"; touch "${stageErrors}"; chmod 0600 "${stageErrors}"
 typeset extractionLog="${outDir}/extraction.log"; : > "${extractionLog}"; chmod 0600 "${extractionLog}"
+
 # Create unique extraction pod name to avoid collisions if multiple extractions run concurrently
 typeset suffix=''; suffix="$(date -u +%Y%m%d%H%M%S)-$$"; typeset extractionPod="bsod-${suffix}-extraction"
 typeset podCreated=0; typeset cleanupDone=0
 
-# Logging helper: prefixes with timestamp and tees to both stdout and log file
+# Logging helpers
+# Log — print timestamped message to both stdout and extraction log file
 function Log () { printf '[%s] %s\n' "$(date -u +%H:%M:%S)" "$*" | tee -a "${extractionLog}"; true; }
+# RecordError — append error entry to stage-errors JSONL file and log to stdout
 function RecordError () {
   typeset stage="${1:?}"; shift
   jq -cn --arg stage "${stage}" --arg error "$*" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{stage:$stage,error:$error,at:$at}' >> "${stageErrors}"
   Log "ERROR [${stage}]: $*"
 }
+# Cleanup function: delete extraction pod and revert Pod Security Standard
 function Cleanup () {
   ((cleanupDone == 0)) || return 0
   cleanupDone=1; typeset failed=0
+  # Delete temporary extraction pod if created
   if ((podCreated)); then RunTimed 70 oc --request-timeout=65s delete pod "${extractionPod}" -n "${ns}" --ignore-not-found --wait=true --timeout=60s >>"${extractionLog}" 2>&1 || { RecordError cleanup "failed to delete extraction pod ${extractionPod}"; failed=1; }; podCreated=0; fi
   # Revert namespace Pod Security Standard back to baseline after extraction completes
   # This minimizes the privilege escalation window to only extraction phase
@@ -87,11 +106,13 @@ function Cleanup () {
   fi
   return "${failed}"
 }
+# Signal handlers for clean shutdown
 function OnSignal () { typeset status="${1:?}"; RecordError interrupted "received signal; exiting with status ${status}"; exit "${status}"; }
 trap Cleanup EXIT
 trap 'OnSignal 130' INT
 trap 'OnSignal 143' TERM
 
+# WaitJsonPath — poll a Kubernetes resource until a jsonpath expression matches expected value
 function WaitJsonPath () {
   typeset resource="${1:?}"; typeset name="${2:?}"; typeset expression="${3:?}"; typeset expected="${4:?}"; typeset timeoutSeconds="${5:?}"
   typeset deadline=$((SECONDS + timeoutSeconds)); typeset actual=''
@@ -284,3 +305,5 @@ RunTimed 60 python3 "${scriptDir}/reliability.py" write-summary --out "${outDir}
   --mode rhov-snapshot-recovery --vm "${vm}" --namespace "${ns}" --run-id "${runId}" --filename extraction-summary.json >/dev/null || summaryStatus=$?
 ((cleanupStatus == 0 && summaryStatus == 0)) || exit 1
 Log 'snapshot extraction exported and validated all extraction-owned artifact classes'
+
+true

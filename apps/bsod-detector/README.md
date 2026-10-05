@@ -356,6 +356,202 @@ python3 reliability.py write-summary \
 
 ---
 
+#### `parse-dump-header.sh` — Extract Bugcheck Code from Dump
+
+**Purpose**: Read the Windows crash dump header to extract BSOD error code without WinDbg
+
+**What it does**:
+1. Reads PAGEDU64 (64-bit Windows dump) binary file at fixed offsets
+2. Extracts bugcheck code (4 bytes at offset `0x38`)
+3. Extracts 4 bugcheck parameters (8 bytes each at `0x40`, `0x48`, `0x50`, `0x58`)
+4. Looks up bugcheck name in `bugcheck-codes.json`
+5. Returns structured JSON output
+
+**Example**:
+```bash
+parse-dump-header.sh vm-memory-windows.dmp
+# Or scan directory:
+parse-dump-header.sh --dir /mnt/persistent-bsod-evidence/<runId>
+```
+
+**Output**:
+```json
+{
+  "ok": true,
+  "dumps": [{
+    "file": "vm-memory-windows.dmp",
+    "bugCheckCode": "0x00000161",
+    "bugCheckName": "LIVE_SYSTEM_DUMP",
+    "parameters": ["0x1589", "0x0", "0x0", "0x0"],
+    "valid": true
+  }],
+  "warnings": []
+}
+```
+
+**Common bugcheck codes**:
+- `0x00000001` — APC_INDEX_MISMATCH (intentional test crash via NotMyFault)
+- `0x00000161` — LIVE_SYSTEM_DUMP (KubeVirt memory export)
+- `0x0000000A` — IRQL_NOT_LESS_OR_EQUAL (driver bug)
+- `0x0000001E` — KMODE_EXCEPTION_NOT_HANDLED (kernel exception)
+
+**Why needed**: Provides immediate crash classification. The bugcheck code tells you what caused the BSOD (driver bug, memory corruption, test crash, etc.) without needing WinDbg or volatility3.
+
+---
+
+#### `trigger-bsod-intentional.sh` — Full Pipeline Orchestrator
+
+**Purpose**: End-to-end orchestration for intentional BSOD testing (development/CI)
+
+**What it does**:
+1. **Preflight** → Calls `preflight-rhov.sh` to validate environment
+2. **Start watcher** → Launches `watch-crash.sh` in background
+3. **Inject crash** → Uses `guest-agent.py` to upload and run NotMyFault.exe
+4. **Wait for completion** → Monitors watcher process
+5. **Validate evidence** → Checks `evidence-summary.json` reports success
+6. **Cleanup** → Removes temporary guestfish cache files
+
+**Usage**:
+```bash
+export GA_NS=windows-bsod GA_VM=win2022-vm-hjoshi1
+
+# Default crash type (0x01 - APC_INDEX_MISMATCH)
+bash src/scripts/crash-injector/trigger-bsod-intentional.sh
+
+# Custom crash type
+bash src/scripts/crash-injector/trigger-bsod-intentional.sh 0x08  # IRQL fault
+```
+
+**NotMyFault crash types**:
+- `0x01` — APC index mismatch (default)
+- `0x02` — High IRQL fault
+- `0x03` — Buffer overflow
+- `0x04` — Hardcoded breakpoint
+- `0x05` — Code overwrite
+- `0x08` — Stack overflow
+- `0x09` — HAL timer watchdog
+
+**Evidence directory**:
+```
+/mnt/persistent-bsod-evidence/YYYYMMDDTHHMMSSZ-intentional-<pid>-<random>/
+├── vm-memory-windows.dmp      # 16GB full RAM dump
+├── vm-memory.elf.tar.gz       # Raw ELF dump from KubeVirt
+├── bsod-screenshot.png        # BSOD screen
+├── EventLogs/
+│   ├── System.evtx            # Windows event log (binary)
+│   ├── Application.evtx
+│   ├── System.json            # Parsed events (16k+ events)
+│   └── Application.json
+├── parse-dump-header.json     # Bugcheck code
+├── volatility-*.txt           # Memory analysis outputs
+├── evidence-summary.json      # Final validation report
+└── watcher.log                # Pipeline execution log
+```
+
+**Exit codes**:
+- `0` — Success (all artifacts captured and validated)
+- `1` — Failure (preflight failed, watcher timeout, or evidence validation failed)
+
+---
+
+### Data Files Reference
+
+#### `crash-control.json` — Windows CrashControl Registry Settings
+
+**Location**: `src/data/crash-control.json`
+
+**Purpose**: Source of truth for Windows crash dump configuration
+
+**Structure**:
+```json
+{
+  "registryPath": "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\CrashControl",
+  "crashDumpTypes": {
+    "none":      { "CrashDumpEnabled": 0, "description": "No dump" },
+    "complete":  { "CrashDumpEnabled": 1, "description": "Complete memory dump" },
+    "kernel":    { "CrashDumpEnabled": 2, "description": "Kernel memory dump" },
+    "small":     { "CrashDumpEnabled": 3, "description": "Small/Minidump (64KB)" },
+    "automatic": { "CrashDumpEnabled": 7, "description": "Automatic (Win8+)" },
+    "filtered":  { "CrashDumpEnabled": 11, "description": "Filtered (variable size)" }
+  },
+  "recommended": {
+    "crashDumpType": "complete",
+    "values": {
+      "CrashDumpEnabled": 1,
+      "AlwaysKeepMemoryDump": 1,
+      "Overwrite": 1,
+      "LogEvent": 1,
+      "AutoReboot": 0,
+      "MinidumpDir": "%SystemRoot%\\Minidump",
+      "DedicatedDumpFile": "C:\\DedicatedDump.sys"
+    }
+  }
+}
+```
+
+**Key settings**:
+- `CrashDumpEnabled=1` — Write complete dump to DedicatedDumpFile
+- `AutoReboot=0` — **Critical**: Keep VM frozen at BSOD (allows offline extraction)
+- `DedicatedDumpFile` — Pre-allocated 16GB file (replaces pagefile for dump staging)
+- `AlwaysKeepMemoryDump=1` — Don't delete dump after Event Log written
+- `Overwrite=1` — Replace previous dump (testing scenario)
+
+**Why DedicatedDumpFile**:
+- KubeVirt VMs with VirtIO balloon driver refuse to create `pagefile.sys`
+- DedicatedDumpFile is an alternative staging area (Windows 7+)
+- Works for `CrashDumpEnabled=1` (complete) and `2` (kernel)
+- Does **NOT** work for `3` (small/Minidump) — that requires real pagefile
+
+**Used by**:
+- `configure-dumps.ps1` — Reads recommended settings and applies to Windows registry
+- `preflight-rhov.sh` — Validates current settings match recommended
+
+---
+
+#### `bugcheck-codes.json` — Windows BSOD Error Code Mappings
+
+**Location**: `src/data/bugcheck-codes.json`
+
+**Purpose**: Maps numeric bugcheck codes to human-readable names and descriptions
+
+**Structure**:
+```json
+{
+  "codes": {
+    "0x00000001": {
+      "name": "APC_INDEX_MISMATCH",
+      "description": "Asynchronous Procedure Call (APC) state index mismatch"
+    },
+    "0x00000161": {
+      "name": "LIVE_SYSTEM_DUMP",
+      "description": "Live dump captured by kernel (not an actual crash)"
+    },
+    "0x0000000A": {
+      "name": "IRQL_NOT_LESS_OR_EQUAL",
+      "description": "Driver accessed pageable memory at DISPATCH_LEVEL or higher"
+    }
+  }
+}
+```
+
+**Common codes in testing**:
+| Code | Name | Cause |
+|---|---|---|
+| `0x00000001` | APC_INDEX_MISMATCH | NotMyFault intentional crash |
+| `0x00000161` | LIVE_SYSTEM_DUMP | KubeVirt memory export (not a real crash) |
+| `0x0000000A` | IRQL_NOT_LESS_OR_EQUAL | Driver bug (memory access at wrong IRQL) |
+| `0x0000001E` | KMODE_EXCEPTION_NOT_HANDLED | Unhandled kernel exception |
+| `0x00000050` | PAGE_FAULT_IN_NONPAGED_AREA | Memory corruption or bad driver |
+| `0x000000D1` | DRIVER_IRQL_NOT_LESS_OR_EQUAL | Driver bug (common in network/storage drivers) |
+
+**Used by**:
+- `parse-dump-header.sh` — Looks up bugcheck code names
+- `watch-crash.sh` — Resolves bugcheck code in final evidence report
+
+**Source**: Microsoft Windows Driver Development documentation
+
+---
+
 ## Supported automated reliability path
 
 The fail-closed automated watcher/recovery path is **RHOV/KubeVirt-only**. It

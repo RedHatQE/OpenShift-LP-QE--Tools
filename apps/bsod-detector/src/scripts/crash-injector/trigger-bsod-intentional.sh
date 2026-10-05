@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Intentional RHOV BSOD orchestration for an explicitly disposable test VM.
 # This script orchestrates the full pipeline: preflight validation → crash injection → watcher → recovery
-set -euo pipefail; shopt -s inherit_errexit
+set -euxo pipefail; shopt -s inherit_errexit
 umask 077
 
 # Parse input: crash type (0x01-0x09 from NotMyFault), VM name, and namespace
@@ -88,3 +88,5 @@ typeset watcherStatus=0; wait "${watcherPid}" || watcherStatus=$?; watcherPid=''
 # Verify that evidence summary exists and reports success (all artifacts extracted)
 jq -e --arg run "${runId}" '.ok == true and .runId == $run' "${outDir}/evidence-summary.json" >/dev/null || Die 'current-run evidence summary is absent or reports failure'
 echo "trigger-bsod-intentional: verified evidence package: ${outDir}"
+
+true
