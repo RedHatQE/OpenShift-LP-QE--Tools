@@ -40,6 +40,8 @@ Post a Prow URL in your monitored channel and watch for bot response.
 
 ### Step 1: Build and Push Image
 
+Run every command in these steps from the repository root; all paths are relative to it.
+
 The Makefile builds `$(IMAGE_REGISTRY)/$(IMAGE_NAMESPACE)/$(IMAGE_NAME):$(IMAGE_TAG)`,
 which defaults to `images.paas.redhat.com/ieng/app/prow-analyzer:latest`. Log in to
 the **same registry** you build for, and note the exact reference you push — Step 3
@@ -79,7 +81,7 @@ oc create secret generic prow-analyzer-secrets \
 
 ### Step 3: Update Configuration
 
-`deploy/openshift/deployment.yaml` ships with placeholders that **must** be replaced
+`apps/prow-analyzer/deploy/openshift/deployment.yaml` ships with placeholders that **must** be replaced
 before `oc apply`. Leaving them will either stop the pod from starting (placeholder
 image → `ImagePullBackOff`/`CrashLoopBackOff`) or stop it from reaching ship-help
 (placeholder MCP URL). Replace all three:
@@ -104,7 +106,7 @@ is intentionally kept out of this manifest, so re-applying it never clobbers tho
 tokens with placeholders. Ensure Step 2 has run first.
 
 ```bash
-oc apply -f deploy/openshift/deployment.yaml
+oc apply -f apps/prow-analyzer/deploy/openshift/deployment.yaml
 ```
 
 ### Step 5: Verify

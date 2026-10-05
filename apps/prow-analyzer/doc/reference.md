@@ -458,17 +458,17 @@ Test by posting a Prow URL in the monitored channel.
 
 **Step 1: Build and push the container image.**
 
-```bash
-cd image/container/prow-analyzer
+Run every command in these steps from the repository root; all paths are relative to it.
 
+```bash
 # Log in to the target registry (default: images.paas.redhat.com)
 podman login images.paas.redhat.com
 
 # --platform linux/amd64 is required when building on Mac ARM
-make push BUILDFLAGS="--platform linux/amd64"
+make -C image/container/prow-analyzer push BUILDFLAGS="--platform linux/amd64"
 
 # Or with a specific tag
-make push BUILDFLAGS="--platform linux/amd64" IMAGE_TAG=v1.1.0
+make -C image/container/prow-analyzer push BUILDFLAGS="--platform linux/amd64" IMAGE_TAG=v1.1.0
 ```
 
 The image pushes to `$(IMAGE_REGISTRY)/$(IMAGE_NAMESPACE)/$(IMAGE_NAME):$(IMAGE_TAG)`, which defaults to `images.paas.redhat.com/ieng/app/prow-analyzer:latest`. Override `IMAGE_REGISTRY`, `IMAGE_NAMESPACE`, `IMAGE_NAME`, or `IMAGE_TAG` on the `make` command line as needed, and note the exact reference — Step 3 puts it in the manifest.
@@ -476,9 +476,12 @@ The image pushes to `$(IMAGE_REGISTRY)/$(IMAGE_NAMESPACE)/$(IMAGE_NAME):$(IMAGE_
 **Step 2: Create secrets in the target namespace.**
 
 This is the only place the Secret is created; the manifest applied in Step 4 omits
-it, so run this first.
+it, so run this first. Create the namespace before the Secret — on a fresh setup it
+does not exist yet (the manifest only creates it in Step 4, which runs later).
 
 ```bash
+oc create namespace <your-namespace>
+
 oc create secret generic prow-analyzer-secrets \
   --from-literal=ship-help-token="YOUR_TOKEN_HERE" \
   --from-literal=slack-bot-token="xoxb-..." \
@@ -488,7 +491,7 @@ oc create secret generic prow-analyzer-secrets \
 
 **Step 3: Update the deployment manifest.**
 
-Edit `deploy/openshift/deployment.yaml`. The manifest ships with placeholders that
+Edit `apps/prow-analyzer/deploy/openshift/deployment.yaml`. The manifest ships with placeholders that
 **must** be replaced before `oc apply`, or the pod will not start (placeholder image
 → `ImagePullBackOff`/`CrashLoopBackOff`) or will not reach ship-help (placeholder MCP
 URL):
@@ -505,7 +508,7 @@ which was created in Step 2 and is kept out of the manifest so re-applying never
 clobbers your tokens.
 
 ```bash
-oc apply -f deploy/openshift/deployment.yaml
+oc apply -f apps/prow-analyzer/deploy/openshift/deployment.yaml
 ```
 
 **Step 5: Verify.**
@@ -522,10 +525,11 @@ oc logs -f -n <your-namespace> -l app=prow-analyzer-bot
 
 ### Updating a Running Deployment
 
+Run these commands from the repository root.
+
 ```bash
 # Rebuild and push
-cd image/container/prow-analyzer
-make push BUILDFLAGS="--platform linux/amd64"
+make -C image/container/prow-analyzer push BUILDFLAGS="--platform linux/amd64"
 
 # Restart to pull the new image (when using :latest tag)
 oc rollout restart deployment/prow-analyzer-bot -n <your-namespace>
@@ -594,9 +598,15 @@ make test
 # Run unit tests with the embedded 100% coverage gate
 make test--unit
 
-# Run specific tests
-go test -v -run TestAnalyzeFailure ./pkg/analyzer/
-go test -v -run TestHandle ./pkg/slack/handler/
+# Run specific tests — the suites are tagged, so a build tag is required or the
+# run selects zero tests. Unit suite is tagged `unit`:
+go test -tags unit -v -run TestAnalyzeFailure ./pkg/analyzer/
+go test -tags unit -v -run TestHandle ./pkg/slack/handler/
+
+# Integration suite is tagged `integration`; run it under -race (as `make
+# test--integration` does):
+go test -tags integration -race -v -run TestAnalyzeFailure ./pkg/analyzer/
+go test -tags integration -race -v -run TestHandle ./pkg/slack/handler/
 ```
 
 Test coverage areas:
@@ -675,10 +685,10 @@ oc logs -n <namespace> -l app=prow-analyzer-bot | grep "PROW-ANALYZER"
 exec container process `/usr/bin/prow-analyzer--bot`: Exec format error
 ```
 
-The image was built for ARM (e.g., on a Mac with Apple Silicon) but the cluster runs x86_64. Rebuild with:
+The image was built for ARM (e.g., on a Mac with Apple Silicon) but the cluster runs x86_64. Rebuild with (from the repository root):
 
 ```bash
-make push BUILDFLAGS="--platform linux/amd64"
+make -C image/container/prow-analyzer push BUILDFLAGS="--platform linux/amd64"
 ```
 
 Then delete the old pod so the deployment creates a new one with the correct image.

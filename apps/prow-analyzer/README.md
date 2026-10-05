@@ -99,11 +99,16 @@ go build ./cmd/prow-analyzer--bot
 
 ### OpenShift Deployment
 
+Run every command below from the repository root; all paths are relative to it.
+
 ```bash
 # Build and push container image
-cd ../../image/container/prow-analyzer
-make build IMAGE_TAG=v1.0.0
-make push IMAGE_TAG=v1.0.0
+make -C image/container/prow-analyzer build IMAGE_TAG=v1.0.0
+make -C image/container/prow-analyzer push IMAGE_TAG=v1.0.0
+
+# Create the namespace first (the Secret below targets it, and on a fresh
+# setup it does not exist yet — the manifest only creates it in the oc apply step):
+oc create namespace prow-analyzer
 
 # Create the Secret out-of-band (it is NOT in the manifest, so oc apply
 # cannot overwrite real tokens with placeholders):
@@ -113,7 +118,7 @@ oc create secret generic prow-analyzer-secrets -n prow-analyzer \
   --from-literal=slack-app-token="xapp-..."
 
 # Edit the image/mcp-url/monitored-channels placeholders in the manifest, then deploy:
-oc apply -f ../../apps/prow-analyzer/deploy/openshift/deployment.yaml
+oc apply -f apps/prow-analyzer/deploy/openshift/deployment.yaml
 ```
 
 ## Configuration
