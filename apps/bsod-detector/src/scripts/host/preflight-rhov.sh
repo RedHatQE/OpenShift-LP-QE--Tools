@@ -236,7 +236,7 @@ probePod="bsod-probe-$(printf '%s' "${runId,,}" | tr -cd 'a-z0-9-' | cut -c1-35)
 # Pod runs non-privileged to verify image integrity (contract check, not actual operation)
 jq -n --arg name "${probePod}" --arg ns "${ns}" --arg image "${recoveryImage}" \
   '{apiVersion:"v1",kind:"Pod",metadata:{name:$name,namespace:$ns},spec:{restartPolicy:"Never",automountServiceAccountToken:false,containers:[{name:"probe",image:$image,command:["/bin/bash","-ceu","command -v guestfish; command -v bash; guestfish --version"],securityContext:{allowPrivilegeEscalation:false,readOnlyRootFilesystem:true,capabilities:{drop:["ALL"]}}}]}}' |
-  Oc apply -f - >/dev/null || Die 'cannot create recovery-image capability probe'
+  Oc apply -f - 2>/dev/null >/dev/null || Die 'cannot create recovery-image capability probe'
 probeCreated=1
 # Wait for probe pod to complete: Succeeded means image has tools, Failed means broken image
 typeset probePhase=''; typeset probeDeadline=$((SECONDS + 120))

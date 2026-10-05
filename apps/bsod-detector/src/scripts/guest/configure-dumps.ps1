@@ -147,6 +147,22 @@ if (-not $VerifyOnly) {
             & fsutil file createnew $dedicatedPath $sizeBytes | Out-Null
         }
     }
+    # Ensure pagefile is configured — required for Minidump writing (CrashDumpEnabled=7/3).
+    # DedicatedDumpFile handles complete/kernel dump staging but NOT Minidump generation.
+    # Use AutomaticManagedPagefile=true — Windows manages size automatically for CrashDumpEnabled=7,
+    # and correctly creates pagefile.sys on next boot. Manual 0,0 is ignored on Windows Server 2022.
+    try {
+        $cs = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
+        if (-not $cs.AutomaticManagedPagefile) {
+            Set-CimInstance -InputObject $cs -Property @{ AutomaticManagedPagefile = $true } -ErrorAction SilentlyContinue
+            $rebootRequired = $true
+        }
+        if (-not (Test-Path 'C:\pagefile.sys')) {
+            $rebootRequired = $true  # File will be created on next boot
+        }
+    } catch {
+        # Non-fatal — pagefile setup failed; Minidump may not be written but other dumps still work
+    }
     foreach ($k in $desired.Keys) {
         $v = $desired[$k]
         if ($v -is [string]) {

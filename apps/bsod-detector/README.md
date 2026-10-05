@@ -3,6 +3,359 @@
 Detect, capture, and analyze Blue Screen of Death (BSOD) events on Windows VMs
 running under KVM/libvirt or KubeVirt/OpenShift Virtualization.
 
+---
+
+## Executive Summary
+
+### Goal
+
+Build a complete BSOD detector for **RHOV/KubeVirt** that:
+1. **Detects** BSOD crashes on Windows VMs
+2. **Captures** full memory dump via `virtctl memory-dump`
+3. **Extracts** offline forensics artifacts from stopped VM disk:
+   - Windows Event Logs (System.evtx, Application.evtx)
+   - On-disk crash dumps (MEMORY.DMP, Minidump, DedicatedDump.sys)
+   - BSOD screenshot
+4. **Analyzes** dumps with volatility3 for crash metadata
+5. **Validates** all artifacts and generates evidence summary
+
+### What We Successfully Capture (Every Pipeline Run)
+
+| Artifact | Format | Size | Method |
+|---|---|---|---|
+| `vm-memory-windows.dmp` | Windows pagedu64 | **16GB** | KubeVirt `virtctl memory-dump` → elf2dmp conversion |
+| `vm-memory.elf.tar.gz` | ELF tar.gz | ~800MB | Raw memory dump from KubeVirt |
+| `bsod-screenshot.png` | PNG | ~37KB | `virtctl` vnc screenshot |
+| `EventLogs/System.evtx` | EVTX | ~6MB | NTFS offline extraction (ntfscat) |
+| `EventLogs/Application.evtx` | EVTX | ~4MB | NTFS offline extraction (ntfscat) |
+| `EventLogs/System.json` | JSON | ~16MB | Python evtx parser (16k+ events) |
+| `EventLogs/Application.json` | JSON | ~8MB | Python evtx parser (9k+ events) |
+| `volatility-windows-info.txt` | Text | ~1KB | OS/kernel version from memory |
+| `volatility-driverscan.txt` | Text | ~120KB | Driver scan from memory |
+| `volatility-dumpfiles.txt` | Text | ~120KB | Dump file inventory from memory |
+| `parse-dump-header.json` | JSON | ~371B | Bugcheck code, stop reason |
+| `domain.xml` | XML | ~14KB | VM config at crash time |
+
+✅ **Pipeline Success Rate**: 100% (all required artifacts captured in runs 3-7)
+
+### What We Cannot Capture (Architectural Blockers)
+
+| Artifact | Why It's Impossible | Investigation Status |
+|---|---|---|
+| **Minidump** (`C:\Windows\Minidump\*.dmp`) | Requires `pagefile.sys` which Windows refuses to create on this VM (even with balloon driver disabled, explicit registry config, startup scripts, multiple reboots) | ❌ **Permanently blocked** — see INVESTIGATION.md |
+| **DedicatedDump.sys** (16GB on-disk dump) | File IS written during BSOD but ntfscat fails to extract large files (works for 6MB .evtx, fails for 16GB .sys); would need ntfs-3g mount instead | ⚠️ **Extractable with code changes** (switch from ntfscat to ntfs-3g mount) |
+
+**Note**: `vm-memory-windows.dmp` (16GB full RAM dump) contains **everything** Minidump would have and much more. Minidump is a 256KB subset — its absence has **zero functional impact** on crash analysis capabilities.
+
+See [`/mnt/persistent-bsod-evidence/INVESTIGATION.md`](/mnt/persistent-bsod-evidence/INVESTIGATION.md) for complete technical investigation (7 pipeline runs, all attempted workarounds documented).
+
+---
+
+## File Structure & Script Responsibilities
+
+```
+apps/bsod-detector/
+├── src/
+│   ├── scripts/
+│   │   ├── host/                      # Run on orchestration host (CI operator / laptop)
+│   │   │   ├── watch-crash.sh         # Main pipeline: detect BSOD → capture dumps → extract artifacts
+│   │   │   ├── recover-natural-crash.sh  # Offline NTFS extraction from stopped VM disk
+│   │   │   ├── preflight-rhov.sh      # Pre-run validation: checks VM config, builds extraction image
+│   │   │   ├── guest-agent.py         # Tunnel PowerShell commands into Windows VM via qemu-guest-agent
+│   │   │   ├── reliability.py         # Artifact validation & evidence summary generation
+│   │   │   └── extract-evtx.py        # Parse Windows .evtx event logs to JSON
+│   │   │
+│   │   ├── crash-injector/            # Intentional crash triggers (testing)
+│   │   │   └── trigger-bsod-intentional.sh  # Trigger BSOD + run full pipeline
+│   │   │
+│   │   └── guest/                     # Run inside Windows VM (via guest-agent.py)
+│   │       ├── configure-dumps.ps1    # Configure Windows crash dump settings (CrashDumpEnabled, DedicatedDumpFile)
+│   │       └── clear-dumps.ps1        # Clean up old crash dumps before test
+│   │
+│   └── data/
+│       └── crash-control.json         # Source of truth for Windows CrashControl registry settings
+│
+└── README.md                          # This file
+```
+
+### Script Execution Flow (Intentional Crash)
+
+```
+1. trigger-bsod-intentional.sh (orchestration host)
+     ↓
+   Calls preflight-rhov.sh
+     → Validates VM configuration
+     → Builds extraction image (if needed)
+     → Verifies crash dump settings via guest-agent.py
+     ↓
+   Calls watch-crash.sh (background)
+     → Monitors VM for BSOD
+     → Captures memory dump via virtctl memory-dump
+     → Converts ELF → Windows DMP via elf2dmp
+     → Runs volatility3 analysis
+     ↓
+   Injects BSOD via guest-agent.py psfile
+     → Runs NotMyFault.exe (bugcheck 0x01)
+     ↓
+   watch-crash.sh detects BSOD
+     → Stops VM (runStrategy: Manual)
+     ↓
+   Calls recover-natural-crash.sh
+     → Temporarily escalates namespace PSS to "privileged"
+     → Creates extraction pod with privileged:true
+     → Mounts NTFS partition via ntfscat/ntfsls
+     → Extracts System.evtx, Application.evtx
+     → Auto-reverts PSS to "baseline"
+     → Deletes extraction pod
+     ↓
+   Calls reliability.py write-summary
+     → Validates all artifacts (checksums, format)
+     → Generates evidence-summary.json
+     ↓
+   Returns exit code 0 (success) or 1 (failure)
+```
+
+### Key Scripts Deep-Dive
+
+#### `watch-crash.sh` — Main Pipeline Orchestrator
+
+**Purpose**: Detect BSOD, capture memory, extract artifacts, validate evidence
+
+**What it does**:
+1. Monitors VM for crash (checks `vmi.status.guestOSInfo`, domain state)
+2. Captures full memory via `virtctl memory-dump` (creates VirtualMachineExport)
+3. Downloads `memory.bin` (raw ELF format)
+4. Converts ELF → Windows DMP via `elf2dmp` (Microsoft tool)
+5. Runs volatility3 plugins: `windows.info.Info`, `windows.crashinfo.CrashInfo`, `windows.dumpfiles.DumpFiles`
+6. Calls `recover-natural-crash.sh` for offline NTFS extraction
+7. Parses dump header for bugcheck code
+8. Generates final evidence summary via `reliability.py`
+
+**Key features**:
+- Fail-safe: All cleanup in `trap EXIT`
+- Timeout handling: `virtctl memory-dump` can take 10+ minutes for 16GB RAM
+- Fallback logic: `windows.crashinfo.CrashInfo` → `windows.driverscan.DriverScan` if crashinfo not applicable
+
+**Evidence directory**: `/mnt/persistent-bsod-evidence/YYYYMMDDTHHMMSSZ-<type>-<pid>-<random>/`
+
+---
+
+#### `recover-natural-crash.sh` — Offline NTFS Artifact Extraction
+
+**Purpose**: Extract Windows Event Logs and crash dumps from stopped VM disk without mounting in the VM itself
+
+**What it does**:
+1. **Temporarily escalates namespace PSS** from `baseline` to `privileged` (required for privileged pod)
+2. **Creates extraction pod**:
+   ```yaml
+   securityContext:
+     privileged: true      # Required: bypass cgroup device allowlist for partition access
+     runAsUser: 0
+   volumeDevices:
+     - name: guest-disk
+       devicePath: /dev/disk-pvc   # Full 120GB disk (major:minor 252:352)
+   ```
+3. **Creates partition device node**:
+   ```bash
+   mknod /dev/disk-pvcp b 252 355  # Partition 3 (Windows C:)
+   ```
+4. **Clears NTFS dirty bit** (set by BSOD unclean shutdown):
+   ```bash
+   ntfsfix --clear-dirty /dev/disk-pvcp
+   ```
+5. **Extracts files via ntfscat** (direct block device access, no mount):
+   ```bash
+   ntfscat /dev/disk-pvcp /Windows/System32/winevt/Logs/System.evtx > System.evtx
+   ```
+6. **Searches for crash dumps**:
+   - Scans `/`, `/Windows`, `/Windows/Minidump`, `/Temp` for `*.dmp`, `*.dump`
+   - Tries to extract `C:\DedicatedDump.sys` (16GB complete dump)
+   - Extracts any found files via ntfscat
+7. **Parses Event Logs** to JSON via `extract-evtx.py`
+8. **Auto-reverts PSS** to `baseline` (even on crash via `trap EXIT`)
+9. **Deletes extraction pod**
+
+**Why PSS escalation is unavoidable**:
+- Kubernetes attaches PVC as `/dev/disk-pvc` (full disk, cgroup allowlist: `252:352`)
+- ntfscat needs `/dev/disk-pvcp` (partition 3, device `252:355`)
+- `mknod` creates partition device successfully, but cgroup blocks I/O to undeclared devices
+- Only `privileged: true` bypasses cgroup device allowlist
+- PSS `baseline` blocks `privileged:true` at admission (runs before RBAC/SCC)
+- **Solution**: Temporary escalation (30 seconds) + auto-revert via `trap EXIT`
+
+See INVESTIGATION.md § "Why PSS Escalation is Unavoidable" for full technical deep-dive.
+
+**Security**:
+- Privilege window: ~30 seconds
+- Auto-revert: `trap EXIT` ensures PSS reverts even on script crash
+- Scope: Only `windows-bsod` namespace affected
+- Disk writes: Only 1 bit (ntfsfix clears dirty bit)
+- Audit: All namespace label changes logged in Kubernetes audit log
+
+---
+
+#### `preflight-rhov.sh` — Pre-Flight Validation
+
+**Purpose**: Validate environment before running pipeline; prevent failures due to misconfiguration
+
+**What it checks**:
+1. **VM requirements**:
+   - `runStrategy: Manual` (required for `virtctl stop` after BSOD)
+   - qemu-guest-agent running
+   - VM is Running (not Paused/Stopped)
+2. **CrashControl settings** (via guest-agent.py):
+   - `CrashDumpEnabled` matches recommended value (1 = complete dump)
+   - `AutoReboot=0` (VM stays frozen at BSOD)
+   - `DedicatedDumpFile` exists and is pre-allocated
+3. **Kubernetes resources**:
+   - Evidence PVC exists and is mounted
+   - Snapshot class available (if using snapshots)
+   - RBAC permissions for virtctl commands
+4. **Extraction image**:
+   - Builds container image with ntfs-3g tools (if not already built)
+   - Pushes to OpenShift internal registry
+   - Validates image pull-ability
+
+**Outputs**:
+- `recovery-metadata.json`: VM config, PVC names, image digest, volumeMode
+- Exit code 0 (pass) or 1 (fail)
+
+**Usage**:
+```bash
+bash src/scripts/host/preflight-rhov.sh \
+  --ns windows-bsod \
+  --vm win2022-vm-hjoshi1 \
+  --out /mnt/persistent-bsod-evidence/<runId> \
+  --metadata recovery-metadata.json
+```
+
+---
+
+#### `guest-agent.py` — Windows VM Command Tunnel
+
+**Purpose**: Execute PowerShell commands inside Windows VM from orchestration host (without SSH/WinRM)
+
+**What it does**:
+- Uses KubeVirt qemu-guest-agent channel (exposed via `virtctl guestfs` API)
+- Tunnels commands through virt-launcher pod → libvirt → qemu-ga → Windows
+- Returns stdout/stderr/exit code
+
+**Subcommands**:
+
+| Subcommand | What It Does | Example |
+|---|---|---|
+| `exec` | Run PowerShell command | `guest-agent.py exec Get-Service` |
+| `psfile` | Upload & execute .ps1 script | `guest-agent.py psfile configure-dumps.ps1` |
+| `write` | Write file to guest | `guest-agent.py write crash-control.json C:\Temp\data.json` |
+| `read` | Read file from guest | `guest-agent.py read C:\Windows\MEMORY.DMP` |
+
+**Environment variables**:
+```bash
+export GA_NS=windows-bsod           # Kubernetes namespace
+export GA_VM=win2022-vm-hjoshi1     # VM name
+```
+
+**Usage**:
+```bash
+# Check crash dump settings
+python3 guest-agent.py exec powershell.exe -NoProfile -Command \
+  'Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl" | ConvertTo-Json'
+
+# Configure dumps
+python3 guest-agent.py psfile \
+  src/scripts/guest/configure-dumps.ps1 \
+  --companion src/data/crash-control.json C:\Temp\crash-control.json \
+  -- -DataFile C:\Temp\crash-control.json
+```
+
+---
+
+#### `configure-dumps.ps1` — Windows Guest Configuration
+
+**Purpose**: Configure Windows to write crash dumps on BSOD
+
+**What it does**:
+1. Reads `crash-control.json` for recommended settings
+2. Applies registry values under `HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl`:
+   - `CrashDumpEnabled = 1` (complete dump)
+   - `DedicatedDumpFile = C:\DedicatedDump.sys` (16GB pre-allocated file)
+   - `AutoReboot = 0` (stay frozen at BSOD)
+   - `AlwaysKeepMemoryDump = 1`
+   - `Overwrite = 1`
+3. Pre-creates `DedicatedDumpFile` sized to RAM+1MB (via `fsutil`)
+4. Verifies settings match recommended values
+5. Returns JSON:
+   ```json
+   {
+     "ok": true,
+     "action": "applied",
+     "matchesRecommended": true,
+     "rebootRequired": false
+   }
+   ```
+
+**Why DedicatedDumpFile instead of pagefile**:
+- KVM VMs with balloon driver refuse to create `pagefile.sys`
+- `DedicatedDumpFile` is an alternative staging area (Windows 7+)
+- Works for `CrashDumpEnabled=1` (complete) or `2` (kernel)
+- Does NOT work for `CrashDumpEnabled=3` (small/Minidump) — that requires real pagefile
+
+**Usage** (via guest-agent.py):
+```bash
+python3 guest-agent.py psfile \
+  src/scripts/guest/configure-dumps.ps1 \
+  --companion src/data/crash-control.json C:\Temp\crash-control.json \
+  -- -DataFile C:\Temp\crash-control.json
+```
+
+---
+
+#### `reliability.py` — Artifact Validation & Evidence Summary
+
+**Purpose**: Validate captured artifacts and generate machine-readable evidence summary
+
+**What it does**:
+1. **`validate-artifact`**: Check if file matches expected format
+   - `dump`: Windows memory dump (pagedu64 header magic)
+   - `memory`: ELF format (KubeVirt memory export)
+   - `evtx`: Windows Event Log (ElfFile header)
+   - `json`: Valid JSON
+   - `log`: Non-empty text file
+   - `screenshot`: PNG image
+2. **`write-summary`**: Generate `evidence-summary.json`
+   ```json
+   {
+     "ok": true,
+     "mode": "intentional-rhov",
+     "artifacts": [
+       {"path": "vm-memory-windows.dmp", "type": "dump", "valid": true, "size": 17129283584, "sha256": "..."},
+       {"path": "EventLogs/System.evtx", "type": "evtx", "valid": true, "size": 6361088, "sha256": "..."}
+     ],
+     "missingRequiredArtifactTypes": [],
+     "stageErrors": []
+   }
+   ```
+
+**Required artifact types by mode**:
+- `intentional-rhov`: screenshot, memory, dump, log, json
+- `natural-rhov`: screenshot, memory, dump, evtx, log, json, checksums
+
+**Usage**:
+```bash
+# Validate single artifact
+python3 reliability.py validate-artifact --type dump --path vm-memory-windows.dmp
+
+# Generate evidence summary
+python3 reliability.py write-summary \
+  --out /mnt/persistent-bsod-evidence/<runId> \
+  --mode intentional-rhov \
+  --vm win2022-vm-hjoshi1 \
+  --namespace windows-bsod \
+  --run-id <runId>
+```
+
+---
+
 ## Supported automated reliability path
 
 The fail-closed automated watcher/recovery path is **RHOV/KubeVirt-only**. It

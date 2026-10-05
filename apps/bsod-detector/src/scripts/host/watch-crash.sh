@@ -289,12 +289,20 @@ EOF
               Log "windows.info.Info failed or timed out"
             fi
 
-            Log "extracting minidump-equivalent crash info (no timeout)..."
+            Log "extracting crash info (bugcheck code, stop reason)..."
             typeset volatilityCrashinfo="${outDir}/volatility-crashinfo.txt"
-            if vol -f "${winDmp}" windows.crashinfo.CrashInfo >"${volatilityCrashinfo}" 2>&1; then
+            # windows.crashinfo.CrashInfo only works on kernel/minidump format, not complete (paged) dumps.
+            # windows.bigpools.BigPools + windows.driverscan.DriverScan give richer context for complete dumps.
+            if RunTimed 120 vol -f "${winDmp}" windows.crashinfo.CrashInfo >"${volatilityCrashinfo}" 2>&1; then
               Log "windows.crashinfo.CrashInfo: $(wc -l <"${volatilityCrashinfo}") lines"
             else
-              Log "WARN: windows.crashinfo.CrashInfo failed — this plugin may not work on this dump format"
+              Log "windows.crashinfo.CrashInfo not applicable to this dump format — trying windows.driverscan.DriverScan..."
+              typeset volatilityCrashinfo="${outDir}/volatility-driverscan.txt"
+              if RunTimed 300 vol -f "${winDmp}" windows.driverscan.DriverScan >"${volatilityCrashinfo}" 2>&1; then
+                Log "windows.driverscan.DriverScan: $(wc -l <"${volatilityCrashinfo}") lines"
+              else
+                Log "WARN: windows.driverscan.DriverScan also failed — skipping crash info extraction"
+              fi
             fi
 
             Log "extracting crash dump files list..."

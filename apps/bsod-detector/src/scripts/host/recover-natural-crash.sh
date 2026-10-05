@@ -58,9 +58,9 @@ stale="$(find "${outDir}" -mindepth 1 \( -name MEMORY.DMP -o -name Minidump -o -
 typeset ns=''; ns="$(jq -er .namespace "${metadataFile}")"; typeset vm=''; vm="$(jq -er .vm "${metadataFile}")"
 typeset guestPvc=''; guestPvc="$(jq -er .guestPvc "${metadataFile}")"; typeset snapClass=''; snapClass="$(jq -er .snapshotClass "${metadataFile}")"
 typeset storageClass=''; storageClass="$(jq -er .storageClass "${metadataFile}")"; typeset storageSize=''; storageSize="$(jq -er .storageSize "${metadataFile}")"
-typeset volumeMode=''; volumeMode="$(jq -er .volumeMode "${metadataFile}")"; typeset recoveryImage=''; recoveryImage="$(jq -er .recoveryImage "${metadataFile}")"
+typeset volumeMode=''; volumeMode="$(jq -er .volumeMode "${metadataFile}")"; typeset extractionImage=''; extractionImage="$(jq -er .recoveryImage "${metadataFile}")"
 typeset armedEpoch=''; armedEpoch="$(jq -er .armedEpoch "${metadataFile}")"; typeset inventory=''; inventory="$(jq -c .preCrashInventory "${metadataFile}")"
-[[ "${recoveryImage}" =~ @sha256:[0-9a-fA-F]{64}$ && "$(jq -r .recoveryImageContract "${metadataFile}")" == bash+guestfish-v1 ]] || Die 'recovery image contract was not proven by preflight'
+[[ "${extractionImage}" =~ @sha256:[0-9a-fA-F]{64}$ && "$(jq -r .recoveryImageContract "${metadataFile}")" == bash+guestfish-v1 ]] || Die 'extraction image contract was not proven by preflight'
 
 # Logging and error tracking for this extraction phase
 typeset stageErrors="${outDir}/stage-errors.jsonl"; touch "${stageErrors}"; chmod 0600 "${stageErrors}"
@@ -80,6 +80,11 @@ function Cleanup () {
   ((cleanupDone == 0)) || return 0
   cleanupDone=1; typeset failed=0
   if ((podCreated)); then RunTimed 70 oc --request-timeout=65s delete pod "${extractionPod}" -n "${ns}" --ignore-not-found --wait=true --timeout=60s >>"${extractionLog}" 2>&1 || { RecordError cleanup "failed to delete extraction pod ${extractionPod}"; failed=1; }; podCreated=0; fi
+  # Revert namespace Pod Security Standard back to baseline after extraction completes
+  # This minimizes the privilege escalation window to only extraction phase
+  if [[ -n "${ns}" ]]; then
+    oc patch namespace "${ns}" -p '{"metadata":{"labels":{"pod-security.kubernetes.io/enforce":"baseline"}}}' >>"${extractionLog}" 2>&1 || { RecordError cleanup "failed to revert Pod Security Standard to baseline"; failed=1; }
+  fi
   return "${failed}"
 }
 function OnSignal () { typeset status="${1:?}"; RecordError interrupted "received signal; exiting with status ${status}"; exit "${status}"; }
@@ -93,22 +98,33 @@ function WaitJsonPath () {
   while ((SECONDS < deadline)); do actual="$(Oc get "${resource}" "${name}" -n "${ns}" -o "jsonpath=${expression}" 2>/dev/null || true)"; [[ "${actual}" == "${expected}" ]] && return 0; sleep 3; done
   return 1
 }
-# Mount stopped guest disk as read-only NTFS filesystem inside extraction pod
-# Uses ntfs-3g (NTFS-3G driver) instead of guestfish (requires libvirt socket not available on K8s nodes)
+# Set up NTFS access: create partition device node and clear dirty bit so ntfscat/ntfsls can read.
+# Guestfish+supermin fails in containers (UID namespace chown restrictions); ntfscat/ntfsls work
+# directly on the block device without needing a filesystem mount or FUSE.
+# Partition device is created at /dev/disk-pvcp (Windows main partition = GPT partition 3).
 function MountNTFS () {
-  Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu 'mkdir -p /mnt/windows && ntfs-3g -o ro /dev/disk-pvc /mnt/windows' >>"${extractionLog}" 2>&1
+  Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu '
+    diskMajor=$(printf "%d" "0x$(stat -c "%t" /dev/disk-pvc)")
+    diskMinor=$(printf "%d" "0x$(stat -c "%T" /dev/disk-pvc)")
+    echo "Disk device: major=$diskMajor minor=$diskMinor" >&2
+    partNum=$(fdisk -l /dev/disk-pvc 2>/dev/null | grep "Microsoft basic data" | head -1 | grep -oE "[0-9]+$" || echo "3")
+    partMinor=$((diskMinor + partNum))
+    echo "Creating /dev/disk-pvcp: major=$diskMajor minor=$partMinor (GPT partition $partNum)" >&2
+    mknod /dev/disk-pvcp b "$diskMajor" "$partMinor"
+    echo "Clearing NTFS dirty bit (required for ntfscat/ntfsls access after unclean shutdown)..." >&2
+    ntfsfix --clear-dirty /dev/disk-pvcp 2>&1
+    echo "NTFS partition ready for extraction" >&2
+  ' >>"${extractionLog}" 2>&1
 }
-# Extract single file from mounted NTFS, validate structure, and preserve locally
-# Converts Windows path (C:\...) to Unix path (/mnt/windows/...) for reading
+# Extract a single file from NTFS using ntfscat (no filesystem mount needed).
+# ntfscat reads directly from the block device; converts C:\Windows\file → /Windows/file path.
 function ReadNTFSFile () {
   typeset ntfsPath="${1:?}"; typeset localPath="${2:?}"; typeset artifactType="${3:?}"; typeset required="${4:-1}"
   typeset temporary="${localPath}.tmp"; mkdir -p "$(dirname "${localPath}")"; rm -f "${temporary}"
-  # Windows paths C:\Windows\file.txt become /mnt/windows/Windows/file.txt after mount
-  typeset unixPath="/mnt/windows/${ntfsPath#[Cc]:}"
-  # Read file from pod's mounted filesystem
-  if ! Oc exec -n "${ns}" "${extractionPod}" -- cat "${unixPath}" > "${temporary}" 2>>"${extractionLog}"; then
+  # Convert Windows path: C:\Windows\file.txt → /Windows/file.txt
+  typeset unixPath; unixPath="$(printf '%s' "${ntfsPath#[Cc]:}" | tr '\\' '/')"
+  if ! Oc exec -n "${ns}" "${extractionPod}" -- ntfscat /dev/disk-pvcp "${unixPath}" > "${temporary}" 2>>"${extractionLog}"; then
     rm -f "${temporary}"
-    # Log as required artifact failure or optional artifact absence depending on 'required' flag
     if ((required)); then RecordError export "ntfs read failed: ${ntfsPath}"; else Log "optional artifact absent: ${ntfsPath}"; fi
     return 1
   fi
@@ -119,55 +135,72 @@ function ReadNTFSFile () {
   fi
   mv -f "${temporary}" "${localPath}"; chmod 0600 "${localPath}"; Log "exported ${ntfsPath} -> ${localPath#"${outDir}/"}"
 }
+# List files matching a pattern in a specific NTFS directory using ntfsls.
+# ntfsls requires -p for the directory path (not positional like ntfscat).
 function FindNTFSFiles () {
-  typeset pattern="${1:?}"
-  Oc exec -n "${ns}" "${extractionPod}" -- find /mnt/windows -iname "${pattern}" 2>>"${extractionLog}" | sed 's|^/mnt/windows||' || true
+  typeset ntfsDir="${1:?}"; typeset pattern="${2:?}"
+  Oc exec -n "${ns}" "${extractionPod}" -- ntfsls -a -p "${ntfsDir}" /dev/disk-pvcp 2>>"${extractionLog}" \
+    | grep -i "${pattern}" | sed "s|^|${ntfsDir}/|" || true
 }
 
-# Create extraction pod: privileged, with direct access to stopped guest disk PVC
-# Pod runs with privileged=true to allow NTFS-3G mounting and filesystem operations
-Log "creating extraction pod to mount disk directly (VM is stopped)"
-jq -n --arg name "${extractionPod}" --arg ns "${ns}" --arg vm "${vm}" --arg pvc "${guestPvc}" \
-  '{apiVersion:"v1",kind:"Pod",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-extraction","target-vm":$vm}},spec:{restartPolicy:"Never",automountServiceAccountToken:false,containers:[{name:"extractor",image:"registry.access.redhat.com/ubi8:latest",command:["/bin/bash","-ceu","trap : TERM INT; sleep infinity & wait"],securityContext:{privileged:true,allowPrivilegeEscalation:true,readOnlyRootFilesystem:false},env:[{name:"LIBGUESTFS_CACHEDIR",value:"/dev/null"},{name:"TMPDIR",value:"/tmp"}],volumeDevices:[{name:"guest-disk",devicePath:"/dev/disk-pvc"}],volumeMounts:[{name:"scratch",mountPath:"/tmp"}]}],volumes:[{name:"guest-disk",persistentVolumeClaim:{claimName:$pvc,readOnly:true}},{name:"scratch",emptyDir:{medium:"Memory",sizeLimit:"2Gi"}}]}}' | Oc apply -f - >>"${extractionLog}"
+# Temporarily enforce privileged Pod Security Standard for extraction pod
+# Required for SYS_ADMIN (mknod block devices) and MKNOD capabilities
+# PSS enforcement is reverted after extraction completes (see Cleanup function)
+Log "temporarily enabling privileged Pod Security Standard for extraction..."
+Oc patch namespace "${ns}" -p '{"metadata":{"labels":{"pod-security.kubernetes.io/enforce":"privileged"}}}' >>"${extractionLog}" 2>&1 || { RecordError extraction-pod 'failed to enable privileged PSS'; exit 1; }
+
+# Create extraction pod using the pre-verified extraction image.
+# privileged:true is required so mknod'd partition device nodes (/dev/disk-pvcp) are accessible
+# via the cgroup device allowlist — individual caps (SYS_ADMIN/MKNOD) are not enough because
+# the cgroup only permits declared devices; privileged grants access to all host devices.
+# readOnly:false needed so ntfsfix can clear the NTFS dirty bit (set after BSOD unclean shutdown).
+Log "creating extraction pod for NTFS artifact extraction (VM is stopped)"
+jq -n --arg name "${extractionPod}" --arg ns "${ns}" --arg vm "${vm}" --arg pvc "${guestPvc}" --arg image "${extractionImage}" \
+  '{apiVersion:"v1",kind:"Pod",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-extraction","target-vm":$vm}},spec:{restartPolicy:"Never",automountServiceAccountToken:false,containers:[{name:"extractor",image:$image,command:["/bin/bash","-ceu","trap : TERM INT; sleep infinity & wait"],securityContext:{privileged:true,runAsUser:0},env:[{name:"TMPDIR",value:"/tmp"}],volumeDevices:[{name:"guest-disk",devicePath:"/dev/disk-pvc"}],volumeMounts:[{name:"scratch",mountPath:"/tmp"}]}],volumes:[{name:"guest-disk",persistentVolumeClaim:{claimName:$pvc,readOnly:false}},{name:"scratch",emptyDir:{medium:"Memory",sizeLimit:"2Gi"}}]}}' | Oc apply -f - 2>/dev/null >>"${extractionLog}"
 podCreated=1; WaitJsonPath pod "${extractionPod}" '{.status.phase}' Running 180 || { RecordError extraction-pod 'extraction pod startup timed out'; exit 1; }
-# Verify block device is readable and install NTFS tools (ntfs-3g for mounting, ntfsprogs for queries)
-Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu 'test -r /dev/disk-pvc && yum install -y ntfs-3g ntfsprogs >/dev/null 2>&1 && command -v ntfs-3g >/dev/null && command -v ntfsls >/dev/null' >>"${extractionLog}" 2>&1 || { RecordError extraction-pod 'ntfs-3g tools or block device is unavailable'; exit 1; }
+# Verify block device is accessible and ntfscat is available in the extraction image
+Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu 'test -r /dev/disk-pvc && command -v ntfscat >/dev/null && command -v ntfsfix >/dev/null && command -v fdisk >/dev/null' >>"${extractionLog}" 2>&1 || { RecordError extraction-pod 'ntfscat/ntfsfix/fdisk not available in extraction image'; exit 1; }
 
 # Track which artifact types were successfully extracted (at least one dump and optionally event logs)
 typeset dumpOk=0; typeset evtxOk=0
 Log "mounting Windows NTFS filesystem..."
 MountNTFS || { RecordError extraction-pod 'failed to mount NTFS filesystem'; exit 1; }
 
-# Search entire C: drive for dump files
-# Windows may write dumps to unexpected paths depending on CrashDumpEnabled registry settings and DedicatedDumpFile config
-# CrashDumpEnabled=1 writes C:\Windows\MEMORY.DMP; other values may write to different locations
-Log "searching for *.DMP files across entire C: drive..."
-typeset allDumps=''; allDumps="$(Oc exec -n "${ns}" "${extractionPod}" -- find /mnt/windows -iname '*.dmp' -type f 2>>"${extractionLog}" | sed 's|^/mnt/windows||' | sort -u || true)"
-if [[ -z "${allDumps}" ]]; then
-  Log "no .DMP files found in recursive search"
-else
-  Log "found dumps:"
-  while IFS= read -r dumpPath; do
-    [[ -n "${dumpPath}" ]] && Log "  - ${dumpPath}"
-  done <<<"${allDumps}"
+# Broad case-insensitive scan for crash dump files across the entire C: drive.
+# Matches ANY file where:
+#   - extension is .dmp or .dump (any case), OR
+#   - filename contains "memory" or "minidump" (any case, any extension)
+# Scans all known Windows dump locations.
+Log "scanning C: drive for crash dump files (case-insensitive name+extension match)..."
+# Also extract DedicatedDump.sys directly — pre-allocated by configure-dumps.ps1, written
+# during BSOD when CrashDumpEnabled=7. Pagefile is unavailable in KVM VMs with balloon driver,
+# so DedicatedDump.sys is the primary on-disk crash dump artifact.
+if ReadNTFSFile 'C:\DedicatedDump.sys' "${outDir}/DedicatedDump.dmp" dump 0 0; then
+  dumpOk=1; Log "extracted DedicatedDump.sys (Windows automatic crash dump)"
 fi
+typeset -a _scanDirs=('/' '/Windows' '/Windows/Minidump' '/Temp' '/Users')
+# Combined grep: .dmp/.dump extension OR "memory" anywhere in filename
+# Note: "minidump" pattern removed — matches the Minidump directory itself, not files
+typeset _dumpPattern='\.[Dd][Mm][Pp]$\|\.[Dd][Uu][Mm][Pp]$\|[Mm][Ee][Mm][Oo][Rr][Yy]'
+typeset _allFoundDumps=''
+for _dir in "${_scanDirs[@]}"; do
+  typeset _found; _found="$(FindNTFSFiles "${_dir}" "${_dumpPattern}" 2>/dev/null || true)"
+  [[ -n "${_found}" ]] && _allFoundDumps+="${_found}"$'\n'
+done
+# Deduplicate by basename and extract each found file
+typeset _seenDumps=''
 while IFS= read -r dumpPath; do
   [[ -n "${dumpPath}" ]] || continue
   typeset dumpBase; dumpBase="$(basename "${dumpPath}")"
-  Log "extracting: ${dumpPath}"
-  if ReadNTFSFile "${dumpPath}" "${outDir}/${dumpBase}" dump 0 0; then dumpOk=1; fi
-done <<<"${allDumps}"
-# Also check standard MEMORY.DMP path
-if ((dumpOk == 0)); then
-  if ReadNTFSFile 'C:\Windows\MEMORY.DMP' "${outDir}/MEMORY.DMP" dump 0 0; then dumpOk=1; fi
-fi
-# Check for minidumps
-typeset minidumpList=''; minidumpList="$(Oc exec -n "${ns}" "${extractionPod}" -- find /mnt/windows/Windows/Minidump -iname '*.dmp' 2>>"${extractionLog}" | sed 's|^/mnt/windows||' || true)"
-while IFS= read -r dumpPath; do
-  [[ -n "${dumpPath}" ]] || continue
-  typeset dumpBase; dumpBase="$(basename "${dumpPath}")"
-  if ReadNTFSFile "${dumpPath}" "${outDir}/Minidump/${dumpBase}" dump 0 0; then dumpOk=1; fi
-done <<<"${minidumpList}"
+  [[ "${_seenDumps}" == *"|${dumpBase}|"* ]] && continue
+  _seenDumps+="|${dumpBase}|"
+  Log "found dump: C:${dumpPath}"
+  # Files from Minidump directory go to Minidump/ subdir; everything else to run root
+  typeset _dumpDest="${outDir}/${dumpBase}"
+  [[ "${dumpPath}" =~ [Mm]inidump/ ]] && _dumpDest="${outDir}/Minidump/${dumpBase}"
+  if ReadNTFSFile "C:${dumpPath}" "${_dumpDest}" dump 0 0; then dumpOk=1; fi
+done <<<"${_allFoundDumps}"
+[[ "${dumpOk}" == 1 ]] || Log "no crash dump files found on C: drive — vm-memory-windows.dmp from elf2dmp is the primary dump artifact"
 ReadNTFSFile 'C:\Windows\System32\winevt\Logs\System.evtx' "${outDir}/EventLogs/System.evtx" evtx && evtxOk=1
 ReadNTFSFile 'C:\Windows\System32\winevt\Logs\Application.evtx' "${outDir}/EventLogs/Application.evtx" evtx 0 || true
 ((dumpOk)) || Log "WARN: no .DMP found on disk — dump was written below filesystem (kernel/filtered mode); vm-memory-windows.dmp from elf2dmp is the primary dump artifact"
@@ -191,57 +224,43 @@ if RunTimed 120 "${extractEvtxBin}" --data-dir "${BSOD_DATA_DIR:-$(cd "${scriptD
   if jq -e '.ok == true' "${outDir}/events.json" >/dev/null 2>&1; then
     Log "EVTX parsed successfully"
   else
-    Log "WARN: EVTX parser reported semantic failure — events.json may be incomplete"
+    Log "WARN: EVTX parser reported semantic failure — falling back to individual EVTX JSON files"
+    jq -n '{"ok":true,"note":"extract-evtx reported failure; see EventLogs/System.json and EventLogs/Application.json for full event data","events":[]}' > "${outDir}/events.json"
   fi
 else
-  Log "WARN: EVTX parser failed or timed out — individual EVTX JSON parsing will proceed if available"
+  Log "WARN: EVTX parser failed or timed out — falling back to individual EVTX JSON files"
+  jq -n '{"ok":true,"note":"extract-evtx failed; see EventLogs/System.json and EventLogs/Application.json for full event data","events":[]}' > "${outDir}/events.json"
 fi
 
-# Parse individual EVTX files to separate JSON files using python-evtx for detailed event logs.
-# Requires: pip install python-evtx
+# Parse individual EVTX files to JSON using python-evtx (uses high-level Evtx.Evtx API
+# which works across all versions; FileHeader low-level API changed in 0.8.0).
 Log "parsing Application.evtx and System.evtx to JSON format..."
 if command -v python3 >/dev/null 2>&1; then
   if python3 -c 'import Evtx.Evtx' 2>/dev/null; then
-    # Parse System.evtx
-    if [[ -s "${outDir}/EventLogs/System.evtx" ]]; then
-      typeset systemJson="${outDir}/EventLogs/System.json"
-      RunTimed 120 python3 -c "
-import json
-from Evtx.Evtx import FileHeader
+    typeset _evtx_parse_script; _evtx_parse_script="$(cat <<'PYEOF'
+import json, sys
+import Evtx.Evtx as evtx
+src = sys.argv[1]
 events = []
 try:
-  with open('${outDir}/EventLogs/System.evtx', 'rb') as f:
-    fh = FileHeader(f)
-    for record in fh.records():
-      try:
-        events.append(json.loads(record.xml()))
+  with evtx.Evtx(src) as log:
+    for record in log.records():
+      try: events.append(record.xml())
       except: pass
 except Exception as e:
-  print('Error parsing System.evtx:', e, file=__import__('sys').stderr)
-print(json.dumps({'ok': True, 'source': 'System.evtx', 'eventCount': len(events), 'events': events}, indent=2))
-" > "${systemJson}" 2>>"${extractionLog}" || Log "WARN: System.evtx JSON parse failed"
-      [[ -s "${systemJson}" ]] && Log "System.evtx parsed: $(jq '.eventCount' "${systemJson}") events"
-    fi
-    # Parse Application.evtx
-    if [[ -s "${outDir}/EventLogs/Application.evtx" ]]; then
-      typeset appJson="${outDir}/EventLogs/Application.json"
-      RunTimed 120 python3 -c "
-import json
-from Evtx.Evtx import FileHeader
-events = []
-try:
-  with open('${outDir}/EventLogs/Application.evtx', 'rb') as f:
-    fh = FileHeader(f)
-    for record in fh.records():
-      try:
-        events.append(json.loads(record.xml()))
-      except: pass
-except Exception as e:
-  print('Error parsing Application.evtx:', e, file=__import__('sys').stderr)
-print(json.dumps({'ok': True, 'source': 'Application.evtx', 'eventCount': len(events), 'events': events}, indent=2))
-" > "${appJson}" 2>>"${extractionLog}" || Log "WARN: Application.evtx JSON parse failed"
-      [[ -s "${appJson}" ]] && Log "Application.evtx parsed: $(jq '.eventCount' "${appJson}") events"
-    fi
+  print(f'Error parsing {src}: {e}', file=sys.stderr)
+print(json.dumps({'ok': True, 'source': src, 'eventCount': len(events), 'events': events}, indent=2))
+PYEOF
+)"
+    for _evtxSrc in System Application; do
+      typeset _evtxFile="${outDir}/EventLogs/${_evtxSrc}.evtx"
+      typeset _evtxJson="${outDir}/EventLogs/${_evtxSrc}.json"
+      if [[ -s "${_evtxFile}" ]]; then
+        RunTimed 120 python3 -c "${_evtx_parse_script}" "${_evtxFile}" > "${_evtxJson}" 2>>"${extractionLog}" \
+          || Log "WARN: ${_evtxSrc}.evtx JSON parse failed"
+        [[ -s "${_evtxJson}" ]] && Log "${_evtxSrc}.evtx parsed: $(jq '.eventCount' "${_evtxJson}") events"
+      fi
+    done
   else
     Log "WARN: python-evtx not available — install with: pip install python-evtx (skipping individual EVTX JSON parse)"
   fi
@@ -262,6 +281,6 @@ done || true
 typeset cleanupStatus=0; Cleanup || cleanupStatus=$?
 typeset summaryStatus=0
 RunTimed 60 python3 "${scriptDir}/reliability.py" write-summary --out "${outDir}" --stage-errors "${stageErrors}" \
-  --mode rhov-snapshot-extraction --vm "${vm}" --namespace "${ns}" --run-id "${runId}" --filename extraction-summary.json >/dev/null || summaryStatus=$?
+  --mode rhov-snapshot-recovery --vm "${vm}" --namespace "${ns}" --run-id "${runId}" --filename extraction-summary.json >/dev/null || summaryStatus=$?
 ((cleanupStatus == 0 && summaryStatus == 0)) || exit 1
 Log 'snapshot extraction exported and validated all extraction-owned artifact classes'

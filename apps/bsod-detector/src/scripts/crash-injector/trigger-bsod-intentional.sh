@@ -18,7 +18,8 @@ typeset preflightTimeout="${BSOD_PREFLIGHT_TIMEOUT:-300}"
 typeset scriptDir=''; scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 typeset appDir=''; appDir="$(cd "${scriptDir}/../../.." && pwd)"; typeset hostDir="${appDir}/src/scripts/host"
 # Project root for cleanup of libguestfs cache files (file.0x*)
-typeset projectRoot=''; projectRoot="$(cd "${appDir}/.." && pwd)"
+# guestfish writes cache files to CWD which is the git repo root (two levels above appDir)
+typeset projectRoot=''; projectRoot="$(cd "${appDir}/../.." && pwd)"
 typeset watcherPid=''; typeset runId=''; runId="$(date -u +%Y%m%dT%H%M%SZ)-intentional-$$-$RANDOM"
 typeset outDir="${evidenceRoot}/${runId}"; typeset metadataFile="${outDir}/recovery-metadata.json"; typeset readyFile="${outDir}/watcher-ready"
 

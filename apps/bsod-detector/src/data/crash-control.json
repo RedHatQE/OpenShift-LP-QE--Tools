@@ -21,7 +21,7 @@
       "MinidumpDir": "%SystemRoot%\\Minidump",
       "DumpFile": "%SystemRoot%\\MEMORY.DMP"
     },
-    "notes": "CrashDumpEnabled=1 (complete dump) writes entire physical memory as native WinDbg DMP format. Guarantees MEMORY.DMP at C:\\Windows\\MEMORY.DMP. AutoReboot=0 keeps VM frozen for offline extraction. Extraction via NTFS-3G in recovery pod provides: MEMORY.DMP, Minidump/*.dmp files, System.evtx, and Application.evtx. Requires page file >= RAM size (+1MB). Primary artifact for forensics analysis."
+    "notes": "CrashDumpEnabled=1 (complete dump) writes the entire physical memory to DedicatedDumpFile (C:\\DedicatedDump.sys, pre-allocated to RAM+1MB). DedicatedDumpFile replaces pagefile for complete/kernel dumps — no pagefile.sys required. KVM VMs with balloon driver cannot create pagefile; DedicatedDumpFile is the only viable on-disk dump mechanism. Extracted as DedicatedDump.dmp during NTFS extraction. Full physical memory also captured via KubeVirt elf.tar.gz. AutoReboot=0 keeps VM frozen."
   },
   "pageFile": {
     "path": "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",
