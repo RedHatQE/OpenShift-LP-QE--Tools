@@ -4,9 +4,10 @@ SHELL := /bin/bash
 
 IMAGE_REGISTRY  ?= images.paas.redhat.com
 IMAGE_NAMESPACE ?= ieng/app
-IMAGE_NAME      ?= prow-analyzer
+IMAGE_REPO      ?= prow-analyzer
 IMAGE_TAG       ?= latest
-IMAGE_FULL       = $(IMAGE_REGISTRY)/$(IMAGE_NAMESPACE)/$(IMAGE_NAME):$(IMAGE_TAG)
+IMAGE_NAME       = $(IMAGE_REGISTRY)/$(IMAGE_NAMESPACE)/$(IMAGE_REPO):$(IMAGE_TAG)
+IMAGE_LATEST     = $(IMAGE_REGISTRY)/$(IMAGE_NAMESPACE)/$(IMAGE_REPO):latest
 
 # Application source directory (relative to repo root)
 APP_DIR = apps/prow-analyzer
