@@ -119,7 +119,7 @@ service credentials, **not** by the requesting user.
 | GitHub repositories and PRs | Code/PR context |
 | Build logs and artifacts | Failure detail |
 | Test results and history | Failure/flake context |
-| automated known-issue triage | Known-issue correlation |
+| Automated known-issue triage | Known-issue correlation |
 | Slack team discussions | Prior discussion context |
 | Internal documentation | Guidance/runbooks |
 | Historical failure patterns | Recurring-pattern analysis |
