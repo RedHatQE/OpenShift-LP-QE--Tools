@@ -136,7 +136,7 @@ happens **inside ship-help**, not in this agent.
 | Data sources (via ship-help) | GitHub repositories and PRs | |
 | Data sources (via ship-help) | Build logs and artifacts | |
 | Data sources (via ship-help) | Test results and history | |
-| Data sources (via ship-help) | automated known-issue triage | |
+| Data sources (via ship-help) | Automated known-issue triage | |
 | Data sources (via ship-help) | Slack team discussions | |
 | Data sources (via ship-help) | Internal documentation | |
 | Data sources (via ship-help) | Historical failure patterns | |
