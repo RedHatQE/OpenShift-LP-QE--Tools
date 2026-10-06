@@ -28,7 +28,7 @@ Automated Prow CI failure analysis using Red Hat's ship-help MCP (AI helpdesk).
   - GitHub repositories and PRs
   - Build logs and artifacts
   - Test results and history
-  - automated known-issue triage
+  - Automated known-issue triage
   - Slack team discussions
   - Internal documentation
   - Historical failure patterns
