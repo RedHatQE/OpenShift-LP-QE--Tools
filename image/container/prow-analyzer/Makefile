@@ -17,7 +17,7 @@ APP_DIR = apps/prow-analyzer
 build:
 	{ set -euxo pipefail; shopt -s inherit_errexit;\
 	    : 'Building container image: $(IMAGE_FULL)';\
-	    podman build $(BUILDFLAGS) -t '$(IMAGE_FULL)' -f Dockerfile '../../../$(APP_DIR)';\
+	    podman build $(BUILDFLAGS) -t '$(IMAGE_NAME)' -t '$(IMAGE_LATEST)' -f Dockerfile '../../../$(APP_DIR)';\
 	}
 
 # Push container image to registry
