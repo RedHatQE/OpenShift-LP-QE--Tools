@@ -98,11 +98,7 @@ spec:
 - ✅ **Application-level audit trail:** implemented in code (`pkg/audit`, wired
   into the Slack handler, analyzer, and CLI) and unit-tested. It is **active as
   soon as the updated image is deployed**.
-- ⚠️ **Not yet in the running production image.** The live deployment
-  (`quay.io/<your-org>/prow-analyzer-bot:<tag>` in ns
-  `<your-namespace>`) predates this change. Rebuild and roll out (see
-  [reference.md](reference.md#updating-a-running-deployment) /
-  [dataflow-architecture.md](dataflow-architecture.md)) to activate it.
+- ⚠️ The live deployment https://images.paas.redhat.com/organization/ieng/app/prow-analyzer
 - ❓ **Centralized immutable storage:** **not verified.** Whether a
   `ClusterLogForwarder` to an immutable store exists for this cluster must be
   confirmed with the cluster/logging owners. Until then, audit events live only
