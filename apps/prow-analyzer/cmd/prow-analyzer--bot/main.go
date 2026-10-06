@@ -50,10 +50,10 @@ func main() {
 		mcpToken    = flag.String("mcp-token", os.Getenv("SHIP_HELP_MCP_TOKEN"), "Ship-help MCP token")
 		channels    = flag.String("channels", os.Getenv("MONITORED_CHANNELS"), "Comma-separated list of channel IDs to monitor")
 		allowedBots = flag.String("allowed-bots", os.Getenv("ALLOWED_BOT_IDS"), "Comma-separated list of bot IDs (B...) whose Prow URLs should be analyzed")
-		prompt      = flag.String("prompt", envStr("PROMPT_TEMPLATE", defaultPrompt), "Analysis prompt template with a {job_url} placeholder (or set PROMPT_TEMPLATE)")
-		monitorAll  = flag.Bool("monitor-all", envBool("MONITOR_ALL", false), "Monitor every channel the bot is a member of instead of only --channels (or set MONITOR_ALL=true). Fail-closed: without this and with no --channels, no channel is monitored")
+		prompt      = flag.String("prompt", envStr("PROW_AN__PROMPT_TEMPLATE", defaultPrompt), "Analysis prompt template with a {job_url} placeholder (or set PROW_AN__PROMPT_TEMPLATE)")
+		monitorAll  = flag.Bool("monitor-all", envBool("PROW_AN__MONITOR_ALL", false), "Monitor every channel the bot is a member of instead of only --channels (or set PROW_AN__MONITOR_ALL=true). Fail-closed: without this and with no --channels, no channel is monitored")
 		slackDebug  = flag.Bool("slack-debug", envBool("SLACK_DEBUG", false), "Enable verbose Slack SDK and Socket Mode debug logging (or set SLACK_DEBUG)")
-		mcpDebug    = flag.Bool("mcp-debug", envBool("MCP_DEBUG", false), "Enable verbose MCP SSE logging that includes response payload previews (or set MCP_DEBUG). Off by default for data minimization")
+		mcpDebug    = flag.Bool("mcp-debug", envBool("PROW_AN__MCP_DEBUG", false), "Enable verbose MCP SSE logging that includes response payload previews (or set PROW_AN__MCP_DEBUG). Off by default for data minimization")
 		tlsInsecure = flag.Bool("tls-insecure", envBool("TLS_INSECURE_SKIP_VERIFY", false), "Skip TLS certificate verification for MCP/Prow HTTP requests (or set TLS_INSECURE_SKIP_VERIFY)")
 	)
 
@@ -99,10 +99,10 @@ func main() {
 	slog.Info("Starting prow-analyzer-bot")
 	switch {
 	case *monitorAll:
-		slog.Warn("MONITOR_ALL enabled: monitoring EVERY channel the bot is a member of; messages from all such channels may be forwarded to ship-help under shared service credentials",
+		slog.Warn("PROW_AN__MONITOR_ALL enabled: monitoring EVERY channel the bot is a member of; messages from all such channels may be forwarded to ship-help under shared service credentials",
 			"channels_configured", len(monitoredChannels))
 	case len(monitoredChannels) == 0:
-		slog.Warn("No channels configured and MONITOR_ALL not set: fail-closed, the bot will not monitor any channel. Set MONITORED_CHANNELS or MONITOR_ALL=true")
+		slog.Warn("No channels configured and PROW_AN__MONITOR_ALL not set: fail-closed, the bot will not monitor any channel. Set MONITORED_CHANNELS or PROW_AN__MONITOR_ALL=true")
 	default:
 		slog.Info("Monitoring channels", "channels", monitoredChannels)
 	}

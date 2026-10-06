@@ -4,12 +4,8 @@ metadata:
   name: prow-analyzer
 ---
 # NOTE: the prow-analyzer-secrets Secret is intentionally NOT defined in this
-# manifest. Create it out-of-band with real tokens BEFORE `oc apply`, e.g.:
-#   oc create secret generic prow-analyzer-secrets -n prow-analyzer \
-#     --from-literal=ship-help-token=... \
-#     --from-literal=slack-bot-token=xoxb-... \
-#     --from-literal=slack-app-token=xapp-...
-# (see doc/deployment.md, Step 2). Shipping placeholder token values here would
+# manifest. Create it out-of-band with real tokens BEFORE `oc apply` (see
+# doc/deployment.md, Step 2). Shipping placeholder token values here would
 # overwrite the real Secret with invalid tokens on every `oc apply`.
 apiVersion: v1
 kind: ConfigMap
@@ -80,10 +76,10 @@ spec:
               name: prow-analyzer-config
               key: monitored-channels
         # Fail-closed by default: with an empty MONITORED_CHANNELS the bot monitors
-        # nothing unless MONITOR_ALL is set to "true" (monitors every joined channel).
-        - name: MONITOR_ALL
+        # nothing unless PROW_AN__MONITOR_ALL is set to "true" (monitors every joined channel).
+        - name: PROW_AN__MONITOR_ALL
           value: "false"
-        - name: PROMPT_TEMPLATE
+        - name: PROW_AN__PROMPT_TEMPLATE
           valueFrom:
             configMapKeyRef:
               name: prow-analyzer-config

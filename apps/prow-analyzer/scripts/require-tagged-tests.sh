@@ -9,9 +9,9 @@
 # Usage: require-tagged-tests.sh <build-tag> [packages] [minCount]
 set -euxo pipefail; shopt -s inherit_errexit
 
-typeset -r buildTag="${1:?usage: require-tagged-tests.sh <build-tag> [packages] [minCount]}"
-typeset -r pkgs="${2:-./pkg/...}"
-typeset -ri minCount="${3:-1}"
+typeset -r buildTag="${1:?usage: require-tagged-tests.sh <build-tag> [packages] [minCount]}"; (($#)) && shift
+typeset -r pkgs="${1:-./pkg/...}"; (($#)) && shift
+typeset -ri minCount="${1:-1}"; (($#)) && shift
 
 : "Checking that -tags ${buildTag} selects at least ${minCount} test(s) in ${pkgs}..."
 

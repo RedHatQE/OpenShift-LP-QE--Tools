@@ -259,10 +259,11 @@ If step 2 returns `HTTP 404` with `{"error":{"message":"Session not found"}}`, t
 | `SLACK_APP_TOKEN`          | Bot only | Bot      | Slack app-level token for Socket Mode (`xapp-...`)                                             |
 | `MONITORED_CHANNELS`       | Bot only | Bot      | Comma-separated Slack channel IDs to monitor                                                   |
 | `ALLOWED_BOT_IDS`          | No       | Bot      | Comma-separated bot IDs (`B...`) whose Prow URLs are analyzed; the bot always ignores its own  |
-| `MONITOR_ALL`              | No       | Bot      | `"true"` monitors every joined channel instead of only `MONITORED_CHANNELS` (default `false`)  |
-| `PROMPT_TEMPLATE`          | No       | Bot      | Analysis prompt template with a `{job_url}` placeholder (default: built-in detailed prompt)    |
+| `PROW_AN__MONITOR_ALL`     | No       | Bot      | `"true"` monitors every joined channel instead of only `MONITORED_CHANNELS` (default `false`)  |
+| `PROW_AN__PROMPT_TEMPLATE` | No       | Bot      | Analysis prompt template with a `{job_url}` placeholder (default: built-in detailed prompt)    |
 | `SLACK_DEBUG`              | No       | Bot      | `"true"` enables verbose Slack SDK / Socket Mode debug logging (default `false`)               |
-| `MCP_DEBUG`                | No       | CLI, Bot | `"true"` enables verbose MCP SSE logging incl. response payload previews (default `false`)     |
+| `PROW_AN__MCP_DEBUG`       | No       | Bot      | `"true"` enables verbose MCP SSE logging incl. response payload previews (default `false`)     |
+| `MCP_DEBUG`                | No       | CLI      | Same as above for the CLI (the bot reads `PROW_AN__MCP_DEBUG` instead)                         |
 | `MCP_TIMEOUT_SECONDS`      | No       | CLI, Bot | MCP HTTP client timeout in seconds; caps the whole request incl. SSE read (default `1200`)     |
 | `TLS_INSECURE_SKIP_VERIFY` | No       | CLI, Bot | Set to `"true"` to skip TLS certificate verification                                           |
 
@@ -270,7 +271,7 @@ For the **bot**, every variable above has a corresponding flag that overrides it
 (see [Bot Flags](#bot-flags)). The **CLI** exposes flags only for `--mcp-url`,
 `--token`, and `--prompt`; the other variables it honors — `MCP_DEBUG`,
 `MCP_TIMEOUT_SECONDS`, and `TLS_INSECURE_SKIP_VERIFY` — are env-only there.
-`PROMPT_TEMPLATE` is read only by the bot; the CLI's prompt comes from `--prompt`.
+`PROW_AN__PROMPT_TEMPLATE` is read only by the bot; the CLI's prompt comes from `--prompt`.
 
 ### CLI Flags
 
@@ -300,16 +301,16 @@ prow-analyzer--bot [flags]
   -allowed-bots  Comma-separated bot IDs (B...) whose Prow URLs are analyzed
                  (default: $ALLOWED_BOT_IDS)
   -prompt        Analysis prompt template with a {job_url} placeholder
-                 (default: $PROMPT_TEMPLATE, else a built-in detailed template
-                 requesting root cause, Jira issues, recurring patterns, and
-                 recommended actions)
+                 (default: $PROW_AN__PROMPT_TEMPLATE, else a built-in detailed
+                 template requesting root cause, Jira issues, recurring patterns,
+                 and recommended actions)
   -monitor-all   Monitor every channel the bot is a member of instead of only
-                 -channels (default: $MONITOR_ALL, else false). Fail-closed:
+                 -channels (default: $PROW_AN__MONITOR_ALL, else false). Fail-closed:
                  without this and with no -channels, no channel is monitored
   -slack-debug   Verbose Slack SDK / Socket Mode debug logging
                  (default: $SLACK_DEBUG, else false)
   -mcp-debug     Verbose MCP SSE logging incl. response payload previews
-                 (default: $MCP_DEBUG, else false; off for data minimization)
+                 (default: $PROW_AN__MCP_DEBUG, else false; off for data minimization)
   -tls-insecure  Skip TLS certificate verification for MCP/Prow requests
                  (default: $TLS_INSECURE_SKIP_VERIFY, else false)
 ```
@@ -324,13 +325,13 @@ The prompt is a string with a `{job_url}` placeholder that is replaced with the 
 4. Recommended actions
 
 Customize via the `-prompt` command-line flag, or — for the bot — the
-`PROMPT_TEMPLATE` environment variable.
+`PROW_AN__PROMPT_TEMPLATE` environment variable.
 
-> **Note:** The bot resolves its prompt as `-prompt` flag → `PROMPT_TEMPLATE` env
-> var → built-in default, so the `prompt-template` ConfigMap key wired to
-> `PROMPT_TEMPLATE` in `deploy/openshift/deployment.yaml` takes effect on the
+> **Note:** The bot resolves its prompt as `-prompt` flag → `PROW_AN__PROMPT_TEMPLATE`
+> env var → built-in default, so the `prompt-template` ConfigMap key wired to
+> `PROW_AN__PROMPT_TEMPLATE` in `deploy/openshift/deployment.yaml` takes effect on the
 > deployed bot. The CLI's prompt comes only from its `-prompt` flag (it does not
-> read `PROMPT_TEMPLATE`).
+> read `PROW_AN__PROMPT_TEMPLATE`).
 
 ### Recognized Prow URL Patterns
 

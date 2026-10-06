@@ -105,7 +105,7 @@ The exported functions/constants that define the agent's behavior:
 |---|---|---|
 | Slack channel messages | `channels:history` | Only public channels the bot has been **invited to**. Reads message text to detect Prow URLs. |
 | Prow job URL | From message text / CLI arg | The URL string is passed to ship-help. |
-| Runtime configuration | Env vars / CLI flags | `SHIP_HELP_MCP_URL`, `SHIP_HELP_MCP_TOKEN`, `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `MONITORED_CHANNELS`, `PROMPT_TEMPLATE`/`-prompt`, `TLS_INSECURE_SKIP_VERIFY`. |
+| Runtime configuration | Env vars / CLI flags | `SHIP_HELP_MCP_URL`, `SHIP_HELP_MCP_TOKEN`, `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `MONITORED_CHANNELS`, `PROW_AN__PROMPT_TEMPLATE`/`-prompt`, `TLS_INSECURE_SKIP_VERIFY`. |
 
 ### Indirect (viewed by ship-help on the agent's behalf)
 

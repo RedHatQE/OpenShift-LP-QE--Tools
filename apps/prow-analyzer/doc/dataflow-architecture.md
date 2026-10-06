@@ -113,7 +113,7 @@ flowchart LR
 | **Source code repo** | `github.com/RedHatQE/OpenShift-LP-QE--Tools` (module path) | All agent code under `apps/prow-analyzer/` | No |
 | **Container image repo** | `images.paas.redhat.com/ieng/app/prow-analyzer` (deployed tag: `<tag>`) | Built runtime image (both bot + CLI binaries) | No (but do not bake secrets) |
 | **Deployment manifests** | `apps/prow-analyzer/deploy/openshift/`, `deploy/slack/` | K8s resources + Slack app manifest | No |
-| **Runtime config store** | ConfigMap `prow-analyzer-config` in ns `<your-namespace>`, surfaced to the container as env vars via `configMapKeyRef` | `SHIP_HELP_MCP_URL` (`mcp-url`), `MONITORED_CHANNELS` (`monitored-channels`), `PROMPT_TEMPLATE` (`prompt-template`); `MONITOR_ALL` is a literal env value | No |
+| **Runtime config store** | ConfigMap `prow-analyzer-config` in ns `<your-namespace>`, surfaced to the container as env vars via `configMapKeyRef` | `SHIP_HELP_MCP_URL` (`mcp-url`), `MONITORED_CHANNELS` (`monitored-channels`), `PROW_AN__PROMPT_TEMPLATE` (`prompt-template`); `PROW_AN__MONITOR_ALL` is a literal env value | No |
 | **Secrets store** | K8s Secret / env in ns `<your-namespace>` | `SHIP_HELP_MCP_TOKEN`, `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` | **Yes** |
 | **Ephemeral state** | In-memory only (MCP session ID, semaphore) | No database; nothing persisted by the bot | No |
 | **Logs** | Pod stdout (`oc logs`) | Timing + error + (proposed) HAP-redaction counts | Low; avoid logging payloads |
@@ -137,7 +137,7 @@ flowchart LR
   ConfigMap and surfaces its keys to the container as env vars via
   `configMapKeyRef` (tokens come from the `prow-analyzer-secrets` Secret via
   `secretKeyRef`; that Secret is created out-of-band, not shipped in the manifest,
-  so `oc apply` can't overwrite real tokens with placeholders). `MONITOR_ALL` is
+  so `oc apply` can't overwrite real tokens with placeholders). `PROW_AN__MONITOR_ALL` is
   set as a literal env value on the Deployment.
 - **HAP guardrails** shown with an asterisk are **not yet in the deployed
   image** — they were in progress at the time of writing. Treat that node as
