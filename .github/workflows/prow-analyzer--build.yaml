@@ -2,8 +2,8 @@ name: Build and Test
 
 on:
   push:
-    branches: &branches [ main, master ]
-    paths: &paths
+    branches: [main]
+    paths: &prow-analyzer--path
       - 'apps/prow-analyzer/**'
       - 'image/container/prow-analyzer/**'
       - '.github/workflows/prow-analyzer--build.yaml'
