@@ -51,7 +51,7 @@ jobs:
         persist-credentials: false
 
     - name: Log in to Container Registry
-      if: github.event_name != 'pull_request'
+      if: github.event_name == 'push'
       uses: docker/login-action@v3
       with:
         registry: images.paas.redhat.com
