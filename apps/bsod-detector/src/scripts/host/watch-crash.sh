@@ -27,18 +27,18 @@ typeset scriptDir=''; scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 typeset ns=''; typeset vm=''; typeset outArg=''; typeset outDir=''; typeset metadataFile=''; typeset runId=''
 # Crash detection tuning: ping interval (5s), miss threshold (2 misses = crash), quiesce time (15 min for dump), idle samples before quiesce
 typeset interval=5; typeset miss=2; typeset quiesceWait=900; typeset idleSamples=3
-typeset snapClass="${BSOD_SNAPSHOT_CLASS:-}"; typeset recoveryImage="${BSOD_RECOVERY_IMAGE:-}"
-typeset memoryPvc="${BSOD_MEMORY_DUMP_PVC:-}"; typeset diskTarget=''; typeset noRestart=0
-typeset evidenceRoot="${BSOD_EVIDENCE_MOUNT:-}"; typeset evidenceKind="${BSOD_EVIDENCE_VOLUME_KIND:-}"
-typeset evidenceId="${BSOD_EVIDENCE_STORAGE_ID:-}"; typeset readyFile=''
-typeset commandTimeout="${BSOD_COMMAND_TIMEOUT:-30}"; typeset preflightTimeout="${BSOD_PREFLIGHT_TIMEOUT:-300}"
-typeset captureTimeout="${BSOD_CAPTURE_TIMEOUT:-300}"; typeset memoryTimeout="${BSOD_MEMORY_CAPTURE_TIMEOUT:-1800}"
-typeset armedTimeout="${BSOD_ARMED_TIMEOUT:-3600}"
+typeset snapClass="${BSOD_DET__SNAPSHOT__CLASS:-}"; typeset recoveryImage="${BSOD_RECOVERY_IMAGE:-}"
+typeset memoryPvc="${BSOD_DET__MEMORY__DUMP_PVC:-}"; typeset diskTarget=''; typeset noRestart=0
+typeset evidenceRoot="${BSOD_DET__EVIDENCE__MOUNT:-}"; typeset evidenceKind="${BSOD_EVIDENCE_VOLUME_KIND:-}"
+typeset evidenceId="${BSOD_DET__EVIDENCE__STORAGE_ID:-}"; typeset readyFile=''
+typeset commandTimeout="${BSOD_DET__COMMAND__TIMEOUT:-30}"; typeset preflightTimeout="${BSOD_DET__PREFLIGHT__TIMEOUT:-300}"
+typeset captureTimeout="${BSOD_DET__CAPTURE__TIMEOUT:-300}"; typeset memoryTimeout="${BSOD_MEMORY_CAPTURE_TIMEOUT:-1800}"
+typeset armedTimeout="${BSOD_DET__ARMED__TIMEOUT:-3600}"
 typeset runDir=''; typeset pvpanicFile=''; typeset pvpanicPid=''; typeset progressPid=''; typeset memoryAssociated=0
 typeset stageErrors=''; typeset pipelineLog=''; typeset summaryMode='natural-rhov'
 typeset -a guestAgent=(python3 "${scriptDir}/guest-agent.py")
-[[ -z "${BSOD_GUEST_AGENT_BIN:-}" ]] || guestAgent=("${BSOD_GUEST_AGENT_BIN}")
-typeset hostSignalsBin="${BSOD_HOST_SIGNALS_BIN:-${scriptDir}/collect-host-signals.sh}"
+[[ -z "${BSOD_DET__GUEST_AGENT__BIN:-}" ]] || guestAgent=("${BSOD_DET__GUEST_AGENT__BIN}")
+typeset hostSignalsBin="${BSOD_DET__HOST_SIGNALS__BIN:-${scriptDir}/collect-host-signals.sh}"
 
 # Helper function definitions
 # Die — print a fatal error to stderr and exit.

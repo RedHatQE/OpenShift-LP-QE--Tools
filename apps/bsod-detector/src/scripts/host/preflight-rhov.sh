@@ -10,21 +10,21 @@ umask 077
 typeset scriptDir=''; scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 typeset appDir=''; appDir="$(cd "${scriptDir}/../../.." && pwd)"
 # Guest configuration: PowerShell script to configure Windows dump settings + crash control JSON
-typeset configureScript="${BSOD_CONFIGURE_DUMPS:-${appDir}/src/scripts/guest/configure-dumps.ps1}"
-typeset crashControlFile="${BSOD_CRASH_CONTROL_FILE:-${appDir}/src/data/crash-control.json}"
+typeset configureScript="${BSOD_DET__CONFIGURE__DUMPS:-${appDir}/src/scripts/guest/configure-dumps.ps1}"
+typeset crashControlFile="${BSOD_DET__CRASH_CONTROL__FILE:-${appDir}/src/data/crash-control.json}"
 # Target: namespace, VM name, output directory for metadata, run ID
 typeset ns=''; typeset vm=''; typeset outDir=''; typeset metadataFile=''; typeset runId=''
 # Storage: snapshot class (RBD), recovery image digest-pinned, guest disk target (vda, sda, etc)
-typeset snapClass="${BSOD_SNAPSHOT_CLASS:-}"; typeset recoveryImage="${BSOD_RECOVERY_IMAGE:-}"
-typeset diskTarget=''; typeset memoryPvc="${BSOD_MEMORY_DUMP_PVC:-}"; typeset requireTrigger=0
+typeset snapClass="${BSOD_DET__SNAPSHOT__CLASS:-}"; typeset recoveryImage="${BSOD_RECOVERY_IMAGE:-}"
+typeset diskTarget=''; typeset memoryPvc="${BSOD_DET__MEMORY__DUMP_PVC:-}"; typeset requireTrigger=0
 # Evidence storage: mount point, kind (pvc/network/csi), and stable storage ID for validation
-typeset evidenceRoot="${BSOD_EVIDENCE_MOUNT:-}"; typeset evidenceKind="${BSOD_EVIDENCE_VOLUME_KIND:-}"
-typeset evidenceId="${BSOD_EVIDENCE_STORAGE_ID:-}"; typeset commandTimeout="${BSOD_COMMAND_TIMEOUT:-30}"
+typeset evidenceRoot="${BSOD_DET__EVIDENCE__MOUNT:-}"; typeset evidenceKind="${BSOD_EVIDENCE_VOLUME_KIND:-}"
+typeset evidenceId="${BSOD_DET__EVIDENCE__STORAGE_ID:-}"; typeset commandTimeout="${BSOD_DET__COMMAND__TIMEOUT:-30}"
 # Probe pod: temporary container to verify recovery image has required tools
 typeset probePod=''; typeset probeCreated=0; typeset temporaryDir=''
 # Guest agent: Python CLI for communicating with guest via QEMU Guest Agent (QGA)
 typeset -a guestAgent=(python3 "${scriptDir}/guest-agent.py")
-if [[ -n "${BSOD_GUEST_AGENT_BIN:-}" ]]; then guestAgent=("${BSOD_GUEST_AGENT_BIN}"); fi
+if [[ -n "${BSOD_DET__GUEST_AGENT__BIN:-}" ]]; then guestAgent=("${BSOD_DET__GUEST_AGENT__BIN}"); fi
 
 # Helper function definitions
 # Die — print a fatal error to stderr and exit.
@@ -94,7 +94,7 @@ done
 # Memory dump PVC must be distinct from guest disk PVC (will be populated by KubeVirt memory-dump)
 [[ -n "${memoryPvc}" ]] || Die 'a dedicated KubeVirt memory-dump PVC is required'
 # Command timeout must be positive integer (for kubectl operations)
-[[ "${commandTimeout}" =~ ^[1-9][0-9]*$ ]] || Die 'BSOD_COMMAND_TIMEOUT must be a positive integer'
+[[ "${commandTimeout}" =~ ^[1-9][0-9]*$ ]] || Die 'BSOD_DET__COMMAND__TIMEOUT must be a positive integer'
 # Evidence storage kind: restrict to durable storage (forbid ephemeral tmpfs, hostPath, emptyDir)
 case "${evidenceKind}" in pvc|network|csi) ;; *) Die 'evidence volume kind must explicitly be pvc, network, or csi (hostPath, emptyDir, and local-node storage are forbidden)' ;; esac
 # Evidence storage ID must be valid identifier (PVC name, NFS mount ID, etc)

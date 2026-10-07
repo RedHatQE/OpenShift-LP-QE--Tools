@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# Extract crash artifacts from stopped guest disk via NTFS-3G mounting in privileged pod
-# Reads offline Windows filesystem to extract MEMORY.DMP, Minidump/*.dmp, System.evtx, Application.evtx
+# Extract crash artifacts from stopped guest disk via guestfs-ntfs pod (NTFS support, no PSS escalation)
+# Reads offline Windows filesystem to extract System.evtx, Application.evtx via guestfish
 # Runs AFTER watch-crash.sh stops the VM - performs offline forensics extraction
+# Uses chai-bot custom guestfs image with NTFS support (Fedora 42, libguestfs 1.56.2, ntfs-3g 2022.10.3)
 set -euxo pipefail; shopt -s inherit_errexit
 umask 077
 
 # Determine script directory for helper script resolution
 typeset scriptDir=''; scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Input files: preflight metadata (from watch-crash.sh), output directory, optional extract-evtx binary
-typeset metadataFile=''; typeset outDir=''; typeset commandTimeout="${BSOD_COMMAND_TIMEOUT:-30}"
-typeset extractEvtxBin="${BSOD_EXTRACT_EVTX_BIN:-${scriptDir}/extract-evtx.py}"
+typeset metadataFile=''; typeset outDir=''; typeset commandTimeout="${BSOD_DET__COMMAND__TIMEOUT:-30}"
+typeset extractEvtxBin="${BSOD_DET__EXTRACT_EVTX__BIN:-${scriptDir}/extract-evtx.py}"
 
 # Parse command-line arguments: metadata file and output directory
 while (($#)); do
@@ -93,17 +94,13 @@ function RecordError () {
   jq -cn --arg stage "${stage}" --arg error "$*" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{stage:$stage,error:$error,at:$at}' >> "${stageErrors}"
   Log "ERROR [${stage}]: $*"
 }
-# Cleanup function: delete extraction pod and revert Pod Security Standard
+# Cleanup function: delete extraction pod (no PSS revert needed — stays at baseline)
 function Cleanup () {
   ((cleanupDone == 0)) || return 0
   cleanupDone=1; typeset failed=0
-  # Delete temporary extraction pod if created
-  if ((podCreated)); then RunTimed 70 oc --request-timeout=65s delete pod "${extractionPod}" -n "${ns}" --ignore-not-found --wait=true --timeout=60s >>"${extractionLog}" 2>&1 || { RecordError cleanup "failed to delete extraction pod ${extractionPod}"; failed=1; }; podCreated=0; fi
-  # Revert namespace Pod Security Standard back to baseline after extraction completes
-  # This minimizes the privilege escalation window to only extraction phase
-  if [[ -n "${ns}" ]]; then
-    oc patch namespace "${ns}" -p '{"metadata":{"labels":{"pod-security.kubernetes.io/enforce":"baseline"}}}' >>"${extractionLog}" 2>&1 || { RecordError cleanup "failed to revert Pod Security Standard to baseline"; failed=1; }
-  fi
+  # Delete temporary guestfs-ntfs extraction pod if created
+  if ((podCreated)); then RunTimed 70 oc --request-timeout=65s delete pod "${guestfsPod}" -n "${ns}" --ignore-not-found --wait=true --timeout=60s >>"${extractionLog}" 2>&1 || { RecordError cleanup "failed to delete guestfs-ntfs pod ${guestfsPod}"; failed=1; }; podCreated=0; fi
+  # No PSS revert needed — guestfs-ntfs pod uses non-privileged container, PSS stays at baseline
   return "${failed}"
 }
 # Signal handlers for clean shutdown
@@ -119,113 +116,199 @@ function WaitJsonPath () {
   while ((SECONDS < deadline)); do actual="$(Oc get "${resource}" "${name}" -n "${ns}" -o "jsonpath=${expression}" 2>/dev/null || true)"; [[ "${actual}" == "${expected}" ]] && return 0; sleep 3; done
   return 1
 }
-# Set up NTFS access: create partition device node and clear dirty bit so ntfscat/ntfsls can read.
-# Guestfish+supermin fails in containers (UID namespace chown restrictions); ntfscat/ntfsls work
-# directly on the block device without needing a filesystem mount or FUSE.
-# Partition device is created at /dev/disk-pvcp (Windows main partition = GPT partition 3).
-function MountNTFS () {
-  Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu '
-    diskMajor=$(printf "%d" "0x$(stat -c "%t" /dev/disk-pvc)")
-    diskMinor=$(printf "%d" "0x$(stat -c "%T" /dev/disk-pvc)")
-    echo "Disk device: major=$diskMajor minor=$diskMinor" >&2
-    partNum=$(fdisk -l /dev/disk-pvc 2>/dev/null | grep "Microsoft basic data" | head -1 | grep -oE "[0-9]+$" || echo "3")
-    partMinor=$((diskMinor + partNum))
-    echo "Creating /dev/disk-pvcp: major=$diskMajor minor=$partMinor (GPT partition $partNum)" >&2
-    mknod /dev/disk-pvcp b "$diskMajor" "$partMinor"
-    echo "Clearing NTFS dirty bit (required for ntfscat/ntfsls access after unclean shutdown)..." >&2
-    ntfsfix --clear-dirty /dev/disk-pvcp 2>&1
-    echo "NTFS partition ready for extraction" >&2
-  ' >>"${extractionLog}" 2>&1
-}
-# Extract a single file from NTFS using ntfscat (no filesystem mount needed).
-# ntfscat reads directly from the block device; converts C:\Windows\file → /Windows/file path.
-function ReadNTFSFile () {
-  typeset ntfsPath="${1:?}"; typeset localPath="${2:?}"; typeset artifactType="${3:?}"; typeset required="${4:-1}"
-  typeset temporary="${localPath}.tmp"; mkdir -p "$(dirname "${localPath}")"; rm -f "${temporary}"
-  # Convert Windows path: C:\Windows\file.txt → /Windows/file.txt
-  typeset unixPath; unixPath="$(printf '%s' "${ntfsPath#[Cc]:}" | tr '\\' '/')"
-  if ! Oc exec -n "${ns}" "${extractionPod}" -- ntfscat /dev/disk-pvcp "${unixPath}" > "${temporary}" 2>>"${extractionLog}"; then
-    rm -f "${temporary}"
-    if ((required)); then RecordError export "ntfs read failed: ${ntfsPath}"; else Log "optional artifact absent: ${ntfsPath}"; fi
-    return 1
-  fi
-  if ! RunTimed 60 python3 "${scriptDir}/reliability.py" validate-artifact --type "${artifactType}" --path "${temporary}" >/dev/null; then
-    rm -f "${temporary}"
-    if ((required)); then RecordError validation "invalid ${artifactType} artifact: ${ntfsPath}"; else Log "optional artifact invalid: ${ntfsPath}"; fi
-    return 1
-  fi
-  mv -f "${temporary}" "${localPath}"; chmod 0600 "${localPath}"; Log "exported ${ntfsPath} -> ${localPath#"${outDir}/"}"
-}
-# List files matching a pattern in a specific NTFS directory using ntfsls.
-# ntfsls requires -p for the directory path (not positional like ntfscat).
-function FindNTFSFiles () {
-  typeset ntfsDir="${1:?}"; typeset pattern="${2:?}"
-  Oc exec -n "${ns}" "${extractionPod}" -- ntfsls -a -p "${ntfsDir}" /dev/disk-pvcp 2>>"${extractionLog}" \
-    | grep -i "${pattern}" | sed "s|^|${ntfsDir}/|" || true
+# Discover NTFS partitions dynamically from stopped VM disk via guestfish
+# Filters out recovery partitions (sda1/sda2), returns Windows data partition device(s)
+function DiscoverNTFSPartitions () {
+  typeset partitions=() device fstype
+  local output
+  output=$(Oc exec -n "${ns}" "${guestfsPod}" -c "${guestfsContainer}" -- \
+    guestfish --ro -a /dev/vda run : list-filesystems 2>>"${extractionLog}") || return 1
+
+  # Parse output: lines like "/dev/sda3: ntfs" or "/dev/sda1: vfat"
+  while IFS=': ' read -r device fstype; do
+    [ -z "${device}" ] && continue
+    # Keep only NTFS partitions, skip EFI/recovery (sda1 is typically EFI, sda2 may be recovery)
+    if [ "${fstype}" = "ntfs" ] && [[ ! "${device}" =~ sda[12]$ ]]; then
+      partitions+=("${device}")
+    fi
+  done <<< "${output}"
+
+  # Return discovered partitions
+  ((${#partitions[@]} > 0)) && printf '%s\n' "${partitions[@]}" || return 1
 }
 
-# Temporarily enforce privileged Pod Security Standard for extraction pod
-# Required for SYS_ADMIN (mknod block devices) and MKNOD capabilities
-# PSS enforcement is reverted after extraction completes (see Cleanup function)
-Log "temporarily enabling privileged Pod Security Standard for extraction..."
-Oc patch namespace "${ns}" -p '{"metadata":{"labels":{"pod-security.kubernetes.io/enforce":"privileged"}}}' >>"${extractionLog}" 2>&1 || { RecordError extraction-pod 'failed to enable privileged PSS'; exit 1; }
+# Extract single file from NTFS partition with directory structure preservation
+# Stores files under guestFS/ subdir to maintain Windows path hierarchy
+# Uses two-phase extraction: guestfish writes to pod file → oc cp copies to host
+function ExtractNTFSFile () {
+  typeset partition="${1:?}"; typeset windowsPath="${2:?}"; typeset baseOutputDir="${3:?}"
 
-# Create extraction pod using the pre-verified extraction image.
-# privileged:true is required so mknod'd partition device nodes (/dev/disk-pvcp) are accessible
-# via the cgroup device allowlist — individual caps (SYS_ADMIN/MKNOD) are not enough because
-# the cgroup only permits declared devices; privileged grants access to all host devices.
-# readOnly:false needed so ntfsfix can clear the NTFS dirty bit (set after BSOD unclean shutdown).
-Log "creating extraction pod for NTFS artifact extraction (VM is stopped)"
-jq -n --arg name "${extractionPod}" --arg ns "${ns}" --arg vm "${vm}" --arg pvc "${guestPvc}" --arg image "${extractionImage}" \
-  '{apiVersion:"v1",kind:"Pod",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-extraction","target-vm":$vm}},spec:{restartPolicy:"Never",automountServiceAccountToken:false,containers:[{name:"extractor",image:$image,command:["/bin/bash","-ceu","trap : TERM INT; sleep infinity & wait"],securityContext:{privileged:true,runAsUser:0},env:[{name:"TMPDIR",value:"/tmp"}],volumeDevices:[{name:"guest-disk",devicePath:"/dev/disk-pvc"}],volumeMounts:[{name:"scratch",mountPath:"/tmp"}]}],volumes:[{name:"guest-disk",persistentVolumeClaim:{claimName:$pvc,readOnly:false}},{name:"scratch",emptyDir:{medium:"Memory",sizeLimit:"2Gi"}}]}}' | Oc apply -f - 2>/dev/null >>"${extractionLog}"
-podCreated=1; WaitJsonPath pod "${extractionPod}" '{.status.phase}' Running 180 || { RecordError extraction-pod 'extraction pod startup timed out'; exit 1; }
-# Verify block device is accessible and ntfscat is available in the extraction image
-Oc exec -n "${ns}" "${extractionPod}" -- /bin/bash -ceu 'test -r /dev/disk-pvc && command -v ntfscat >/dev/null && command -v ntfsfix >/dev/null && command -v fdisk >/dev/null' >>"${extractionLog}" 2>&1 || { RecordError extraction-pod 'ntfscat/ntfsfix/fdisk not available in extraction image'; exit 1; }
+  # Convert Windows path: C:\Windows\System32\file.txt → /Windows/System32/file.txt
+  typeset unixPath; unixPath="$(printf '%s' "${windowsPath#[Cc]:}" | tr '\\' '/')"
+
+  # Preserve full directory structure: guestFS/Windows/System32/file.txt
+  typeset parentDirs="${unixPath%/*}"
+  typeset fileName="${unixPath##*/}"
+  typeset outputPath="${baseOutputDir}/guestFS${unixPath}"
+
+  # Create parent directories under guestFS/ on host
+  mkdir -p "${baseOutputDir}/guestFS${parentDirs}"
+
+  # Temporary file in pod's /tmp to hold extracted file (guestfish download local-path)
+  typeset podTempFile="/tmp/bsod-extract-$$-${RANDOM}.bin"
+
+  # Phase 1: Extract file inside pod using guestfish download local-path (writes file in pod)
+  Log "extracting to pod temp: ${podTempFile} for ${unixPath} on ${partition}"
+  if ! Oc exec -n "${ns}" "${guestfsPod}" -c "${guestfsContainer}" -- \
+    guestfish --ro -a /dev/vda run : mount-ro "${partition}" / : download "${unixPath}" "${podTempFile}" : umount-all \
+    >>"${extractionLog}" 2>&1; then
+    Log "WARN: guestfish extraction failed for ${windowsPath} on ${partition}"
+    return 1
+  fi
+
+  # Phase 2: Copy file from pod to host using oc cp
+  Log "copying from pod to host: ${podTempFile} → ${outputPath}"
+  if ! oc cp "${ns}/${guestfsPod}:${podTempFile}" "${outputPath}" -c "${guestfsContainer}" 2>>"${extractionLog}"; then
+    Log "WARN: oc cp failed for ${windowsPath}"
+    Oc exec -n "${ns}" "${guestfsPod}" -c "${guestfsContainer}" -- rm -f "${podTempFile}" 2>/dev/null || true
+    return 1
+  fi
+
+  # Cleanup pod temp file
+  Oc exec -n "${ns}" "${guestfsPod}" -c "${guestfsContainer}" -- rm -f "${podTempFile}" 2>/dev/null || true
+
+  # Verify extracted file is not empty on host
+  if [ ! -s "${outputPath}" ]; then
+    rm -f "${outputPath}"
+    Log "WARN: extracted file is empty: ${windowsPath}"
+    return 1
+  fi
+
+  chmod 0600 "${outputPath}"
+  Log "extracted ${windowsPath} → guestFS${unixPath} ($(du -h "${outputPath}" | cut -f1))"
+  return 0
+}
+
+# Create guestfs-ntfs extraction pod using public quay.io image (NTFS support via oadp-vmfr-access)
+# Uses same security context as verified working pod: runAsNonRoot:true, fsGroup, seccompProfile
+Log "creating guestfs-ntfs pod for NTFS artifact extraction (using quay.io/konveyor/oadp-vmfr-access)"
+
+# Pod naming: use suffixed name to allow concurrent extractions
+typeset guestfsSuffix=''; guestfsSuffix="$(date -u +%s)-$$"; typeset guestfsPod="guestfs-ntfs-${guestfsSuffix}"
+typeset guestfsContainer="libguestfs"
+typeset guestfsImage="${BSOD_DET__GUESTFS__NTFS_IMAGE:-quay.io/konveyor/oadp-vmfr-access:latest}"
+
+# Create guestfs-ntfs pod with block device attachment
+# Security: matches verified working pod (oadp-vmfr-access)
+#   - fsGroup: 1000800000 (restricted-v2 SCC assigned UID)
+#   - runAsNonRoot: true
+#   - seccompProfile: RuntimeDefault
+#   - allowPrivilegeEscalation: false, capabilities drop ALL
+# Backend: direct with force_tcg (software QEMU, works on any node without KVM requirements)
+jq -n --arg name "${guestfsPod}" --arg ns "${ns}" --arg image "${guestfsImage}" --arg pvc "${guestPvc}" \
+  '{apiVersion:"v1",kind:"Pod",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-guestfs-extraction"}},spec:{restartPolicy:"Never",automountServiceAccountToken:false,securityContext:{runAsNonRoot:true,fsGroup:1000800000,seccompProfile:{type:"RuntimeDefault"}},nodeSelector:{"kubernetes.io/arch":"amd64"},containers:[{name:"libguestfs",image:$image,imagePullPolicy:"Always",command:["/bin/bash","-c","exec tail -f /dev/null"],env:[{name:"LIBGUESTFS_BACKEND",value:"direct"},{name:"LIBGUESTFS_BACKEND_SETTINGS",value:"force_tcg"},{name:"LIBGUESTFS_TMPDIR",value:"/tmp/guestfs"},{name:"LIBGUESTFS_CACHEDIR",value:"/tmp/guestfs"},{name:"HOME",value:"/home/guestfs"}],securityContext:{allowPrivilegeEscalation:false,capabilities:{drop:["ALL"]}},volumeDevices:[{name:"guest-disk",devicePath:"/dev/vda"}],volumeMounts:[{name:"guestfs-tmp",mountPath:"/tmp/guestfs"},{name:"guestfs-home",mountPath:"/home/guestfs"}],workingDir:"/tmp/guestfs"}],volumes:[{name:"guest-disk",persistentVolumeClaim:{claimName:$pvc,readOnly:true}},{name:"guestfs-tmp",emptyDir:{}},{name:"guestfs-home",emptyDir:{}}]}}' | Oc apply -f - 2>/dev/null >>"${extractionLog}"
+
+podCreated=1; WaitJsonPath pod "${guestfsPod}" '{.status.phase}' Running 180 || { RecordError extraction-pod "guestfs-ntfs pod '${guestfsPod}' startup timed out"; exit 1; }
+
+# Verify guestfish is available and can list filesystems
+Log "verifying guestfs-ntfs pod functionality..."
+Oc exec -n "${ns}" "${guestfsPod}" -c "${guestfsContainer}" -- \
+  guestfish --ro -a /dev/vda run : list-filesystems >>"${extractionLog}" 2>&1 || { RecordError extraction-pod 'guestfish not available or block device not accessible'; exit 1; }
+Log "guestfs-ntfs pod ready for extraction"
 
 # Track which artifact types were successfully extracted (at least one dump and optionally event logs)
 typeset dumpOk=0; typeset evtxOk=0
-Log "mounting Windows NTFS filesystem..."
-MountNTFS || { RecordError extraction-pod 'failed to mount NTFS filesystem'; exit 1; }
+Log "accessing Windows NTFS filesystem via guestfish..."
 
-# Broad case-insensitive scan for crash dump files across the entire C: drive.
-# Matches ANY file where:
-#   - extension is .dmp or .dump (any case), OR
-#   - filename contains "memory" or "minidump" (any case, any extension)
-# Scans all known Windows dump locations.
-Log "scanning C: drive for crash dump files (case-insensitive name+extension match)..."
-# Also extract DedicatedDump.sys directly — pre-allocated by configure-dumps.ps1, written
-# during BSOD when CrashDumpEnabled=7. Pagefile is unavailable in KVM VMs with balloon driver,
-# so DedicatedDump.sys is the primary on-disk crash dump artifact.
-if ReadNTFSFile 'C:\DedicatedDump.sys' "${outDir}/DedicatedDump.dmp" dump 0 0; then
-  dumpOk=1; Log "extracted DedicatedDump.sys (Windows automatic crash dump)"
+# Primary dump artifact comes from vm-memory-windows.dmp (virtctl memory-dump via elf2dmp)
+# On-disk dumps (Minidump, DedicatedDump.sys) are either not created (balloon driver blocks pagefile)
+# or not extractable via ntfscat (large file timeout). See INVESTIGATION.md for full analysis.
+Log "primary dump artifact from elf2dmp (vm-memory-windows.dmp) — skipping on-disk dump scan"
+dumpOk=1
+
+# Discover NTFS partitions dynamically and extract files while preserving directory structure
+Log "discovering NTFS partitions..."
+typeset -a ntfsPartitions; while IFS= read -r partition; do
+  ntfsPartitions+=("${partition}")
+  Log "found NTFS partition: ${partition}"
+done < <(DiscoverNTFSPartitions)
+
+# Target .evtx files to search for across all partitions
+typeset -a evtxTargets=(
+  '/Windows/System32/winevt/Logs/System.evtx'
+  '/Windows/System32/winevt/Logs/Application.evtx'
+)
+
+# Comprehensive search: list all .evtx files on each partition before extraction
+# This ensures we find all EventLog files regardless of location
+Log "searching for .evtx files across all NTFS partitions..."
+typeset -a foundEvtxFiles=()
+
+if ((${#ntfsPartitions[@]} > 0)); then
+  for partition in "${ntfsPartitions[@]}"; do
+    Log "scanning partition ${partition} for .evtx files..."
+    # List all .evtx files on this partition
+    typeset evtxList
+    evtxList=$(Oc exec -n "${ns}" "${guestfsPod}" -c "${guestfsContainer}" -- \
+      bash -c "guestfish --ro -a /dev/vda run : mount-ro '${partition}' / : find / -name '*.evtx' : umount-all" 2>>"${extractionLog}") || true
+
+    # Parse found files and track them
+    while IFS= read -r evtxFile; do
+      [ -z "${evtxFile}" ] && continue
+      Log "found .evtx file on ${partition}: ${evtxFile}"
+      foundEvtxFiles+=("${partition}|${evtxFile}")
+    done <<< "${evtxList}"
+  done
+
+  # Log summary of discovered files
+  if ((${#foundEvtxFiles[@]} > 0)); then
+    Log "discovered ${#foundEvtxFiles[@]} .evtx file(s) across partitions"
+  else
+    Log "WARN: no .evtx files found in any partition"
+  fi
+
+  # Extract all discovered .evtx files
+  Log "extracting all discovered .evtx files..."
+  for partFile in "${foundEvtxFiles[@]}"; do
+    IFS='|' read -r partition evtxFile <<< "${partFile}"
+    Log "extracting from ${partition}: ${evtxFile}"
+    if ExtractNTFSFile "${partition}" "C:${evtxFile}" "${outDir}"; then
+      evtxOk=1
+    fi
+  done
+
+  # Also attempt extraction from standard locations (fallback)
+  Log "attempting extraction from standard EventLog locations..."
+  for partition in "${ntfsPartitions[@]}"; do
+    for filePath in "${evtxTargets[@]}"; do
+      # Skip if already extracted
+      if grep -q "${filePath}" <<< "${foundEvtxFiles[@]}" 2>/dev/null; then
+        Log "skipping ${filePath} — already extracted from ${partition}"
+        continue
+      fi
+
+      Log "attempting: ${partition}${filePath}"
+      if ExtractNTFSFile "${partition}" "C:${filePath}" "${outDir}"; then
+        evtxOk=1
+      fi
+    done
+  done
+
+  # Create EventLogs symlink for backward compatibility
+  if [ -d "${outDir}/guestFS/Windows/System32/winevt/Logs" ]; then
+    mkdir -p "${outDir}/EventLogs"
+    ln -sf ../guestFS/Windows/System32/winevt/Logs/*.evtx "${outDir}/EventLogs/" 2>/dev/null || true
+  fi
+else
+  Log "WARN: no NTFS partitions discovered — skipping file extraction"
 fi
-typeset -a _scanDirs=('/' '/Windows' '/Windows/Minidump' '/Temp' '/Users')
-# Combined grep: .dmp/.dump extension OR "memory" anywhere in filename
-# Note: "minidump" pattern removed — matches the Minidump directory itself, not files
-typeset _dumpPattern='\.[Dd][Mm][Pp]$\|\.[Dd][Uu][Mm][Pp]$\|[Mm][Ee][Mm][Oo][Rr][Yy]'
-typeset _allFoundDumps=''
-for _dir in "${_scanDirs[@]}"; do
-  typeset _found; _found="$(FindNTFSFiles "${_dir}" "${_dumpPattern}" 2>/dev/null || true)"
-  [[ -n "${_found}" ]] && _allFoundDumps+="${_found}"$'\n'
-done
-# Deduplicate by basename and extract each found file
-typeset _seenDumps=''
-while IFS= read -r dumpPath; do
-  [[ -n "${dumpPath}" ]] || continue
-  typeset dumpBase; dumpBase="$(basename "${dumpPath}")"
-  [[ "${_seenDumps}" == *"|${dumpBase}|"* ]] && continue
-  _seenDumps+="|${dumpBase}|"
-  Log "found dump: C:${dumpPath}"
-  # Files from Minidump directory go to Minidump/ subdir; everything else to run root
-  typeset _dumpDest="${outDir}/${dumpBase}"
-  [[ "${dumpPath}" =~ [Mm]inidump/ ]] && _dumpDest="${outDir}/Minidump/${dumpBase}"
-  if ReadNTFSFile "C:${dumpPath}" "${_dumpDest}" dump 0 0; then dumpOk=1; fi
-done <<<"${_allFoundDumps}"
-[[ "${dumpOk}" == 1 ]] || Log "no crash dump files found on C: drive — vm-memory-windows.dmp from elf2dmp is the primary dump artifact"
-ReadNTFSFile 'C:\Windows\System32\winevt\Logs\System.evtx' "${outDir}/EventLogs/System.evtx" evtx && evtxOk=1
-ReadNTFSFile 'C:\Windows\System32\winevt\Logs\Application.evtx' "${outDir}/EventLogs/Application.evtx" evtx 0 || true
-((dumpOk)) || Log "WARN: no .DMP found on disk — dump was written below filesystem (kernel/filtered mode); vm-memory-windows.dmp from elf2dmp is the primary dump artifact"
-((evtxOk)) || Log "WARN: System.evtx not exported"
+
+# Log final status
+if ((evtxOk)); then
+  Log "✅ EventLog files extracted successfully"
+else
+  Log "WARN: no EventLog files could be extracted from any partition"
+fi
 
 typeset parseStatus=0
 # Skip dump parsing if parse-dump-header.json already exists from watch-crash.sh (elf2dmp conversion)
@@ -241,7 +324,7 @@ else
 fi
 if ((parseStatus != 0)) || ! jq -e '.ok == true' "${outDir}/parse-dump-header.json" >/dev/null; then RecordError dump-parse 'dump parser failed or reported semantic failure'; exit 1; fi
 typeset -a evtxFiles=("${outDir}/EventLogs/System.evtx"); [[ -s "${outDir}/EventLogs/Application.evtx" ]] && evtxFiles+=("${outDir}/EventLogs/Application.evtx")
-if RunTimed 120 "${extractEvtxBin}" --data-dir "${BSOD_DATA_DIR:-$(cd "${scriptDir}/../../data" && pwd)}" "${evtxFiles[@]}" > "${outDir}/events.json" 2>>"${extractionLog}"; then
+if RunTimed 120 "${extractEvtxBin}" --data-dir "${BSOD_DET__DATA__DIR:-$(cd "${scriptDir}/../../data" && pwd)}" "${evtxFiles[@]}" > "${outDir}/events.json" 2>>"${extractionLog}"; then
   if jq -e '.ok == true' "${outDir}/events.json" >/dev/null 2>&1; then
     Log "EVTX parsed successfully"
   else

@@ -7,13 +7,13 @@ umask 077
 # Parse input: crash type (0x01-0x09 from NotMyFault), VM name, and namespace
 typeset crashType="${1:-0x01}"; typeset vm="${GA_VM:-win2022-vm-hjoshi1}"; typeset ns="${GA_NS:-windows-bsod}"
 # Storage configuration: evidence root (mounted PVC), volume kind, and storage identity
-typeset evidenceRoot="${EVIDENCE_DIR:-/mnt/persistent-bsod-evidence}"; typeset evidenceKind="${BSOD_EVIDENCE_VOLUME_KIND:-pvc}"
-typeset evidenceId="${BSOD_EVIDENCE_STORAGE_ID:-shared-bsod-evidence}"; typeset memoryPvc="${BSOD_MEMORY_DUMP_PVC:-win2022-vm-hjoshi1-memdump}"
+typeset evidenceRoot="${BSOD_DET__EVIDENCE__DIR:-/mnt/persistent-bsod-evidence}"; typeset evidenceKind="${BSOD_EVIDENCE_VOLUME_KIND:-pvc}"
+typeset evidenceId="${BSOD_DET__EVIDENCE__STORAGE_ID:-shared-bsod-evidence}"; typeset memoryPvc="${BSOD_DET__MEMORY__DUMP_PVC:-win2022-vm-hjoshi1-memdump}"
 # Kubernetes storage classes and container image for extraction pod
-typeset snapClass="${BSOD_SNAPSHOT_CLASS:-ocs-storagecluster-rbdplugin-snapclass}"; typeset recoveryImage="${BSOD_RECOVERY_IMAGE:-image-registry.openshift-image-registry.svc:5000/windows-bsod/bsod-recovery:latest@sha256:4f46353f8e63ef419b66b9828b4771fe0c2c692c6fe6e6a49b5d57153b6edb76}"
+typeset snapClass="${BSOD_DET__SNAPSHOT__CLASS:-ocs-storagecluster-rbdplugin-snapclass}"; typeset recoveryImage="${BSOD_RECOVERY_IMAGE:-image-registry.openshift-image-registry.svc:5000/windows-bsod/bsod-recovery:latest@sha256:4f46353f8e63ef419b66b9828b4771fe0c2c692c6fe6e6a49b5d57153b6edb76}"
 # Timeouts: how long to wait for watcher readiness and preflight validation
-typeset readyTimeout="${BSOD_READY_TIMEOUT:-300}"
-typeset preflightTimeout="${BSOD_PREFLIGHT_TIMEOUT:-300}"
+typeset readyTimeout="${BSOD_DET__READY__TIMEOUT:-300}"
+typeset preflightTimeout="${BSOD_DET__PREFLIGHT__TIMEOUT:-300}"
 # Directory structure: script location, app root, host scripts location
 typeset scriptDir=''; scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 typeset appDir=''; appDir="$(cd "${scriptDir}/../../.." && pwd)"; typeset hostDir="${appDir}/src/scripts/host"

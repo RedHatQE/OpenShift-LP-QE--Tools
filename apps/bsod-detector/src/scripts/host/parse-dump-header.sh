@@ -26,7 +26,7 @@ set -euxo pipefail; shopt -s inherit_errexit
 # Determine script and repository root paths for file resolution
 typeset scriptDir; scriptDir="$(cd "$(dirname "$0")" && pwd)"
 typeset repoRoot; repoRoot="$(cd "${scriptDir}/../../.." && pwd)"
-typeset codesFile="${BSOD_CODES_FILE:-${repoRoot}/src/data/bugcheck-codes.json}"
+typeset codesFile="${BSOD_DET__CODES__FILE:-${repoRoot}/src/data/bugcheck-codes.json}"
 
 # Helper function definitions
 # Die — print a fatal error to stderr and exit.
