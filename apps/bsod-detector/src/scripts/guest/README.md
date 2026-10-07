@@ -8,15 +8,26 @@ These scripts configure Windows crash dump settings and manage pre-test/post-tes
 
 ### `configure-dumps.ps1`
 
-**Purpose**: Configure Windows crash dump settings for BSOD detection.
+**Purpose**: Configure Windows crash dump settings for BSOD detection and EventLog recording.
 
-**Responsibilities**:
-- Set CrashDumpEnabled registry value (determines what gets dumped)
-- Set AutoReboot flag (0 = stay at BSOD screen for capture)
-- Set DumpFile path (optional custom dump location)
-- Create DedicatedDump.sys pre-allocated dump file (optional)
+**Primary Responsibilities**:
+1. **AutoReboot=0** — Most critical — prevents VM reboot after BSOD so detection can capture the crash state
+2. **EventLog recording** — Enables System.evtx to capture crash events and timestamps
+3. **DedicatedDump.sys** — Safety measure to prevent Windows from trying to write to pagefile.sys (blocked by VirtIO Balloon)
+
+**Additional Responsibilities**:
+- Set CrashDumpEnabled registry value (determines dump behavior)
+- Set DumpFile path (custom dump location)
+- Create DedicatedDump.sys pre-allocated file
 - Verify configuration was applied correctly
 - Report current crash dump state
+
+**What Gets Extracted vs What Doesn't**:
+- ✅ **System.evtx** (7.1MB) — Extracted successfully, contains crash events
+- ✅ **Application.evtx** (5.1MB) — Extracted successfully, contains app-level crash events
+- ✅ **vm-memory-windows.dmp** (16GB) — Captured via `virtctl memory-dump`, contains full RAM
+- ❌ **Minidump** (256KB) — Cannot be extracted (VirtIO Balloon blocks pagefile.sys creation, minidump has nowhere to write)
+- ❌ **DedicatedDump.sys** (16GB) — Not extracted (redundant with vm-memory-windows.dmp which is more complete)
 
 **Execution**:
 ```powershell
@@ -83,7 +94,13 @@ For BSOD detector pipeline, we use:
 }
 ```
 
-This creates a 16GB DedicatedDump.sys file so Windows doesn't depend on pagefile.sys (which is blocked by KVM balloon driver).
+**Why each setting**:
+- **CrashDumpEnabled=11**: Configures Windows to attempt writing a dump (though minidump won't succeed due to pagefile blocker)
+- **AutoReboot=0**: ⭐ CRITICAL — Keeps VM frozen at BSOD so `watch-crash.sh` can detect it via vmi.status.guestOSInfo disappearance
+- **DumpFile + DedicatedDump.sys (16GB)**: Safety measure — gives Windows a fallback location to attempt writing, prevents errors when pagefile.sys unavailable
+- **Result**: Crash is detected reliably, EventLogs are recorded properly, Windows doesn't error out
+
+**Note**: We DON'T extract the DedicatedDump.sys file itself — it's just a safety fallback. Our actual dump comes from `virtctl memory-dump` (16GB vm-memory-windows.dmp) which is more complete.
 
 ---
 
@@ -185,19 +202,38 @@ HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl\
 - `HKLM:\SYSTEM\CurrentControlSet\Services\VirtIO` — KVM drivers
 - `HKLM:\SYSTEM\CurrentControlSet\Services\VirtIOBalloon` — Memory balloon driver
 
-## Known Issues & Workarounds
+## Known Issues & Architectural Blockers
+
+### Blocker: DedicatedDump.sys Never Extracted
+
+**Situation**:
+- We configure `CrashDumpEnabled=11` with `DedicatedDump.sys` (16GB pre-allocated)
+- Windows successfully writes the dump to C:\DedicatedDump.sys during BSOD
+- **BUT**: We never extract it
+
+**Why**:
+- `virtctl memory-dump` captures full 16GB RAM dump at BSOD moment → `vm-memory-windows.dmp`
+- DedicatedDump.sys contains the same data (kernel memory) but is redundant
+- Extracting both would be wasteful (32GB transfer for same information)
+- We chose virtctl dump because it's more reliable and complete
+
+**Result**: DedicatedDump.sys is configured for safety (gives Windows a write location) but never extracted
+
+### Other Known Issues & Workarounds
 
 **Issue**: Pagefile.sys never created (VirtIO Balloon blocks it)
 - **Workaround**: Use DedicatedDump.sys instead (`CrashDumpEnabled=11`)
 - **Config**: Pre-allocate 16GB file at C:\DedicatedDump.sys
+- **Note**: This prevents Windows from erroring, even though we don't extract it
 
 **Issue**: AutoReboot doesn't stick (registry reverts)
 - **Workaround**: Disable Windows Update that resets this value
 - **Config**: Force `AutoReboot=0` in configure-dumps.ps1
 
-**Issue**: DedicatedDump.sys not written during BSOD
-- **Cause**: CrashDumpEnabled must be set BEFORE the BSOD occurs
-- **Solution**: Ensure configure-dumps.ps1 runs successfully in preflight
+**Issue**: Minidump never created (pagefile.sys unavailable)
+- **Cause**: CrashDumpEnabled=0x01 would create minidump, but pagefile.sys blocked by VirtIO Balloon
+- **Impact**: Minidump never appears on disk to extract
+- **Solution**: Use `CrashDumpEnabled=11` (attempts full dump), extract via `virtctl memory-dump` instead
 
 **Issue**: Registry changes require reboot
 - **Workaround**: Some settings take effect immediately via group policy refresh
