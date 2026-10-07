@@ -46,6 +46,215 @@ Build a complete BSOD detector for **RHOV/KubeVirt** that:
 
 ---
 
+## Architecture
+
+### High-Level System Design
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     CI/Orchestration Host                        │
+│                    (trigger-bsod-intentional.sh)                 │
+└────────────────────────────┬────────────────────────────────────┘
+                             │
+                ┌────────────┼────────────┐
+                │            │            │
+        ┌───────▼────┐  ┌────▼──────┐  ┌─▼──────────┐
+        │  Preflight │  │  Watch    │  │ Extraction │
+        │   Validation│  │  (BSOD    │  │  (Offline  │
+        │   (preflight│  │  Detection)   │  NTFS)     │
+        │   -rhov.sh) │  │(watch-   │  │recover-  │
+        └────────────┘  │crash.sh) │  │natural-  │
+                        └──────────┘  │crash.sh) │
+                                      └────┬─────┘
+                                           │
+        ┌──────────────────────────────────┼──────────────────────┐
+        │                                  │                      │
+   ┌────▼──────────┐         ┌────────────▼────────┐  ┌──────────▼──┐
+   │   Guest VM    │         │  OpenShift/KubeVirt  │  │   Evidence  │
+   │(Windows BSOD) │         │                      │  │   Storage   │
+   │               │         │  ┌────────────────┐  │  │  (PVC)      │
+   │ - EventLogs   │         │  │ guestfs-ntfs   │  │  │             │
+   │ - Crash dump  │         │  │ pod (extract)  │  │  │ 30GB+       │
+   │ - Screenshots │         │  └────────────────┘  │  │ artifacts   │
+   └───────────────┘         │                      │  └─────────────┘
+                             │  ┌────────────────┐  │
+                             │  │  virt-launcher │  │
+                             │  │  (qemu-ga)     │  │
+                             │  └────────────────┘  │
+                             └──────────────────────┘
+
+Flows: 
+- Host → Guest: guest-agent.py (PowerShell tunnel via qemu-guest-agent)
+- Host ← Guest: Memory dump (virtctl memory-dump)
+- Host ← VM Disk: EventLogs (guestfish via pod)
+- Offline Analysis: volatility3 on captured dumps
+```
+
+### Component Responsibilities
+
+| Component | Role | Technology |
+|---|---|---|
+| **Orchestrator** | Main entry point, pipeline control, cleanup | `trigger-bsod-intentional.sh` |
+| **Preflight** | VM validation, crash dump config, qemu-ga check | `preflight-rhov.sh`, `guest-agent.py` |
+| **Detection** | BSOD detection, memory capture, crash analysis | `watch-crash.sh`, `virtctl memory-dump`, `volatility3` |
+| **Extraction** | Offline NTFS artifact extraction (EventLogs) | `recover-natural-crash.sh`, `guestfish`, `oc cp` |
+| **Guest Config** | Windows crash dump settings, EventLog recording | `configure-dumps.ps1`, `clear-dumps.ps1` |
+| **Analysis** | Memory forensics, bugcheck code extraction | `volatility3`, `parse-dump-header.sh`, `extract-evtx.py` |
+| **Validation** | Artifact verification, checksums, summary | `reliability.py` |
+
+---
+
+## Workflow
+
+### Complete BSOD Detection & Extraction Pipeline
+
+**Step 1: Host Initiates Test**
+```bash
+GA_VM="win2022-vm-hjoshi1" GA_NS="windows-bsod" \
+  ./trigger-bsod-intentional.sh 0x01
+```
+
+**Step 2: Preflight Validation** (preflight-rhov.sh)
+- ✅ Verify VM is Running
+- ✅ Check qemu-guest-agent responsive
+- ✅ Validate crash dump settings via guest-agent.py
+  - Executes `configure-dumps.ps1` in Windows
+  - Sets CrashDumpEnabled=11, AutoReboot=0
+  - Creates 16GB DedicatedDump.sys
+- ✅ Verify evidence storage PVC mounted
+- ✅ Generate recovery-metadata.json (VM config, storage details)
+
+**Step 3: Background BSOD Monitoring Starts** (watch-crash.sh)
+- Poll VM status every 5 seconds
+- Monitor: vmi.status.guestOSInfo disappearance (BSOD indicator)
+- Ready to capture when BSOD occurs
+
+**Step 4: Intentional BSOD Injection**
+- guest-agent.py uploads NotMyFault.exe to Windows VM
+- Executes: `notmyfault.exe /crash 0x01` (triggers BSOD)
+- VM immediately hits blue screen, stays frozen (AutoReboot=0)
+
+**Step 5: BSOD Detection & Memory Capture** (watch-crash.sh)
+- Detects BSOD via vmi.status.guestOSInfo disappearance
+- Executes `virtctl memory-dump` → captures full 16GB RAM
+- Converts ELF dump to Windows PAGEDU64 format via elf2dmp
+- Takes VNC screenshot of BSOD screen
+- Stops VM with `virtctl stop`
+
+**Step 6: Volatility3 Analysis** (watch-crash.sh)
+- Runs memory forensics on captured dump:
+  - `windows.info` (OS/kernel version)
+  - `windows.crashinfo` (crash context)
+  - `windows.driverscan` (loaded drivers at crash)
+  - `windows.dumpfiles` (dump file inventory)
+
+**Step 7: Offline NTFS Artifact Extraction** (recover-natural-crash.sh)
+- **Phase 0**: Dynamic partition discovery
+  - `guestfish list-filesystems` → find all NTFS partitions
+- **Phase 1**: File discovery
+  - `guestfish find / -name '*.evtx'` → locate EventLog files
+- **Phase 2**: Two-phase extraction
+  - Create guestfs-ntfs pod (quay.io/konveyor/oadp-vmfr-access:latest)
+  - guestfish mounts NTFS partition read-only
+  - Downloads EventLogs to pod `/tmp/`
+  - `oc cp` transfers files to host evidence directory
+- **Phase 3**: EventLog parsing
+  - extract-evtx.py converts binary EVTX to JSON
+  - Produces System.json, Application.json with event details
+
+**Step 8: Artifact Analysis** (parse-dump-header.sh)
+- Extract bugcheck code from vm-memory-windows.dmp header
+- Look up bugcheck name from crash-control.json database
+- Generate parse-dump-header.json with crash details
+
+**Step 9: Validation & Summary** (reliability.py)
+- Validate all artifact formats (EVTX, DMP, PNG, JSON)
+- Verify required artifacts present
+- Generate checksums (SHA256) for integrity verification
+- Create evidence-summary.json report
+- Track errors in stage-errors.jsonl
+
+**Step 10: Cleanup & Exit**
+- Delete guestfs-ntfs extraction pod
+- Remove temp files, cleanup locks
+- Return exit code (0=success, 1=failure)
+
+### Data Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Step 1: Test Initialization                                │
+│  Host: trigger-bsod-intentional.sh                           │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+┌────────────────▼────────────────────────────────────────────┐
+│  Step 2: Preflight Validation (preflight-rhov.sh)            │
+│  • VM state check                                            │
+│  • guest-agent.py tunnel to Windows                          │
+│  • configure-dumps.ps1 execution                             │
+│  • recovery-metadata.json generation                         │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+┌────────────────▼────────────────────────────────────────────┐
+│  Step 3-4: BSOD Injection & Monitoring (watch-crash.sh)     │
+│  • Start background polling                                 │
+│  • guest-agent.py injects NotMyFault.exe /crash 0x01        │
+│  • VM hits blue screen, stays frozen (AutoReboot=0)         │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+┌────────────────▼────────────────────────────────────────────┐
+│  Step 5-6: Memory Capture & Volatility (watch-crash.sh)     │
+│  • virtctl memory-dump → 16GB dump                           │
+│  • elf2dmp conversion → vm-memory-windows.dmp                │
+│  • VNC screenshot of BSOD                                   │
+│  • volatility3 analysis (info, crashinfo, driverscan, etc)  │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+┌────────────────▼────────────────────────────────────────────┐
+│  Step 7: Offline NTFS Extraction (recover-natural-crash.sh) │
+│  • guestfs-ntfs pod created                                 │
+│  • guestfish mount-ro partition                             │
+│  • Two-phase: download → oc cp transfer                     │
+│  • extract-evtx.py: EVTX → JSON conversion                  │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+┌────────────────▼────────────────────────────────────────────┐
+│  Step 8-9: Analysis & Validation                             │
+│  • parse-dump-header.sh: Extract bugcheck code              │
+│  • reliability.py: Validate artifacts                       │
+│  • Generate checksums, summary report                       │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+┌────────────────▼────────────────────────────────────────────┐
+│  Step 10: Evidence Storage                                   │
+│  /mnt/persistent-bsod-evidence/{TIMESTAMP}/                 │
+│  ├── vm-memory-windows.dmp (16GB)                           │
+│  ├── vm-memory.elf.tar.gz (800MB)                           │
+│  ├── guestFS/Windows/System32/winevt/Logs/                  │
+│  │   ├── System.evtx (7.1MB)                                │
+│  │   └── Application.evtx (5.1MB)                           │
+│  ├── EventLogs/ (JSON parsed)                               │
+│  ├── volatility-*.txt (analysis)                            │
+│  ├── parse-dump-header.json (bugcheck)                      │
+│  ├── evidence-summary.json (report)                         │
+│  └── ... (40+ files, 30GB+ total)                           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Timing & Concurrency
+
+| Phase | Duration | Notes |
+|---|---|---|
+| Preflight validation | ~30-60s | Sequential, must complete before crash |
+| BSOD injection | <5s | Immediate once preflight passes |
+| BSOD detection | 5-30s | Polling every 5 seconds, timeout configurable |
+| Memory capture | 5-15min | 16GB dump transfer, depends on storage I/O |
+| Volatility analysis | 5-10min | Memory forensics on 16GB dump |
+| NTFS extraction | 5-10min | guestfish mount, two-phase transfer |
+| Total pipeline | 30-60min | All steps sequential, no parallelization |
+
+---
+
 ## Artifact Extraction: Two-Phase guestfish Approach
 
 ### Overview
