@@ -8,11 +8,11 @@ records reach a **centralized, immutable** store.
 Every interaction emits three correlated audit events (linked by
 `interaction_id`), covering exactly the required lifecycle:
 
-| Requirement | Event | Emitted from | Key fields |
-|---|---|---|---|
-| **Interaction trace** — the user prompt / system trigger | `interaction_received` | `handler.Handle` (Slack), `cli/main` (CLI) | `interaction_id`, `source` (`slack`/`cli`), `actor` (Slack user ID / OS user), `channel`, `trigger` (the Prow URL) |
-| **Tools / data sources queried** | `tool_query` (one per query) | `analyzer.initializeSession`, `analyzer.doAnalysis` | `interaction_id`, `target` (`ship-help-mcp`), `operation` (`initialize` / `tools/call`), `tool` (`ask_persona`), `persona` (e.g. `<persona>`) |
-| **AI action / outcome** | `interaction_outcome` | `handler.analyzeAndRespond`, `cli/main` | `interaction_id`, `status` (`success`/`failed`/`delivery_failed`/`rejected`), `duration_ms`, `response_chars`, `response_sha256`, `error`/`reason` |
+| Requirement                                              | Event                        | Emitted from                                        | Key fields                                                                                                                                         |
+|----------------------------------------------------------|------------------------------|-----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Interaction trace** — the user prompt / system trigger | `interaction_received`       | `handler.Handle` (Slack), `cli/main` (CLI)          | `interaction_id`, `source` (`slack`/`cli`), `actor` (Slack user ID / OS user), `channel`, `trigger` (the Prow URL)                                 |
+| **Tools / data sources queried**                         | `tool_query` (one per query) | `analyzer.initializeSession`, `analyzer.doAnalysis` | `interaction_id`, `target` (`ship-help-mcp`), `operation` (`initialize` / `tools/call`), `tool` (`ask_persona`), `persona` (e.g. `<persona>`)      |
+| **AI action / outcome**                                  | `interaction_outcome`        | `handler.analyzeAndRespond`, `cli/main`             | `interaction_id`, `status` (`success`/`failed`/`delivery_failed`/`rejected`), `duration_ms`, `response_chars`, `response_sha256`, `error`/`reason` |
 
 All events are single-line JSON tagged `"log_type":"audit"`,
 `"component":"prow-analyzer"`.

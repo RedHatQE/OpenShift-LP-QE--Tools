@@ -16,22 +16,24 @@ APP_DIR = apps/prow-analyzer
 # interpolation, so `:` no-ops double as progress messages.
 build:
 	{ set -euxo pipefail; shopt -s inherit_errexit;\
-	    : 'Building container image: $(IMAGE_FULL)';\
+	    : 'Building container image: $(IMAGE_NAME) (also tagged $(IMAGE_LATEST))';\
 	    podman build $(BUILDFLAGS) -t '$(IMAGE_NAME)' -t '$(IMAGE_LATEST)' -f Dockerfile '../../../$(APP_DIR)';\
 	}
 
-# Push container image to registry
+# Push container image to registry. Push both the requested tag and :latest so a
+# tagged build (e.g. IMAGE_TAG=v1.0.0) also advances :latest registry-side.
 push: build
 	{ set -euxo pipefail; shopt -s inherit_errexit;\
-	    : 'Pushing container image: $(IMAGE_FULL)';\
-	    podman push '$(IMAGE_FULL)';\
+	    : 'Pushing container images: $(IMAGE_NAME) and $(IMAGE_LATEST)';\
+	    podman push '$(IMAGE_NAME)';\
+	    podman push '$(IMAGE_LATEST)';\
 	}
 
-# Clean local image
+# Clean local images
 clean:
 	{ set -euxo pipefail; shopt -s inherit_errexit;\
-	    : 'Removing local image: $(IMAGE_FULL)';\
-	    podman rmi '$(IMAGE_FULL)' || true;\
+	    : 'Removing local images: $(IMAGE_NAME) and $(IMAGE_LATEST)';\
+	    podman rmi '$(IMAGE_NAME)' '$(IMAGE_LATEST)' || true;\
 	}
 
 # Help
@@ -40,7 +42,7 @@ help:
 		'Prow Analyzer Container Build' \
 		'' \
 		'Available targets:' \
-		'  build  - Build container image (default: $(IMAGE_FULL))' \
+		'  build  - Build container image (default: $(IMAGE_NAME), also tagged $(IMAGE_LATEST))' \
 		'  push   - Build and push container image to registry' \
 		'  clean  - Remove local container image' \
 		'' \

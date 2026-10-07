@@ -44,17 +44,17 @@ const defaultPrompt = "Analyze this Prow CI failure in detail. Provide: (1) Root
 
 func main() {
 	var (
-		slackToken  = flag.String("slack-token", os.Getenv("PROW_AN__SLACK_BOT_TOKEN"), "Slack bot token")
-		appToken    = flag.String("app-token", os.Getenv("PROW_AN__SLACK_APP_TOKEN"), "Slack app token (for socket mode)")
-		mcpURL      = flag.String("mcp-url", os.Getenv("PROW_AN__SHIP_HELP_MCP_URL"), "Ship-help MCP URL")
-		mcpToken    = flag.String("mcp-token", os.Getenv("PROW_AN__SHIP_HELP_MCP_TOKEN"), "Ship-help MCP token")
-		channels    = flag.String("channels", os.Getenv("PROW_AN__MONITORED_CHANNELS"), "Comma-separated list of channel IDs to monitor")
-		allowedBots = flag.String("allowed-bots", os.Getenv("PROW_AN__ALLOWED_BOT_IDS"), "Comma-separated list of bot IDs (B...) whose Prow URLs should be analyzed")
-		prompt      = flag.String("prompt", envStr("PROW_AN__PROMPT_TEMPLATE", defaultPrompt), "Analysis prompt template with a {job_url} placeholder (or set PROW_AN__PROMPT_TEMPLATE)")
-		monitorAll  = flag.Bool("monitor-all", envBool("PROW_AN__MONITOR_ALL", false), "Monitor every channel the bot is a member of instead of only --channels (or set PROW_AN__MONITOR_ALL=true). Fail-closed: without this and with no --channels, no channel is monitored")
-		slackDebug  = flag.Bool("slack-debug", envBool("PROW_AN__SLACK_DEBUG", false), "Enable verbose Slack SDK and Socket Mode debug logging (or set PROW_AN__SLACK_DEBUG)")
-		mcpDebug    = flag.Bool("mcp-debug", envBool("PROW_AN__MCP_DEBUG", false), "Enable verbose MCP SSE logging that includes response payload previews (or set PROW_AN__MCP_DEBUG). Off by default for data minimization")
-		tlsInsecure = flag.Bool("tls-insecure", envBool("TLS_INSECURE_SKIP_VERIFY", false), "Skip TLS certificate verification for MCP/Prow HTTP requests (or set TLS_INSECURE_SKIP_VERIFY)")
+		slackToken  = flag.String("slack-token", os.Getenv("PROW_AN__SLACK_BOT_TOKEN"), "Slack bot token (defaults to env. var. PROW_AN__SLACK_BOT_TOKEN, if set).")
+		appToken    = flag.String("app-token", os.Getenv("PROW_AN__SLACK_APP_TOKEN"), "Slack app token for socket mode (defaults to env. var. PROW_AN__SLACK_APP_TOKEN, if set).")
+		mcpURL      = flag.String("mcp-url", os.Getenv("PROW_AN__SHIP_HELP_MCP_URL"), "Ship-help MCP URL (defaults to env. var. PROW_AN__SHIP_HELP_MCP_URL, if set).")
+		mcpToken    = flag.String("mcp-token", os.Getenv("PROW_AN__SHIP_HELP_MCP_TOKEN"), "Ship-help MCP token (defaults to env. var. PROW_AN__SHIP_HELP_MCP_TOKEN, if set).")
+		channels    = flag.String("channels", os.Getenv("PROW_AN__MONITORED_CHANNELS"), "Comma-separated list of channel IDs to monitor (defaults to env. var. PROW_AN__MONITORED_CHANNELS, if set).")
+		allowedBots = flag.String("allowed-bots", os.Getenv("PROW_AN__ALLOWED_BOT_IDS"), "Comma-separated list of bot IDs (B...) whose Prow URLs should be analyzed (defaults to env. var. PROW_AN__ALLOWED_BOT_IDS, if set).")
+		prompt      = flag.String("prompt", envStr("PROW_AN__PROMPT_TEMPLATE", defaultPrompt), "Analysis prompt template with a {job_url} placeholder (defaults to env. var. PROW_AN__PROMPT_TEMPLATE, if set).")
+		monitorAll  = flag.Bool("monitor-all", envBool("PROW_AN__MONITOR_ALL", false), "Monitor every channel the bot is a member of instead of only --channels. Fail-closed: without this and with no --channels, no channel is monitored (defaults to env. var. PROW_AN__MONITOR_ALL; set it to \"true\" to enable).")
+		slackDebug  = flag.Bool("slack-debug", envBool("PROW_AN__SLACK_DEBUG", false), "Enable verbose Slack SDK and Socket Mode debug logging (defaults to env. var. PROW_AN__SLACK_DEBUG; set it to \"true\" to enable).")
+		mcpDebug    = flag.Bool("mcp-debug", envBool("PROW_AN__MCP_DEBUG", false), "Enable verbose MCP SSE logging that includes response payload previews; off by default for data minimization (defaults to env. var. PROW_AN__MCP_DEBUG; set it to \"true\" to enable).")
+		tlsInsecure = flag.Bool("tls-insecure", envBool("TLS_INSECURE_SKIP_VERIFY", false), "Skip TLS certificate verification for MCP/Prow HTTP requests (defaults to env. var. TLS_INSECURE_SKIP_VERIFY; set it to \"true\" to enable).")
 	)
 
 	flag.Parse()
