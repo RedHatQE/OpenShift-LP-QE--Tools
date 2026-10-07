@@ -8,8 +8,8 @@ on:
       - 'image/container/prow-analyzer/**'
       - '.github/workflows/prow-analyzer--build.yaml'
   pull_request:
-    branches: *branches
-    paths: *paths
+    branches: [main]
+    paths: *prow-analyzer--path
 
 permissions:
   contents: read
