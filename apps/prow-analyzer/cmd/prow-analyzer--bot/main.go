@@ -54,7 +54,7 @@ func main() {
 		monitorAll  = flag.Bool("monitor-all", envBool("PROW_AN__MONITOR_ALL", false), "Monitor every channel the bot is a member of instead of only --channels (or set PROW_AN__MONITOR_ALL=true). Fail-closed: without this and with no --channels, no channel is monitored")
 		slackDebug  = flag.Bool("slack-debug", envBool("PROW_AN__SLACK_DEBUG", false), "Enable verbose Slack SDK and Socket Mode debug logging (or set PROW_AN__SLACK_DEBUG)")
 		mcpDebug    = flag.Bool("mcp-debug", envBool("PROW_AN__MCP_DEBUG", false), "Enable verbose MCP SSE logging that includes response payload previews (or set PROW_AN__MCP_DEBUG). Off by default for data minimization")
-		tlsInsecure = flag.Bool("tls-insecure", envBool("PROW_AN__TLS_INSECURE_SKIP_VERIFY", false), "Skip TLS certificate verification for MCP/Prow HTTP requests (or set PROW_AN__TLS_INSECURE_SKIP_VERIFY)")
+		tlsInsecure = flag.Bool("tls-insecure", envBool("TLS_INSECURE_SKIP_VERIFY", false), "Skip TLS certificate verification for MCP/Prow HTTP requests (or set TLS_INSECURE_SKIP_VERIFY)")
 	)
 
 	flag.Parse()
