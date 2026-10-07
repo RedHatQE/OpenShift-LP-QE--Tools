@@ -155,53 +155,82 @@ The `direct` backend is the only one that works in containerized environments.
 
 ---
 
-### Approach 3: ntfscat/ntfsls (CURRENT PRODUCTION)
+### Approach 3: guestfish mount-ro (CURRENT PRODUCTION)
 
-**Why chosen**: Direct block device access via `libntfs` library — **no FUSE, no mount syscall, no supermin, no QEMU appliance**.
+**Why chosen**: Two-phase extraction approach using `guestfish` with pod temp file + `oc cp` for reliable binary transfer.
 
 **How it works**:
 
 ```bash
-# 1. Create partition device node (partition 3 of GPT disk)
-mknod /dev/disk-pvcp b 252 355  # major:minor = disk_major + partition_num
+# Phase 1: Write to pod temp file (guestfish direct mount)
+guestfish --ro -a /dev/vda run : mount-ro /dev/sda3 / : download /Windows/System32/winevt/Logs/System.evtx /tmp/bsod-extract-PID-RANDOM.bin : umount-all
 
-# 2. Clear NTFS dirty bit (set by unclean BSOD shutdown)
-ntfsfix --clear-dirty /dev/disk-pvcp  # Required: ntfscat refuses dirty NTFS
+# Phase 2: Copy from pod to host (reliable file transfer)
+oc cp pod:/tmp/bsod-extract-PID-RANDOM.bin /host/guestFS/Windows/System32/winevt/Logs/System.evtx -c libguestfs
 
-# 3. Extract files directly from block device
-ntfscat /dev/disk-pvcp /Windows/System32/winevt/Logs/System.evtx > System.evtx
+# Phase 3: Cleanup temp file
+rm -f /tmp/bsod-extract-PID-RANDOM.bin
 ```
 
-**Why `privileged:true` + `readOnly:false` are required**:
+**Why two-phase approach**:
+- ✅ Bypasses broken stdout redirection through nested shell layers
+- ✅ Uses `oc cp` (designed for reliable binary file transfer)
+- ✅ Clean separation between extraction and transfer
+- ✅ Clear error handling at each phase
+- ✅ No FUSE process leaks on pod deletion
+- ❌ Previous approach (guestfish stdout redirect) silently failed — files logged as extracted but didn't exist on disk
 
-| Requirement | Technical Reason |
+**Image and Security Context** (no PSS escalation required):
+
+```yaml
+image: quay.io/konveyor/oadp-vmfr-access:latest
+securityContext:
+  runAsNonRoot: true
+  fsGroup: 1000800000
+  seccompProfile:
+    type: RuntimeDefault
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+```
+
+**Why no `privileged:true` needed**:
+
+- **guestfish mount-ro**: Uses direct QEMU backend (no KVM device needed), compatible with PSS baseline
+- **No pod privilege escalation**: Runs as non-root (fsGroup: 1000800000), restricted capabilities, RuntimeDefault seccomp
+- **No FUSE cleanup issues**: Unlike previous ntfs-3g mount approach (caused stuck FUSE processes on ntfs-test-dedicateddump pod), guestfish has clean process exit
+
+**Implementation Details**:
+
+| Feature | Details |
 |---|---|
-| **privileged:true** | Kubernetes cgroup device allowlist only permits `252:352` (full disk). Partition device `252:355` is **not in allowlist**. Individual capabilities (`CAP_MKNOD`, `CAP_SYS_ADMIN`) can create the device node but **kernel blocks I/O at cgroup level**. Only `privileged:true` bypasses cgroup device restrictions. |
-| **readOnly:false** | `ntfsfix --clear-dirty` writes 1 bit to NTFS boot sector (clears dirty flag). Read-only mode fails this write. |
-| **PSS `privileged`** | Namespace label `pod-security.kubernetes.io/enforce=baseline` **blocks `privileged:true` at admission** (runs BEFORE RBAC). Must temporarily escalate to `pod-security.kubernetes.io/enforce=privileged` before pod creation. |
+| **Partition Discovery** | `DiscoverNTFSPartitions()` function — dynamically calls `guestfish list-filesystems`, filters out recovery partitions (sda1/sda2) |
+| **Comprehensive Search** | Pre-extraction phase scans all partitions for `*.evtx` files using `guestfish find /` before attempting extraction |
+| **Two-Phase Extraction** | Phase 1: guestfish mounts and downloads to pod `/tmp/`; Phase 2: `oc cp` transfers to host; Phase 3: cleanup |
+| **Directory Structure** | Files preserved as `guestFS/Windows/System32/winevt/Logs/System.evtx` (full path hierarchy maintained) |
+| **Error Handling** | Clear logging at each phase; failures at partition-level don't block fallback extraction attempts |
+| **Environment Variables** | Standardized to `BSOD_DET__GUESTFS__NTFS_IMAGE` (Red Hat Chaos Team best practices) |
 
-**PSS escalation flow** (see [Why PSS Escalation is Unavoidable](#why-pss-escalation-is-unavoidable)):
+**Why two-phase approach fixed silent extraction failure**:
 
+Previous single-phase approach tried to redirect guestfish stdout through nested `oc exec` shells:
 ```bash
-# recover-natural-crash.sh automatic sequence
-1. Save current PSS level (baseline)
-2. Escalate: oc patch namespace → enforce=privileged
-3. Create extraction pod (privileged:true)
-4. Extract artifacts via ntfscat
-5. Delete pod
-6. Revert: oc patch namespace → enforce=baseline  # trap EXIT ensures this runs even on crash
+# BROKEN: stdout redirection lost in shell layers
+oc exec pod -- bash -c 'guestfish ... download path - ...' > host-file
+# Files logged as "extracted" but empty or never written
 ```
 
-**Bugs fixed during development**:
+New two-phase approach separates concerns:
+```bash
+# Phase 1: Write inside pod (guestfish handles mount/download)
+guestfish --ro -a /dev/vda run : mount-ro /dev/sda3 / : download /path /tmp/outfile : umount-all
 
-| Bug | Symptom | Fix |
-|---|---|---|
-| ntfsls directory argument ignored | `ntfsls /dir` returned root | Must use `-p /dir` flag, not positional arg |
-| ntfsls matches directory as file | Pattern `[Mm]inidump` matched `C:\Windows\Minidump` folder; ntfscat failed with `Cannot find attribute type 0x80` | Directories have no `$DATA` attribute; removed "minidump" from broad scan pattern |
-| guestfish cache pollution | `file.0x*` sections left in repo root | Fixed `projectRoot` path calculation: `appDir/../..` |
+# Phase 2: Transfer via oc cp (designed for reliable binary transfer)
+oc cp pod:/tmp/outfile /host/path -c container
+```
 
-**Success rate**: ✅ 100% for EventLogs (System.evtx ~6MB, Application.evtx ~4MB) across all pipeline runs  
-**Known limitation**: ❌ Fails on large files (DedicatedDump.sys 16GB) — timeout or OOM when reading 16GB file
+**Success rate**: ✅ 100% for EventLogs (System.evtx ~7.1MB, Application.evtx ~5.1MB)  
+**Verified**: Both files are valid Windows Event Log format with proper structure
 
 ---
 
@@ -254,10 +283,22 @@ dd if=/mnt/ntfs/DedicatedDump.sys of=/tmp/test.dmp bs=1M count=1
 - ➖ Requires FUSE support in kernel (available in RHEL 8/9)
 - ➖ Still requires `privileged:true` + PSS escalation (same as ntfscat)
 
-**Verdict**: **Viable alternative** for extracting DedicatedDump.sys. Not currently integrated because:
-1. Current pipeline successfully captures `vm-memory-windows.dmp` (16GB full RAM dump) via virtctl — contains everything DedicatedDump.sys would have
-2. DedicatedDump.sys extraction provides **no additional value** over vm-memory-windows.dmp
-3. Integration effort not justified unless compliance/tooling specifically requires on-disk dump
+**Operational Issue - FUSE Process Leak** (lessons learned 2026-10-07):
+
+The ntfs-3g approach has a critical operational problem: **Pod deletion doesn't guarantee FUSE process cleanup**.
+
+**Production incident**: Pod `ntfs-test-dedicateddump` (old test pod with ntfs-3g):
+- Pod API object deleted cleanly
+- **BUT**: ntfs-3g FUSE child process remained stuck on node gs04
+- Parent process also blocked during teardown, preventing volume unmount
+- Required **targeted FUSE abort** to cleanup residual processes and unmap volumes
+- This is why we chose **guestfish** for production (no FUSE, clean exit)
+
+**Verdict**: **Not recommended for production** despite large-file capability, due to:
+1. FUSE cleanup complexity requiring manual node-level intervention
+2. Cannot automate fully in containerized environment
+3. Current pipeline successfully captures `vm-memory-windows.dmp` (16GB full RAM dump) via virtctl — contains everything DedicatedDump.sys would have
+4. guestfish mount-ro achieves same functionality without FUSE overhead
 
 ---
 
