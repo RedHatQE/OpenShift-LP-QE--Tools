@@ -63,5 +63,5 @@ jobs:
       with:
         context: apps/prow-analyzer
         file: image/container/prow-analyzer/Dockerfile
-        push: ${{ github.event_name != 'pull_request' }}
+        push: ${{ github.event_name == 'push' }}
         tags: images.paas.redhat.com/ieng/app/prow-analyzer:latest
