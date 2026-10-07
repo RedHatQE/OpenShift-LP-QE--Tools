@@ -44,38 +44,38 @@ const defaultPrompt = "Analyze this Prow CI failure in detail. Provide: (1) Root
 
 func main() {
 	var (
-		slackToken  = flag.String("slack-token", os.Getenv("SLACK_BOT_TOKEN"), "Slack bot token")
-		appToken    = flag.String("app-token", os.Getenv("SLACK_APP_TOKEN"), "Slack app token (for socket mode)")
-		mcpURL      = flag.String("mcp-url", os.Getenv("SHIP_HELP_MCP_URL"), "Ship-help MCP URL")
-		mcpToken    = flag.String("mcp-token", os.Getenv("SHIP_HELP_MCP_TOKEN"), "Ship-help MCP token")
-		channels    = flag.String("channels", os.Getenv("MONITORED_CHANNELS"), "Comma-separated list of channel IDs to monitor")
-		allowedBots = flag.String("allowed-bots", os.Getenv("ALLOWED_BOT_IDS"), "Comma-separated list of bot IDs (B...) whose Prow URLs should be analyzed")
+		slackToken  = flag.String("slack-token", os.Getenv("PROW_AN__SLACK_BOT_TOKEN"), "Slack bot token")
+		appToken    = flag.String("app-token", os.Getenv("PROW_AN__SLACK_APP_TOKEN"), "Slack app token (for socket mode)")
+		mcpURL      = flag.String("mcp-url", os.Getenv("PROW_AN__SHIP_HELP_MCP_URL"), "Ship-help MCP URL")
+		mcpToken    = flag.String("mcp-token", os.Getenv("PROW_AN__SHIP_HELP_MCP_TOKEN"), "Ship-help MCP token")
+		channels    = flag.String("channels", os.Getenv("PROW_AN__MONITORED_CHANNELS"), "Comma-separated list of channel IDs to monitor")
+		allowedBots = flag.String("allowed-bots", os.Getenv("PROW_AN__ALLOWED_BOT_IDS"), "Comma-separated list of bot IDs (B...) whose Prow URLs should be analyzed")
 		prompt      = flag.String("prompt", envStr("PROW_AN__PROMPT_TEMPLATE", defaultPrompt), "Analysis prompt template with a {job_url} placeholder (or set PROW_AN__PROMPT_TEMPLATE)")
 		monitorAll  = flag.Bool("monitor-all", envBool("PROW_AN__MONITOR_ALL", false), "Monitor every channel the bot is a member of instead of only --channels (or set PROW_AN__MONITOR_ALL=true). Fail-closed: without this and with no --channels, no channel is monitored")
-		slackDebug  = flag.Bool("slack-debug", envBool("SLACK_DEBUG", false), "Enable verbose Slack SDK and Socket Mode debug logging (or set SLACK_DEBUG)")
+		slackDebug  = flag.Bool("slack-debug", envBool("PROW_AN__SLACK_DEBUG", false), "Enable verbose Slack SDK and Socket Mode debug logging (or set PROW_AN__SLACK_DEBUG)")
 		mcpDebug    = flag.Bool("mcp-debug", envBool("PROW_AN__MCP_DEBUG", false), "Enable verbose MCP SSE logging that includes response payload previews (or set PROW_AN__MCP_DEBUG). Off by default for data minimization")
-		tlsInsecure = flag.Bool("tls-insecure", envBool("TLS_INSECURE_SKIP_VERIFY", false), "Skip TLS certificate verification for MCP/Prow HTTP requests (or set TLS_INSECURE_SKIP_VERIFY)")
+		tlsInsecure = flag.Bool("tls-insecure", envBool("PROW_AN__TLS_INSECURE_SKIP_VERIFY", false), "Skip TLS certificate verification for MCP/Prow HTTP requests (or set PROW_AN__TLS_INSECURE_SKIP_VERIFY)")
 	)
 
 	flag.Parse()
 
 	// Validate required flags
 	if *slackToken == "" {
-		slog.Error("--slack-token is required (or set SLACK_BOT_TOKEN)")
+		slog.Error("--slack-token is required (or set PROW_AN__SLACK_BOT_TOKEN)")
 		os.Exit(1)
 	}
 	if *appToken == "" {
-		slog.Error("--app-token is required (or set SLACK_APP_TOKEN)")
+		slog.Error("--app-token is required (or set PROW_AN__SLACK_APP_TOKEN)")
 		os.Exit(1)
 	}
 	if *mcpURL == "" || *mcpToken == "" {
-		slog.Error("Both --mcp-url and --mcp-token are required (or set SHIP_HELP_MCP_URL and SHIP_HELP_MCP_TOKEN)")
+		slog.Error("Both --mcp-url and --mcp-token are required (or set PROW_AN__SHIP_HELP_MCP_URL and PROW_AN__SHIP_HELP_MCP_TOKEN)")
 		os.Exit(1)
 	}
 
 	// Parse monitored channels. Fail-closed: when empty and --monitor-all is not
-	// set, the bot monitors nothing. Set MONITOR_ALL=true to opt into monitoring
-	// every channel the bot is a member of.
+	// set, the bot monitors nothing. Set PROW_AN__MONITOR_ALL=true to opt into
+	// monitoring every channel the bot is a member of.
 	var monitoredChannels []string
 	if *channels != "" {
 		for _, ch := range strings.Split(*channels, ",") {
@@ -102,7 +102,7 @@ func main() {
 		slog.Warn("PROW_AN__MONITOR_ALL enabled: monitoring EVERY channel the bot is a member of; messages from all such channels may be forwarded to ship-help under shared service credentials",
 			"channels_configured", len(monitoredChannels))
 	case len(monitoredChannels) == 0:
-		slog.Warn("No channels configured and PROW_AN__MONITOR_ALL not set: fail-closed, the bot will not monitor any channel. Set MONITORED_CHANNELS or PROW_AN__MONITOR_ALL=true")
+		slog.Warn("No channels configured and PROW_AN__MONITOR_ALL not set: fail-closed, the bot will not monitor any channel. Set PROW_AN__MONITORED_CHANNELS or PROW_AN__MONITOR_ALL=true")
 	default:
 		slog.Info("Monitoring channels", "channels", monitoredChannels)
 	}

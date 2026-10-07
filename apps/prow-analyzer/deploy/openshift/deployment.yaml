@@ -50,32 +50,32 @@ spec:
           seccompProfile:
             type: RuntimeDefault
         env:
-        - name: SHIP_HELP_MCP_URL
+        - name: PROW_AN__SHIP_HELP_MCP_URL
           valueFrom:
             configMapKeyRef:
               name: prow-analyzer-config
               key: mcp-url
-        - name: SHIP_HELP_MCP_TOKEN
+        - name: PROW_AN__SHIP_HELP_MCP_TOKEN
           valueFrom:
             secretKeyRef:
               name: prow-analyzer-secrets
               key: ship-help-token
-        - name: SLACK_BOT_TOKEN
+        - name: PROW_AN__SLACK_BOT_TOKEN
           valueFrom:
             secretKeyRef:
               name: prow-analyzer-secrets
               key: slack-bot-token
-        - name: SLACK_APP_TOKEN
+        - name: PROW_AN__SLACK_APP_TOKEN
           valueFrom:
             secretKeyRef:
               name: prow-analyzer-secrets
               key: slack-app-token
-        - name: MONITORED_CHANNELS
+        - name: PROW_AN__MONITORED_CHANNELS
           valueFrom:
             configMapKeyRef:
               name: prow-analyzer-config
               key: monitored-channels
-        # Fail-closed by default: with an empty MONITORED_CHANNELS the bot monitors
+        # Fail-closed by default: with an empty PROW_AN__MONITORED_CHANNELS the bot monitors
         # nothing unless PROW_AN__MONITOR_ALL is set to "true" (monitors every joined channel).
         - name: PROW_AN__MONITOR_ALL
           value: "false"

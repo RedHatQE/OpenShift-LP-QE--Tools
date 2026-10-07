@@ -58,10 +58,12 @@ export SHIP_HELP_MCP_TOKEN="eyJhbGc..."
 ### Slack Bot
 
 ```bash
-# Additional environment variables for Slack
-export SLACK_BOT_TOKEN="xoxb-..."
-export SLACK_APP_TOKEN="xapp-..."
-export MONITORED_CHANNELS="C12345678,C87654321"
+# The bot reads all of its environment variables under the PROW_AN__ prefix
+export PROW_AN__SHIP_HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
+export PROW_AN__SHIP_HELP_MCP_TOKEN="<your-token>"
+export PROW_AN__SLACK_BOT_TOKEN="xoxb-..."
+export PROW_AN__SLACK_APP_TOKEN="xapp-..."
+export PROW_AN__MONITORED_CHANNELS="C12345678,C87654321"
 
 # Build and run
 go build ./cmd/prow-analyzer--bot
@@ -108,14 +110,21 @@ placeholders, and `oc apply`). The deployment manifest lives at
 
 ### Environment Variables
 
-**Required:**
+**Required (CLI):**
 - `SHIP_HELP_MCP_URL` - Ship-help MCP endpoint
 - `SHIP_HELP_MCP_TOKEN` - Authentication token for ship-help MCP
 
-**Slack bot only:**
-- `SLACK_BOT_TOKEN` - Slack bot token (xoxb-...)
-- `SLACK_APP_TOKEN` - Slack app token for socket mode (xapp-...)
-- `MONITORED_CHANNELS` - Comma-separated list of channel IDs
+**Slack bot (all read under the `PROW_AN__` prefix):**
+- `PROW_AN__SHIP_HELP_MCP_URL` - Ship-help MCP endpoint
+- `PROW_AN__SHIP_HELP_MCP_TOKEN` - Authentication token for ship-help MCP
+- `PROW_AN__SLACK_BOT_TOKEN` - Slack bot token (xoxb-...)
+- `PROW_AN__SLACK_APP_TOKEN` - Slack app token for socket mode (xapp-...)
+- `PROW_AN__MONITORED_CHANNELS` - Comma-separated list of channel IDs
+
+See [doc/reference.md](doc/reference.md#environment-variables) for the full list,
+including the bot's optional vars (`PROW_AN__ALLOWED_BOT_IDS`,
+`PROW_AN__MONITOR_ALL`, `PROW_AN__PROMPT_TEMPLATE`, `PROW_AN__SLACK_DEBUG`,
+`PROW_AN__MCP_DEBUG`, `PROW_AN__TLS_INSECURE_SKIP_VERIFY`).
 
 ### Getting Tokens
 
