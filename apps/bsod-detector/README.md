@@ -145,6 +145,50 @@ securityContext:
 - No elevation of CAP_SYS_ADMIN or CAP_MKNOD
 - Runs with baseline policy, full compliance
 
+#### Why force_tcg Backend Was Critical
+
+**Problem**: Earlier attempts used `force_kvm` backend which required `/dev/kvm` device access.
+
+**Issue**: Worker nodes without hardware KVM acceleration (or restricted KVM device access) couldn't run extraction pod:
+```
+libguestfs: error: force_kvm supplied but kvm not available
+```
+
+**Solution**: Switched to `force_tcg` backend (software QEMU emulation):
+- ✅ Works on **any** Kubernetes node (KVM or non-KVM)
+- ✅ No `/dev/kvm` device required (no cgroup allowlist needed)
+- ✅ No PSS escalation needed (baseline policy compatible)
+- ⚠️ Trade-off: CPU emulation slower than hardware KVM, but acceptable for offline extraction
+
+**Result**: Approach 3 works universally across all worker node types.
+
+#### Why Root Permissions (fsGroup) Matter
+
+**Pod Security Context**:
+```yaml
+securityContext:
+  runAsNonRoot: true         # Non-root user (prevents privilege escalation)
+  fsGroup: 1000800000        # File ownership group (allows pod access to mounted volumes)
+  seccompProfile:
+    type: RuntimeDefault     # Standard seccomp (no custom filtering)
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]            # No special capabilities needed
+```
+
+**Why fsGroup is needed**:
+- Pod runs as non-root (`runAsNonRoot: true`)
+- guestfish writes to pod `/tmp/` which needs group ownership
+- fsGroup ensures pod can read/write extracted files even as non-root
+- Baseline PSS allows fsGroup (doesn't require escalation)
+
+**Why no root required**:
+- guestfish doesn't need `CAP_SYS_ADMIN` or `CAP_MKNOD` (those were needed for ntfscat/ntfs-3g)
+- mount-ro is read-only (no write permissions on host filesystem)
+- Pod runs with restricted capabilities, full baseline compliance
+
+**Result**: Baseline Pod Security Standards fully satisfied, zero escalation needed.
+
 ### Implementation Details
 
 | Feature | Details |
