@@ -385,17 +385,6 @@ The extraction pipeline runs with **baseline Pod Security Standards** — no esc
 
 ---
 
-## Future Work
-
-- [ ] Integrate with CI/CD for automated BSOD detection testing
-- [ ] Add support for custom crash types and parameters
-- [ ] Add volatility3 profile management for different Windows versions
-- [ ] Create dashboard for BSOD trend analysis
-- [ ] Extend partition discovery to handle non-standard layouts
-- [ ] Add support for additional EventLog files beyond System/Application
-
----
-
 ## Contributing
 
 See `CONTRIBUTING.md` and `.AI_INIT.md` for contribution guidelines, commit conventions, and AI agent reference.
