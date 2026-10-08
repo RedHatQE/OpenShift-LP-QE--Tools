@@ -70,7 +70,7 @@ func WithSelfBotID(botID string) Option {
 
 // WithMonitorAll enables monitoring of every channel the bot is a member of,
 // rather than only the explicit monitored-channels allow-list. It is an explicit
-// opt-in (e.g. PROW_AN__MONITOR_ALL=true) because it broadens data collection: messages
+// opt-in (e.g. PROW_AN__MONITOR__ALL=true) because it broadens data collection: messages
 // from every channel the bot can see may be forwarded to ship-help under shared
 // service credentials. Without it, and with no channels configured, the handler
 // is fail-closed and monitors nothing.
@@ -114,7 +114,7 @@ func (h *handler) Handle(callback *slackevents.EventsAPIEvent, logger *slog.Logg
 
 	// Only monitor configured channels. Fail-closed: a channel is monitored only
 	// if it is in the allow-list, unless monitor-all was explicitly enabled
-	// (WithMonitorAll / PROW_AN__MONITOR_ALL), in which case every joined channel is
+	// (WithMonitorAll / PROW_AN__MONITOR__ALL), in which case every joined channel is
 	// monitored so inviting the bot is enough.
 	if !h.monitorAll && !h.monitoredChannels[event.Channel] {
 		return false, nil

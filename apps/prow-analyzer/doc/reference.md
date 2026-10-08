@@ -159,7 +159,7 @@ Multi-stage Dockerfile:
 
 Both stages use publicly pullable Red Hat base images (`registry.access.redhat.com`, no auth) because the image is built by GitHub Actions, which has no `registry.ci.openshift.org` credentials.
 
-The Makefile supports `build`, `push`, and `clean` targets with configurable `IMAGE_REGISTRY`, `IMAGE_NAMESPACE`, `IMAGE_NAME`, and `IMAGE_TAG`. The `BUILDFLAGS` variable passes flags to `podman build` (e.g., `--platform linux/amd64`).
+The Makefile supports `build`, `push`, and `clean` targets with configurable `IMAGE_REGISTRY`, `IMAGE_NAMESPACE`, `IMAGE_REPO`, and `IMAGE_TAG` (the full reference `IMAGE_NAME` is composed from these). The `BUILDFLAGS` variable passes flags to `podman build` (e.g., `--platform linux/amd64`).
 
 **OpenShift deployment** (`deploy/openshift/deployment.yaml`)
 
@@ -257,29 +257,29 @@ the bot (`SHIP_HELP_MCP_URL`, `SHIP_HELP_MCP_TOKEN`), so those appear twice belo
 — once per binary. `TLS_INSECURE_SKIP_VERIFY` and `MCP_TIMEOUT_SECONDS` are read
 unprefixed by both.
 
-| Variable                           | Required | Used By  | Description                                                                                       |
-|------------------------------------|----------|----------|--------------------------------------------------------------------------------------------------|
-| `PROW_AN__SHIP_HELP_MCP_URL`       | Yes      | Bot      | Ship-help MCP endpoint URL                                                                        |
-| `PROW_AN__SHIP_HELP_MCP_TOKEN`     | Yes      | Bot      | Bearer token for MCP authentication                                                               |
-| `PROW_AN__SLACK_BOT_TOKEN`         | Bot only | Bot      | Slack bot token (`xoxb-...`)                                                                      |
-| `PROW_AN__SLACK_APP_TOKEN`         | Bot only | Bot      | Slack app-level token for Socket Mode (`xapp-...`)                                                |
-| `PROW_AN__MONITORED_CHANNELS`      | Bot only | Bot      | Comma-separated Slack channel IDs to monitor                                                      |
-| `PROW_AN__ALLOWED_BOT_IDS`         | No       | Bot      | Comma-separated bot IDs (`B...`) whose Prow URLs are analyzed; the bot always ignores its own     |
-| `PROW_AN__MONITOR_ALL`             | No       | Bot      | `"true"` monitors every joined channel instead of only `PROW_AN__MONITORED_CHANNELS` (default `false`) |
-| `PROW_AN__PROMPT_TEMPLATE`         | No       | Bot      | Analysis prompt template with a `{job_url}` placeholder (default: built-in detailed prompt)       |
-| `PROW_AN__SLACK_DEBUG`             | No       | Bot      | `"true"` enables verbose Slack SDK / Socket Mode debug logging (default `false`)                  |
-| `PROW_AN__MCP_DEBUG`               | No       | Bot      | `"true"` enables verbose MCP SSE logging incl. response payload previews (default `false`)        |
-| `SHIP_HELP_MCP_URL`                | Yes      | CLI      | Ship-help MCP endpoint URL (the bot reads `PROW_AN__SHIP_HELP_MCP_URL` instead)                   |
-| `SHIP_HELP_MCP_TOKEN`              | Yes      | CLI      | Bearer token for MCP authentication (the bot reads `PROW_AN__SHIP_HELP_MCP_TOKEN` instead)        |
-| `MCP_DEBUG`                        | No       | CLI      | Verbose MCP SSE logging for the CLI (the bot reads `PROW_AN__MCP_DEBUG` instead)                  |
-| `TLS_INSECURE_SKIP_VERIFY`         | No       | CLI, Bot | Set to `"true"` to skip TLS certificate verification                                              |
+| Variable                        | Required | Used By  | Description                                                                                             |
+|---------------------------------|----------|----------|---------------------------------------------------------------------------------------------------------|
+| `PROW_AN__SHIP__HELP_MCP_URL`   | Yes      | Bot      | Ship-help MCP endpoint URL                                                                              |
+| `PROW_AN__SHIP__HELP_MCP_TOKEN` | Yes      | Bot      | Bearer token for MCP authentication                                                                     |
+| `PROW_AN__SLACK__BOT_TOKEN`     | Bot only | Bot      | Slack bot token (`xoxb-...`)                                                                            |
+| `PROW_AN__SLACK__APP_TOKEN`     | Bot only | Bot      | Slack app-level token for Socket Mode (`xapp-...`)                                                      |
+| `PROW_AN__MONITORED__CHANNELS`  | Bot only | Bot      | Comma-separated Slack channel IDs to monitor                                                            |
+| `PROW_AN__ALLOWED__BOT_IDS`     | No       | Bot      | Comma-separated bot IDs (`B...`) whose Prow URLs are analyzed; the bot always ignores its own           |
+| `PROW_AN__MONITOR__ALL`         | No       | Bot      | `"true"` monitors every joined channel instead of only `PROW_AN__MONITORED__CHANNELS` (default `false`) |
+| `PROW_AN__PROMPT__TEMPLATE`     | No       | Bot      | Analysis prompt template with a `{job_url}` placeholder (default: built-in detailed prompt)             |
+| `PROW_AN__SLACK__DEBUG`         | No       | Bot      | `"true"` enables verbose Slack SDK / Socket Mode debug logging (default `false`)                        |
+| `PROW_AN__MCP__DEBUG`           | No       | Bot      | `"true"` enables verbose MCP SSE logging incl. response payload previews (default `false`)              |
+| `SHIP_HELP_MCP_URL`             | Yes      | CLI      | Ship-help MCP endpoint URL (the bot reads `PROW_AN__SHIP__HELP_MCP_URL` instead)                        |
+| `SHIP_HELP_MCP_TOKEN`           | Yes      | CLI      | Bearer token for MCP authentication (the bot reads `PROW_AN__SHIP__HELP_MCP_TOKEN` instead)             |
+| `MCP_DEBUG`                     | No       | CLI      | Verbose MCP SSE logging for the CLI (the bot reads `PROW_AN__MCP__DEBUG` instead)                       |
+| `TLS_INSECURE_SKIP_VERIFY`      | No       | CLI, Bot | Set to `"true"` to skip TLS certificate verification                                                    |
 | `MCP_TIMEOUT_SECONDS`              | No       | CLI, Bot | MCP HTTP client timeout in seconds; caps the whole request incl. SSE read (default `1200`)        |
 
 For the **bot**, every variable above has a corresponding flag that overrides it
 (see [Bot Flags](#bot-flags)). The **CLI** exposes flags only for `--mcp-url`,
 `--token`, and `--prompt`; the other variables it honors — `MCP_DEBUG`,
 `MCP_TIMEOUT_SECONDS`, and `TLS_INSECURE_SKIP_VERIFY` — are env-only there.
-`PROW_AN__PROMPT_TEMPLATE` is read only by the bot; the CLI's prompt comes from `--prompt`.
+`PROW_AN__PROMPT__TEMPLATE` is read only by the bot; the CLI's prompt comes from `--prompt`.
 
 ### CLI Flags
 
@@ -301,24 +301,24 @@ The CLI has no flags for `MCP_DEBUG`, `MCP_TIMEOUT_SECONDS`, or
 ```
 prow-analyzer--bot [flags]
 
-  -slack-token   Slack bot token (default: $PROW_AN__SLACK_BOT_TOKEN)
-  -app-token     Slack app token for socket mode (default: $PROW_AN__SLACK_APP_TOKEN)
-  -mcp-url       Ship-help MCP URL (default: $PROW_AN__SHIP_HELP_MCP_URL)
-  -mcp-token     Ship-help MCP token (default: $PROW_AN__SHIP_HELP_MCP_TOKEN)
-  -channels      Comma-separated channel IDs (default: $PROW_AN__MONITORED_CHANNELS)
+  -slack-token   Slack bot token (default: $PROW_AN__SLACK__BOT_TOKEN)
+  -app-token     Slack app token for socket mode (default: $PROW_AN__SLACK__APP_TOKEN)
+  -mcp-url       Ship-help MCP URL (default: $PROW_AN__SHIP__HELP_MCP_URL)
+  -mcp-token     Ship-help MCP token (default: $PROW_AN__SHIP__HELP_MCP_TOKEN)
+  -channels      Comma-separated channel IDs (default: $PROW_AN__MONITORED__CHANNELS)
   -allowed-bots  Comma-separated bot IDs (B...) whose Prow URLs are analyzed
-                 (default: $PROW_AN__ALLOWED_BOT_IDS)
+                 (default: $PROW_AN__ALLOWED__BOT_IDS)
   -prompt        Analysis prompt template with a {job_url} placeholder
-                 (default: $PROW_AN__PROMPT_TEMPLATE, else a built-in detailed
+                 (default: $PROW_AN__PROMPT__TEMPLATE, else a built-in detailed
                  template requesting root cause, Jira issues, recurring patterns,
                  and recommended actions)
   -monitor-all   Monitor every channel the bot is a member of instead of only
-                 -channels (default: $PROW_AN__MONITOR_ALL, else false). Fail-closed:
+                 -channels (default: $PROW_AN__MONITOR__ALL, else false). Fail-closed:
                  without this and with no -channels, no channel is monitored
   -slack-debug   Verbose Slack SDK / Socket Mode debug logging
-                 (default: $PROW_AN__SLACK_DEBUG, else false)
+                 (default: $PROW_AN__SLACK__DEBUG, else false)
   -mcp-debug     Verbose MCP SSE logging incl. response payload previews
-                 (default: $PROW_AN__MCP_DEBUG, else false; off for data minimization)
+                 (default: $PROW_AN__MCP__DEBUG, else false; off for data minimization)
   -tls-insecure  Skip TLS certificate verification for MCP/Prow requests
                  (default: $TLS_INSECURE_SKIP_VERIFY, else false)
 ```
@@ -333,13 +333,13 @@ The prompt is a string with a `{job_url}` placeholder that is replaced with the 
 4. Recommended actions
 
 Customize via the `-prompt` command-line flag, or — for the bot — the
-`PROW_AN__PROMPT_TEMPLATE` environment variable.
+`PROW_AN__PROMPT__TEMPLATE` environment variable.
 
-> **Note:** The bot resolves its prompt as `-prompt` flag → `PROW_AN__PROMPT_TEMPLATE`
+> **Note:** The bot resolves its prompt as `-prompt` flag → `PROW_AN__PROMPT__TEMPLATE`
 > env var → built-in default, so the `prompt-template` ConfigMap key wired to
-> `PROW_AN__PROMPT_TEMPLATE` in `deploy/openshift/deployment.yaml` takes effect on the
+> `PROW_AN__PROMPT__TEMPLATE` in `deploy/openshift/deployment.yaml` takes effect on the
 > deployed bot. The CLI's prompt comes only from its `-prompt` flag (it does not
-> read `PROW_AN__PROMPT_TEMPLATE`).
+> read `PROW_AN__PROMPT__TEMPLATE`).
 
 ### Recognized Prow URL Patterns
 
@@ -450,11 +450,11 @@ Analysis queue is currently full. Please retry in a moment.
 ### Option 1: Run Locally
 
 ```bash
-export PROW_AN__SHIP_HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
-export PROW_AN__SHIP_HELP_MCP_TOKEN="$(cat /path/to/token.txt | tr -d '\n')"
-export PROW_AN__SLACK_BOT_TOKEN="xoxb-..."
-export PROW_AN__SLACK_APP_TOKEN="xapp-..."
-export PROW_AN__MONITORED_CHANNELS="C12345678"
+export PROW_AN__SHIP__HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
+export PROW_AN__SHIP__HELP_MCP_TOKEN="$(cat /path/to/token.txt | tr -d '\n')"
+export PROW_AN__SLACK__BOT_TOKEN="xoxb-..."
+export PROW_AN__SLACK__APP_TOKEN="xapp-..."
+export PROW_AN__MONITORED__CHANNELS="C12345678"
 
 cd apps/prow-analyzer
 make build--bot
@@ -480,7 +480,7 @@ make -C image/container/prow-analyzer push BUILDFLAGS="--platform linux/amd64"
 make -C image/container/prow-analyzer push BUILDFLAGS="--platform linux/amd64" IMAGE_TAG=v1.1.0
 ```
 
-The image pushes to `$(IMAGE_REGISTRY)/$(IMAGE_NAMESPACE)/$(IMAGE_NAME):$(IMAGE_TAG)`, which defaults to `images.paas.redhat.com/ieng/app/prow-analyzer:latest`. Override `IMAGE_REGISTRY`, `IMAGE_NAMESPACE`, `IMAGE_NAME`, or `IMAGE_TAG` on the `make` command line as needed, and note the exact reference — Step 3 puts it in the manifest.
+The image pushes to `$(IMAGE_NAME)` (defined as `$(IMAGE_REGISTRY)/$(IMAGE_NAMESPACE)/$(IMAGE_REPO):$(IMAGE_TAG)`), which defaults to `images.paas.redhat.com/ieng/app/prow-analyzer:latest`. Override `IMAGE_REGISTRY`, `IMAGE_NAMESPACE`, `IMAGE_REPO`, or `IMAGE_TAG` on the `make` command line as needed, and note the exact reference — Step 3 puts it in the manifest.
 
 **Step 2: Create secrets in the target namespace.**
 
@@ -682,7 +682,7 @@ oc logs -n <namespace> -l app=prow-analyzer-bot | grep "PROW-ANALYZER"
 ### Bot Not Responding
 
 1. **Pod running?** `oc get pods -n <namespace> -l app=prow-analyzer-bot`
-2. **Correct channel ID?** Verify the channel ID is listed in `PROW_AN__MONITORED_CHANNELS`. Channel IDs look like `C1234ABCD`, not channel names.
+2. **Correct channel ID?** Verify the channel ID is listed in `PROW_AN__MONITORED__CHANNELS`. Channel IDs look like `C1234ABCD`, not channel names.
 3. **Bot invited to channel?** Slack doesn't deliver events for channels the bot hasn't joined. Run `/invite @Prow Analyzer` in the channel.
 4. **URL recognized?** Only `prow.ci.openshift.org` and `deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com` URLs are detected.
 5. **Message from a human?** Bot messages (including the bot's own replies) are ignored to prevent loops.

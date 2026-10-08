@@ -20,11 +20,11 @@
 
 ```bash
 # Set environment variables
-export PROW_AN__SHIP_HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
-export PROW_AN__SHIP_HELP_MCP_TOKEN="$(cat /path/to/token.txt | tr -d '\n')"
-export PROW_AN__SLACK_BOT_TOKEN="xoxb-..."
-export PROW_AN__SLACK_APP_TOKEN="xapp-..."
-export PROW_AN__MONITORED_CHANNELS="C12345678"  # Your channel ID
+export PROW_AN__SHIP__HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
+export PROW_AN__SHIP__HELP_MCP_TOKEN="$(cat /path/to/token.txt | tr -d '\n')"
+export PROW_AN__SLACK__BOT_TOKEN="xoxb-..."
+export PROW_AN__SLACK__APP_TOKEN="xapp-..."
+export PROW_AN__MONITORED__CHANNELS="C12345678"  # Your channel ID
 
 # Build (requires Go 1.22+)
 go build ./cmd/prow-analyzer--bot
@@ -42,7 +42,8 @@ Post a Prow URL in your monitored channel and watch for bot response.
 
 Run every command in these steps from the repository root; all paths are relative to it.
 
-The Makefile builds `$(IMAGE_REGISTRY)/$(IMAGE_NAMESPACE)/$(IMAGE_NAME):$(IMAGE_TAG)`,
+The Makefile builds `$(IMAGE_NAME)` (defined as
+`$(IMAGE_REGISTRY)/$(IMAGE_NAMESPACE)/$(IMAGE_REPO):$(IMAGE_TAG)`),
 which defaults to `images.paas.redhat.com/ieng/app/prow-analyzer:latest`. Log in to
 the **same registry** you build for, and note the exact reference you push — Step 3
 requires putting it in the manifest.
@@ -56,7 +57,7 @@ podman login images.paas.redhat.com
 make -C image/container/prow-analyzer build
 make -C image/container/prow-analyzer push
 
-# Or override any of IMAGE_REGISTRY / IMAGE_NAMESPACE / IMAGE_NAME / IMAGE_TAG, e.g.:
+# Or override any of IMAGE_REGISTRY / IMAGE_NAMESPACE / IMAGE_REPO / IMAGE_TAG, e.g.:
 #   -> images.paas.redhat.com/<your-namespace>/prow-analyzer:v1.0.0
 make -C image/container/prow-analyzer push IMAGE_NAMESPACE=<your-namespace> IMAGE_TAG=v1.0.0
 ```

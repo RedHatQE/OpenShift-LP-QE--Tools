@@ -59,11 +59,11 @@ export SHIP_HELP_MCP_TOKEN="eyJhbGc..."
 
 ```bash
 # The bot reads all of its environment variables under the PROW_AN__ prefix
-export PROW_AN__SHIP_HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
-export PROW_AN__SHIP_HELP_MCP_TOKEN="<your-token>"
-export PROW_AN__SLACK_BOT_TOKEN="xoxb-..."
-export PROW_AN__SLACK_APP_TOKEN="xapp-..."
-export PROW_AN__MONITORED_CHANNELS="C12345678,C87654321"
+export PROW_AN__SHIP__HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
+export PROW_AN__SHIP__HELP_MCP_TOKEN="<your-token>"
+export PROW_AN__SLACK__BOT_TOKEN="xoxb-..."
+export PROW_AN__SLACK__APP_TOKEN="xapp-..."
+export PROW_AN__MONITORED__CHANNELS="C12345678,C87654321"
 
 # Build and run
 go build ./cmd/prow-analyzer--bot
@@ -115,16 +115,16 @@ placeholders, and `oc apply`). The deployment manifest lives at
 - `SHIP_HELP_MCP_TOKEN` - Authentication token for ship-help MCP
 
 **Slack bot (all read under the `PROW_AN__` prefix):**
-- `PROW_AN__SHIP_HELP_MCP_URL` - Ship-help MCP endpoint
-- `PROW_AN__SHIP_HELP_MCP_TOKEN` - Authentication token for ship-help MCP
-- `PROW_AN__SLACK_BOT_TOKEN` - Slack bot token (xoxb-...)
-- `PROW_AN__SLACK_APP_TOKEN` - Slack app token for socket mode (xapp-...)
-- `PROW_AN__MONITORED_CHANNELS` - Comma-separated list of channel IDs
+- `PROW_AN__SHIP__HELP_MCP_URL` - Ship-help MCP endpoint
+- `PROW_AN__SHIP__HELP_MCP_TOKEN` - Authentication token for ship-help MCP
+- `PROW_AN__SLACK__BOT_TOKEN` - Slack bot token (xoxb-...)
+- `PROW_AN__SLACK__APP_TOKEN` - Slack app token for socket mode (xapp-...)
+- `PROW_AN__MONITORED__CHANNELS` - Comma-separated list of channel IDs
 
 See [doc/reference.md](doc/reference.md#environment-variables) for the full list,
-including the bot's optional vars (`PROW_AN__ALLOWED_BOT_IDS`,
-`PROW_AN__MONITOR_ALL`, `PROW_AN__PROMPT_TEMPLATE`, `PROW_AN__SLACK_DEBUG`,
-`PROW_AN__MCP_DEBUG`) and `TLS_INSECURE_SKIP_VERIFY` (read unprefixed by both the
+including the bot's optional vars (`PROW_AN__ALLOWED__BOT_IDS`,
+`PROW_AN__MONITOR__ALL`, `PROW_AN__PROMPT__TEMPLATE`, `PROW_AN__SLACK__DEBUG`,
+`PROW_AN__MCP__DEBUG`) and `TLS_INSECURE_SKIP_VERIFY` (read unprefixed by both the
 bot and the CLI).
 
 ### Getting Tokens
