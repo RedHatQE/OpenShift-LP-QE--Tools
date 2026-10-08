@@ -269,7 +269,7 @@ done
 Cleanup
 
 # Establish and validate communication with guest via QEMU Guest Agent (QGA)
-export GA_NS="${ns}" GA_VM="${vm}" GA_POD="${pod}" GA_DOM="${dom}"
+export BSOD_DET__NAMESPACE="${ns}" BSOD_DET__VM__NAME="${vm}" BSOD_DET__POD__NAME="${pod}" BSOD_DET__DOMAIN__NAME="${dom}"
 # Test QGA connectivity with retries (HTTP/2 connection to guest can drop transiently)
 typeset pingOk=0
 for i in $(seq 1 5); do

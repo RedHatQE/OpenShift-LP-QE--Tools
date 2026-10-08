@@ -136,7 +136,7 @@ typeset dom=''; dom="$(jq -er .domain "${metadataFile}")"
 typeset node=''; node="$(jq -r .node "${metadataFile}")"
 diskTarget="$(jq -er .diskTarget "${metadataFile}")"; memoryPvc="$(jq -er .memoryDumpPvc "${metadataFile}")"
 [[ "$(jq -r .namespace "${metadataFile}")" == "${ns}" && "$(jq -r .vm "${metadataFile}")" == "${vm}" ]] || Die 'metadata target does not match watcher target'
-export GA_NS="${ns}" GA_VM="${vm}" GA_POD="${pod}" GA_DOM="${dom}"
+export BSOD_DET__NAMESPACE="${ns}" BSOD_DET__VM__NAME="${vm}" BSOD_DET__POD__NAME="${pod}" BSOD_DET__DOMAIN__NAME="${dom}"
 
 # Initialize output directory and log files
 mkdir -p "${outDir}"; chmod 0700 "${outDir}"

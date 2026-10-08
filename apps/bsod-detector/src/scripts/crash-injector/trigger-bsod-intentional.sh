@@ -5,7 +5,7 @@ set -euxo pipefail; shopt -s inherit_errexit
 umask 077
 
 # Parse input: crash type (0x01-0x09 from NotMyFault), VM name, and namespace
-typeset crashType="${1:-0x01}"; typeset vm="${GA_VM:-win2022-vm-hjoshi1}"; typeset ns="${GA_NS:-windows-bsod}"
+typeset crashType="${1:-0x01}"; typeset vm="${BSOD_DET__VM__NAME:-win2022-vm-hjoshi1}"; typeset ns="${BSOD_DET__NAMESPACE:-windows-bsod}"
 # Storage configuration: evidence root (mounted PVC), volume kind, and storage identity
 typeset evidenceRoot="${BSOD_DET__EVIDENCE__DIR:-/mnt/persistent-bsod-evidence}"; typeset evidenceKind="${BSOD_EVIDENCE_VOLUME_KIND:-pvc}"
 typeset evidenceId="${BSOD_DET__EVIDENCE__STORAGE_ID:-shared-bsod-evidence}"; typeset memoryPvc="${BSOD_DET__MEMORY__DUMP_PVC:-win2022-vm-hjoshi1-memdump}"
@@ -37,7 +37,7 @@ trap Cleanup EXIT
 trap 'OnSignal 130' INT
 trap 'OnSignal 143' TERM
 
-[[ -n "${vm}" && -n "${ns}" ]] || Die 'GA_VM and GA_NS must explicitly identify the disposable RHOV test VM'
+[[ -n "${vm}" && -n "${ns}" ]] || Die 'BSOD_DET__VM__NAME and BSOD_DET__NAMESPACE must explicitly identify the disposable RHOV test VM'
 [[ -n "${evidenceRoot}" ]] || Die 'EVIDENCE_DIR must identify the validated persistent mount'
 [[ "${readyTimeout}" =~ ^[1-9][0-9]*$ && "${preflightTimeout}" =~ ^[1-9][0-9]*$ ]] || Die 'watch/ready/preflight timeouts must be positive integers'
 case "${crashType}" in 0x01|0x02|0x03|0x04|0x05|0x06|0x07|0x08|0x09) ;; *) Die "unsupported NotMyFault crash type '${crashType}'" ;; esac
@@ -52,8 +52,8 @@ timeout --signal=TERM --kill-after=5 1800 "${hostDir}/preflight-rhov.sh" --ns "$
   --evidence-mount "${evidenceRoot}" --evidence-volume-kind "${evidenceKind}" --evidence-storage-id "${evidenceId}" \
   --snap-class "${snapClass}" --recovery-image "${recoveryImage}" --memory-dump-pvc "${memoryPvc}" --require-trigger
 # Extract launcher pod name and domain from preflight metadata for guest agent access
-GA_POD="$(jq -er .launcherPod "${metadataFile}")"; export GA_POD
-GA_DOM="$(jq -er .domain "${metadataFile}")"; export GA_DOM
+BSOD_DET__POD__NAME="$(jq -er .launcherPod "${metadataFile}")"; export BSOD_DET__POD__NAME
+BSOD_DET__DOMAIN__NAME="$(jq -er .domain "${metadataFile}")"; export BSOD_DET__DOMAIN__NAME
 
 # Phase 3: Guest cleanup - ensure no stale dumps from previous runs exist on the VM
 # This prevents false positives from old dumps: we must verify empty state BEFORE injecting crash
