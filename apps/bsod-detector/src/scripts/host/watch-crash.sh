@@ -41,6 +41,11 @@ typeset -a guestAgent=(python3 "${scriptDir}/guest-agent.py")
 typeset hostSignalsBin="${BSOD_DET__HOST_SIGNALS__BIN:-${scriptDir}/collect-host-signals.sh}"
 
 # Helper function definitions
+# CleanupGuestfishCache — remove leftover cache files from libguestfs operations
+function CleanupGuestfishCache () {
+  find "${scriptDir}/../.." -maxdepth 5 -name "file.0x*" -type f -delete 2>/dev/null || true
+  find /tmp -maxdepth 2 -name "file.0x*" -type f -delete 2>/dev/null || true
+}
 # Die — print a fatal error to stderr and exit.
 function Die () { echo "watch-crash: ERROR: $*" >&2; exit 1; }
 # RunTimed — execute command with timeout: TERM after <seconds>, force KILL after 5 more seconds
@@ -65,6 +70,7 @@ function Cleanup () {
     memoryAssociated=0
   fi
   [[ -z "${runDir}" ]] || rm -rf "${runDir}"
+  CleanupGuestfishCache
   true
 }
 # shellcheck disable=SC2317  # Invoked by INT/TERM traps.
@@ -227,7 +233,9 @@ EOF
   typeset tokenSecretName
   tokenSecretName="$(Oc get virtualmachineexport "${exportName}" -n "${ns}" -o jsonpath='{.status.tokenSecretRef}' 2>/dev/null)"
   [[ -n "${tokenSecretName}" ]] || tokenSecretName="secret-${exportName}"
+  set +x
   token="$(Oc get secret "${tokenSecretName}" -n "${ns}" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d)"
+  set -x
   # Pick any available format URL — prefer raw+gz or archive, fall back to first
   dlUrl="$(Oc get virtualmachineexport "${exportName}" -n "${ns}" \
     -o jsonpath='{.status.links.internal.volumes[0].formats[?(@.format=="tar.gz")].url}' 2>/dev/null)"
@@ -246,17 +254,22 @@ EOF
 
   # 6. Resumable download via curl --continue-at -
   # Each GOAWAY just resumes from the last byte — accumulates progress across drops.
-  typeset dlAttempt=0
-  while true; do
+  # Bounded retries: max 10 attempts over ~300s (30s per attempt + 3s sleep)
+  typeset dlAttempt=0; typeset maxAttempts=10; typeset dlDeadline=$((SECONDS + 600))
+  while ((dlAttempt < maxAttempts && SECONDS < dlDeadline)); do
     dlAttempt=$((dlAttempt + 1))
+    set +x
     if curl -k -f -H "x-kubevirt-export-token: ${token}" \
         --connect-timeout 30 --retry 0 \
         --continue-at - --output "${temporary}" \
         "https://localhost:18443${dlPath}" >>"${pipelineLog}" 2>&1; then
+      set -x
       break
     fi
+    set -x
     typeset dlSz; dlSz=$(stat -c%s "${temporary}" 2>/dev/null || echo 0)
-    Log "memory download attempt ${dlAttempt} interrupted at $((dlSz / 1024 / 1024)) MiB — resuming..."
+    Log "memory download attempt ${dlAttempt}/${maxAttempts} interrupted at $((dlSz / 1024 / 1024)) MiB — resuming..."
+    ((dlAttempt < maxAttempts)) || break
     sleep 3
     # Re-establish port-forward if the previous one died
     if ! kill -0 "${pfPid}" 2>/dev/null; then
@@ -264,6 +277,7 @@ EOF
       pfPid=$!; sleep 3
     fi
   done
+  ((dlAttempt < maxAttempts)) || { RecordError memory "memory download failed after ${maxAttempts} attempts"; return 1; }
 
   kill "${pfPid}" 2>/dev/null || true; pfPid=''
   Oc delete virtualmachineexport "${exportName}" -n "${ns}" --ignore-not-found >>"${pipelineLog}" 2>&1 || true

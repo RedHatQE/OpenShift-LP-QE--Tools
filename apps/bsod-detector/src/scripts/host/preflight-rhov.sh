@@ -284,8 +284,10 @@ done
 typeset cfg=''; cfg="$(RunTimed 120 "${guestAgent[@]}" psfile "${configureScript}" \
   --companion "${crashControlFile}" 'C:\Windows\Temp\crash-control.json' -- \
   -DataFile 'C:\Windows\Temp\crash-control.json')" || Die 'guest crash-dump configuration failed'
-# Verify configuration was applied: CrashDumpEnabled matches recommended, AutoReboot=0, page file adequate
-jq -e '.ok == true and (.matchesRecommended == true or .action == "applied") and .current.AutoReboot == 0 and (.pageFile.adequate == true or .pageFile.adequate == null)' <<<"${cfg}" >/dev/null || Die "guest CrashControl/pagefile prerequisites are not proven: ${cfg}"
+# Verify configuration was applied: settings effective (not pending reboot), AutoReboot=0, page file verified adequate
+# CRITICAL: matchesRecommended must be true (settings ARE effective now, not pending)
+# CRITICAL: pageFile.adequate must be explicitly true (not null/"unknown")
+jq -e '.ok == true and .matchesRecommended == true and .current.AutoReboot == 0 and .pageFile.adequate == true' <<<"${cfg}" >/dev/null || Die "guest CrashControl/pagefile prerequisites failed validation (settings must be effective, not pending): ${cfg}"
 
 # Verify required guest paths exist
 # Checks: C:\Windows (dump destination), C:\Windows\Minidump (minidump directory), NotMyFault (if intentional crash)

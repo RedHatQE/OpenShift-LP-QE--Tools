@@ -90,7 +90,8 @@ def advance_progress(state: dict, current: int, idle_samples: int) -> dict:
     else:
         # No writes observed since baseline. Windows may have completed MEMORY.DMP
         # before the guest agent died (common with AutoReboot=0 + hardware-level freeze).
-        # After idle_samples consecutive no-progress samples, treat as pre-quiescent.
+        # After idle_samples consecutive no-progress samples, treat as pre-quiescent (dump already done).
+        # CRITICAL: Allows pre-written dumps that complete before monitoring starts.
         state["idleSamples"] += 1
         if state["idleSamples"] >= idle_samples:
             status, reason = "complete", "pre-quiescent-at-baseline"
@@ -370,6 +371,18 @@ def write_summary(args: argparse.Namespace) -> None:
         required = set()
     found = {kind: 0 for kind in required}
     excluded = {"evidence-summary.json", "recovery-summary.json"}
+
+    # Load checksums.sha256 manifest if present for validation
+    manifest_hashes: dict[str, str] = {}
+    manifest_path = out / "checksums.sha256"
+    if manifest_path.exists():
+        for line in manifest_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip() or line.startswith("#"):
+                continue
+            parts = line.split(maxsplit=1)
+            if len(parts) == 2:
+                manifest_hashes[parts[1].strip()] = parts[0].strip()
+
     for path in sorted(out.rglob("*")):
         if not path.is_file() or path.name in excluded or path == stage_file:
             continue
@@ -383,12 +396,20 @@ def write_summary(args: argparse.Namespace) -> None:
             if value.get("ok") is not True:
                 valid = False
                 semantic_error = "stage-result-reports-failure"
+
+        # Verify against manifest if present
+        actual_hash = sha256_file(path)
+        relative_path = str(path.relative_to(out))
+        if relative_path in manifest_hashes and manifest_hashes[relative_path] != actual_hash:
+            valid = False
+            semantic_error = "manifest-hash-mismatch"
+
         record = {
-            "path": str(path.relative_to(out)),
+            "path": relative_path,
             "type": kind,
             "format": detected,
             "size": path.stat().st_size,
-            "sha256": sha256_file(path),
+            "sha256": actual_hash,
             "valid": valid,
         }
         if semantic_error:

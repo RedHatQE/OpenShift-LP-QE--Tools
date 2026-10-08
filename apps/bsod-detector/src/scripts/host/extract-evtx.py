@@ -148,7 +148,7 @@ def detect_crash(events, bugcheck_codes):
         "crashTime": None,
     }
 
-    # Tier 1: System/1001 BugCheck
+    # Tier 1: System/1001 BugCheck (must be System provider, event ID 1001, correct code)
     for evt in events:
         if evt["eventId"] == 1001 and "System" in evt.get("log", ""):
             msg = evt.get("message", "")
@@ -166,7 +166,7 @@ def detect_crash(events, bugcheck_codes):
                     crash["parameters"] = [p.strip() for p in m.group(2).split(",")]
                 return crash
 
-    # Tier 2: Application/1001 LiveKernelEvent
+    # Tier 2: Application/1001 LiveKernelEvent (must be Application provider, event ID 1001)
     for evt in events:
         if evt["eventId"] == 1001 and "Application" in evt.get("log", ""):
             msg = evt.get("message", "")
@@ -181,7 +181,7 @@ def detect_crash(events, bugcheck_codes):
                     crash["bugCheckName"] = bugcheck_codes.get(code, {}).get("name")
                 return crash
 
-    # Tier 3: System/6008 dirty shutdown
+    # Tier 3: System/6008 dirty shutdown (must be System provider, event ID 6008)
     for evt in events:
         if evt["eventId"] == 6008 and "System" in evt.get("log", ""):
             crash["detected"] = True

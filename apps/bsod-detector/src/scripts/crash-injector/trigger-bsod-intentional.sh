@@ -5,7 +5,7 @@ set -euxo pipefail; shopt -s inherit_errexit
 umask 077
 
 # Parse input: crash type (0x01-0x09 from NotMyFault), VM name, and namespace
-typeset crashType="${1:-0x01}"; typeset vm="${BSOD_DET__VM__NAME:-win2022-vm-hjoshi1}"; typeset ns="${BSOD_DET__NAMESPACE:-windows-bsod}"
+typeset crashType="${1:-0x01}"; typeset vm="${BSOD_DET__VM__NAME:-}"; typeset ns="${BSOD_DET__NAMESPACE:-}"
 # Storage configuration: evidence root (mounted PVC), volume kind, and storage identity
 typeset evidenceRoot="${BSOD_DET__EVIDENCE__DIR:-/mnt/persistent-bsod-evidence}"; typeset evidenceKind="${BSOD_EVIDENCE_VOLUME_KIND:-pvc}"
 typeset evidenceId="${BSOD_DET__EVIDENCE__STORAGE_ID:-shared-bsod-evidence}"; typeset memoryPvc="${BSOD_DET__MEMORY__DUMP_PVC:-win2022-vm-hjoshi1-memdump}"

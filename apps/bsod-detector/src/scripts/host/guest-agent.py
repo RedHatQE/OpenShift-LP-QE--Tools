@@ -29,15 +29,11 @@ TRANSFER NOTES (learned the hard way)
     - For a large MEMORY.DMP, compress in-guest first (see compress-dump.ps1);
       kernel dumps shrink to ~14% and the transfer runs at ~0.5 MB/s.
 
-CONFIG (all optional -- the target is auto-resolved from the cluster)
-    GA_VM   VM (VirtualMachineInstance) name. If unset, and exactly one VMI is
-            found (in GA_NS if set, else cluster-wide), it is used automatically.
-    GA_NS   namespace. If unset, taken from the auto-detected VMI (or from GA_DOM).
-    GA_DOM  libvirt domain name. Defaults to "<GA_NS>_<GA_VM>".
-    GA_POD  virt-launcher pod. Defaults to the running virt-launcher-<vm>-* pod
-            resolved from the cluster (no more stale hardcoded pod suffixes).
-    Nothing is hardcoded to a particular VM: with a single VMI you can run with no
-    env vars at all; otherwise set GA_VM (and GA_NS if it is ambiguous).
+CONFIG (required for target identification)
+    BSOD_DET__VM__NAME          VM (VirtualMachineInstance) name
+    BSOD_DET__NAMESPACE         namespace containing the VM
+    BSOD_DET__DOMAIN__NAME      (optional) libvirt domain name. Defaults to "<BSOD_DET__NAMESPACE>_<BSOD_DET__VM__NAME>".
+    BSOD_DET__POD__NAME         (optional) virt-launcher pod name. Auto-resolved from cluster if unset.
 """
 import base64
 import gzip
@@ -48,10 +44,10 @@ import subprocess
 import sys
 import time
 
-NS  = os.environ.get("GA_NS")
-VM  = os.environ.get("GA_VM")
-POD = os.environ.get("GA_POD")
-DOM = os.environ.get("GA_DOM")
+NS  = os.environ.get("BSOD_DET__NAMESPACE")
+VM  = os.environ.get("BSOD_DET__VM__NAME")
+POD = os.environ.get("BSOD_DET__POD__NAME")
+DOM = os.environ.get("BSOD_DET__DOMAIN__NAME")
 
 _resolved = False
 
@@ -82,6 +78,14 @@ def resolve_target():
     global NS, VM, POD, DOM, _resolved
     if _resolved:
         return
+
+    # CRITICAL: Re-read environment variables in case they were set after module import
+    # This handles cases where variables are exported by parent shell after Python starts
+    NS = NS or os.environ.get("BSOD_DET__NAMESPACE")
+    VM = VM or os.environ.get("BSOD_DET__VM__NAME")
+    POD = POD or os.environ.get("BSOD_DET__POD__NAME")
+    DOM = DOM or os.environ.get("BSOD_DET__DOMAIN__NAME")
+
     # A domain name is "<ns>_<vm>" (k8s names never contain '_') -> back it out.
     if DOM and (not NS or not VM) and "_" in DOM:
         n, v = DOM.split("_", 1)
@@ -97,11 +101,11 @@ def resolve_target():
             NS = NS or n
             VM = v
         elif not rows:
-            sys.exit("guest-agent: no VirtualMachineInstance found; set GA_VM (and GA_NS)")
+            sys.exit("guest-agent: no VirtualMachineInstance found; set BSOD_DET__VM__NAME (and BSOD_DET__NAMESPACE)")
         else:
-            sys.exit("guest-agent: multiple VMs found -- set GA_VM (and GA_NS):\n  " + "\n  ".join(rows))
+            sys.exit("guest-agent: multiple VMs found -- set BSOD_DET__VM__NAME (and BSOD_DET__NAMESPACE):\n  " + "\n  ".join(rows))
     if not NS:
-        sys.exit("guest-agent: namespace unknown; set GA_NS (or GA_DOM=<ns>_<vm>)")
+        sys.exit("guest-agent: namespace unknown; set BSOD_DET__NAMESPACE (or BSOD_DET__DOMAIN__NAME=<ns>_<vm>)")
     if not DOM:
         DOM = f"{NS}_{VM}"
     if not POD:

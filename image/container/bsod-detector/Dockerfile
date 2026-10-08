@@ -116,7 +116,7 @@ COPY apps/bsod-detector/src/scripts/host/collect-host-signals.sh    /usr/local/b
 COPY apps/bsod-detector/src/scripts/host/extract-evtx.py            /usr/local/bin/extract-evtx.py
 COPY apps/bsod-detector/src/scripts/guest/configure-dumps.ps1       /usr/share/bsod-detector/guest/configure-dumps.ps1
 COPY apps/bsod-detector/src/data/                                  /usr/share/bsod-detector/data/
-COPY apps/bsod-detector/host-tools/extract-dump.sh                  /usr/local/bin/extract-dump.sh
+COPY apps/bsod-detector/src/scripts/host/extract-dump.sh            /usr/local/bin/extract-dump.sh
 RUN chmod +x \
     /usr/local/bin/watch-crash.sh \
     /usr/local/bin/preflight-rhov.sh \

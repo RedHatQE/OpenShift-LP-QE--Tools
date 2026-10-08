@@ -94,12 +94,27 @@ function RecordError () {
   jq -cn --arg stage "${stage}" --arg error "$*" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '{stage:$stage,error:$error,at:$at}' >> "${stageErrors}"
   Log "ERROR [${stage}]: $*"
 }
+# CleanupGuestfishCache — remove leftover cache files from libguestfs operations
+function CleanupGuestfishCache () {
+  find "${scriptDir}/../.." -maxdepth 5 -name "file.0x*" -type f -delete 2>/dev/null || true
+  find /tmp -maxdepth 2 -name "file.0x*" -type f -delete 2>/dev/null || true
+}
 # Cleanup function: delete extraction pod (no PSS revert needed — stays at baseline)
 function Cleanup () {
   ((cleanupDone == 0)) || return 0
   cleanupDone=1; typeset failed=0
   # Delete temporary guestfs-ntfs extraction pod if created
-  if ((podCreated)); then RunTimed 70 oc --request-timeout=65s delete pod "${guestfsPod}" -n "${ns}" --ignore-not-found --wait=true --timeout=60s >>"${extractionLog}" 2>&1 || { RecordError cleanup "failed to delete guestfs-ntfs pod ${guestfsPod}"; failed=1; }; podCreated=0; fi
+  if ((podCreated)); then
+    # Verify pod exists before attempting deletion (best practice to avoid error noise)
+    if Oc get pod "${guestfsPod}" -n "${ns}" &>/dev/null 2>&1; then
+      Log "deleting guestfs-ntfs pod: ${guestfsPod}"
+      RunTimed 70 oc --request-timeout=65s delete pod "${guestfsPod}" -n "${ns}" --wait=true --timeout=60s >>"${extractionLog}" 2>&1 || { RecordError cleanup "failed to delete guestfs-ntfs pod ${guestfsPod}"; failed=1; }
+    else
+      Log "guestfs-ntfs pod already deleted or does not exist: ${guestfsPod}"
+    fi
+    podCreated=0
+  fi
+  CleanupGuestfishCache
   # No PSS revert needed — guestfs-ntfs pod uses non-privileged container, PSS stays at baseline
   return "${failed}"
 }
@@ -117,9 +132,9 @@ function WaitJsonPath () {
   return 1
 }
 # Discover NTFS partitions dynamically from stopped VM disk via guestfish
-# Filters out recovery partitions (sda1/sda2), returns Windows data partition device(s)
+# Returns all NTFS partitions for extraction (caller handles multiple partitions)
 function DiscoverNTFSPartitions () {
-  typeset partitions=() device fstype
+  typeset -a partitions=() device fstype
   local output
   output=$(Oc exec -n "${ns}" "${guestfsPod}" -c "${guestfsContainer}" -- \
     guestfish --ro -a /dev/vda run : list-filesystems 2>>"${extractionLog}") || return 1
@@ -127,8 +142,8 @@ function DiscoverNTFSPartitions () {
   # Parse output: lines like "/dev/sda3: ntfs" or "/dev/sda1: vfat"
   while IFS=': ' read -r device fstype; do
     [ -z "${device}" ] && continue
-    # Keep only NTFS partitions, skip EFI/recovery (sda1 is typically EFI, sda2 may be recovery)
-    if [ "${fstype}" = "ntfs" ] && [[ ! "${device}" =~ sda[12]$ ]]; then
+    # Keep only NTFS partitions (no hardcoded exclusions - let extraction handle all)
+    if [ "${fstype}" = "ntfs" ]; then
       partitions+=("${device}")
     fi
   done <<< "${output}"
@@ -138,7 +153,7 @@ function DiscoverNTFSPartitions () {
 }
 
 # Extract single file from NTFS partition with directory structure preservation
-# Stores files under guestFS/ subdir to maintain Windows path hierarchy
+# Stores files under partition-qualified guestFS_<partition>/ subdir to prevent overwrites
 # Uses two-phase extraction: guestfish writes to pod file → oc cp copies to host
 function ExtractNTFSFile () {
   typeset partition="${1:?}"; typeset windowsPath="${2:?}"; typeset baseOutputDir="${3:?}"
@@ -146,13 +161,15 @@ function ExtractNTFSFile () {
   # Convert Windows path: C:\Windows\System32\file.txt → /Windows/System32/file.txt
   typeset unixPath; unixPath="$(printf '%s' "${windowsPath#[Cc]:}" | tr '\\' '/')"
 
-  # Preserve full directory structure: guestFS/Windows/System32/file.txt
+  # Preserve full directory structure with partition qualifier: guestFS_sda3/Windows/System32/file.txt
+  # This prevents overwrites when multiple NTFS partitions exist
+  typeset partitionId; partitionId="${partition##*/}"  # Extract sda3 from /dev/sda3
   typeset parentDirs="${unixPath%/*}"
   typeset fileName="${unixPath##*/}"
-  typeset outputPath="${baseOutputDir}/guestFS${unixPath}"
+  typeset outputPath="${baseOutputDir}/guestFS_${partitionId}${unixPath}"
 
-  # Create parent directories under guestFS/ on host
-  mkdir -p "${baseOutputDir}/guestFS${parentDirs}"
+  # Create parent directories under partition-qualified guestFS_<partition>/ on host
+  mkdir -p "${baseOutputDir}/guestFS_${partitionId}${parentDirs}"
 
   # Temporary file in pod's /tmp to hold extracted file (guestfish download local-path)
   typeset podTempFile="/tmp/bsod-extract-$$-${RANDOM}.bin"
@@ -189,6 +206,92 @@ function ExtractNTFSFile () {
   return 0
 }
 
+# Extract files in parallel with controlled concurrency (3 simultaneous extractions)
+# Allows faster artifact extraction while avoiding pod resource exhaustion
+# Safe for use with read-only mounts and independent files (no interdependencies)
+function ExtractNTFSFilesParallel () {
+  typeset -r maxParallel=3
+  typeset -a fileQueue=("$@")
+  typeset -a activeJobs=()
+  typeset activeCount=0
+  typeset failedCount=0
+
+  Log "extracting ${#fileQueue[@]} files with parallel concurrency (max ${maxParallel} simultaneous)"
+
+  # Process file queue with controlled parallelism
+  while ((${#fileQueue[@]} > 0 || activeCount > 0)); do
+    # Check for completed jobs and remove from tracking
+    typeset i
+    for ((i = ${#activeJobs[@]} - 1; i >= 0; i--)); do
+      typeset jobPid="${activeJobs[$i]}"
+      if ! kill -0 "${jobPid}" 2>/dev/null; then
+        # Job finished, get exit code
+        typeset jobDesc=""; jobDesc="$(jobs -l | grep "${jobPid}")" || true
+        activeJobs=("${activeJobs[@]:0:$i}" "${activeJobs[@]:$((i+1))}")
+        ((activeCount--))
+      fi
+    done
+
+    # Start new jobs if queue not empty and under parallelism limit
+    while ((${#fileQueue[@]} > 0 && activeCount < maxParallel)); do
+      typeset fileSpec="${fileQueue[0]}"
+      fileQueue=("${fileQueue[@]:1}")  # Remove from queue
+
+      # Parse file specification: partition|windows_path|output_dir
+      typeset partition evtxFile baseOutputDir
+      IFS='|' read -r partition evtxFile baseOutputDir <<< "${fileSpec}"
+
+      Log "starting parallel extraction [job $((${#activeJobs[@]} + 1))/${maxParallel}]: ${evtxFile} from ${partition}"
+
+      # Launch extraction in background
+      (
+        if ExtractNTFSFile "${partition}" "C:${evtxFile}" "${baseOutputDir}"; then
+          Log "PARALLEL: completed ${evtxFile}"
+        else
+          Log "PARALLEL: FAILED ${evtxFile}"
+          exit 1
+        fi
+      ) &
+
+      activeJobs+=($!)
+      ((activeCount++))
+    done
+
+    # Brief sleep before checking job status again (avoid busy-wait)
+    sleep 1
+  done
+
+  # Check for job failures
+  typeset jobPid
+  for jobPid in "${activeJobs[@]}"; do
+    if ! wait "${jobPid}" 2>/dev/null; then
+      ((failedCount++))
+    fi
+  done
+
+  if ((failedCount > 0)); then
+    Log "WARN: parallel extraction had ${failedCount} failure(s), but others may have succeeded"
+    return 1  # Signal that at least one extraction failed, but don't stop pipeline
+  fi
+
+  return 0
+}
+
+# Verify source PVC is not attached to any other VMI before extraction
+Log "verifying source PVC ${guestPvc} is not attached to other VMI..."
+typeset attachedVmis
+attachedVmis=$(Oc get vmi -n "${ns}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | while read vmi; do
+  if Oc get vmi "${vmi}" -n "${ns}" -o jsonpath='{.spec.volumes[*].persistentVolumeClaim.claimName}' 2>/dev/null | grep -q "^${guestPvc}\$"; then
+    echo "${vmi}"
+  fi
+done)
+if [[ -n "${attachedVmis}" ]]; then
+  Log "ERROR: source PVC ${guestPvc} is already attached to: ${attachedVmis}"
+  RecordError extraction "source PVC is attached to running VMI; cannot safely mount"
+  exit 1
+fi
+Log "verified source PVC ${guestPvc} is not attached to any running VMI"
+
 # Create guestfs-ntfs extraction pod using public quay.io image (NTFS support via oadp-vmfr-access)
 # Uses same security context as verified working pod: runAsNonRoot:true, fsGroup, seccompProfile
 Log "creating guestfs-ntfs pod for NTFS artifact extraction (using quay.io/konveyor/oadp-vmfr-access)"
@@ -198,15 +301,18 @@ typeset guestfsSuffix=''; guestfsSuffix="$(date -u +%s)-$$"; typeset guestfsPod=
 typeset guestfsContainer="libguestfs"
 typeset guestfsImage="${BSOD_DET__GUESTFS__NTFS_IMAGE:-quay.io/konveyor/oadp-vmfr-access:latest}"
 
-# Create guestfs-ntfs pod with block device attachment
+# Create guestfs-ntfs pod with block device attachment and resource limits
 # Security: matches verified working pod (oadp-vmfr-access)
 #   - fsGroup: 1000800000 (restricted-v2 SCC assigned UID)
 #   - runAsNonRoot: true
 #   - seccompProfile: RuntimeDefault
 #   - allowPrivilegeEscalation: false, capabilities drop ALL
 # Backend: direct with force_tcg (software QEMU, works on any node without KVM requirements)
+# Resource Limits (cost optimization):
+#   - Memory request: 512Mi (typical usage), limit: 2Gi (headroom for spikes)
+#   - CPU request: 500m (conservative), limit: 2000m (allows burst for large extractions)
 jq -n --arg name "${guestfsPod}" --arg ns "${ns}" --arg image "${guestfsImage}" --arg pvc "${guestPvc}" \
-  '{apiVersion:"v1",kind:"Pod",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-guestfs-extraction"}},spec:{restartPolicy:"Never",automountServiceAccountToken:false,securityContext:{runAsNonRoot:true,fsGroup:1000800000,seccompProfile:{type:"RuntimeDefault"}},nodeSelector:{"kubernetes.io/arch":"amd64"},containers:[{name:"libguestfs",image:$image,imagePullPolicy:"Always",command:["/bin/bash","-c","exec tail -f /dev/null"],env:[{name:"LIBGUESTFS_BACKEND",value:"direct"},{name:"LIBGUESTFS_BACKEND_SETTINGS",value:"force_tcg"},{name:"LIBGUESTFS_TMPDIR",value:"/tmp/guestfs"},{name:"LIBGUESTFS_CACHEDIR",value:"/tmp/guestfs"},{name:"HOME",value:"/home/guestfs"}],securityContext:{allowPrivilegeEscalation:false,capabilities:{drop:["ALL"]}},volumeDevices:[{name:"guest-disk",devicePath:"/dev/vda"}],volumeMounts:[{name:"guestfs-tmp",mountPath:"/tmp/guestfs"},{name:"guestfs-home",mountPath:"/home/guestfs"}],workingDir:"/tmp/guestfs"}],volumes:[{name:"guest-disk",persistentVolumeClaim:{claimName:$pvc,readOnly:true}},{name:"guestfs-tmp",emptyDir:{}},{name:"guestfs-home",emptyDir:{}}]}}' | Oc apply -f - 2>/dev/null >>"${extractionLog}"
+  '{apiVersion:"v1",kind:"Pod",metadata:{name:$name,namespace:$ns,labels:{app:"bsod-guestfs-extraction"}},spec:{restartPolicy:"Never",automountServiceAccountToken:false,securityContext:{runAsNonRoot:true,fsGroup:1000800000,seccompProfile:{type:"RuntimeDefault"}},nodeSelector:{"kubernetes.io/arch":"amd64"},containers:[{name:"libguestfs",image:$image,imagePullPolicy:"Always",command:["/bin/bash","-c","exec tail -f /dev/null"],env:[{name:"LIBGUESTFS_BACKEND",value:"direct"},{name:"LIBGUESTFS_BACKEND_SETTINGS",value:"force_tcg"},{name:"LIBGUESTFS_TMPDIR",value:"/tmp/guestfs"},{name:"LIBGUESTFS_CACHEDIR",value:"/tmp/guestfs"},{name:"HOME",value:"/home/guestfs"}],securityContext:{allowPrivilegeEscalation:false,capabilities:{drop:["ALL"]}},resources:{requests:{memory:"512Mi",cpu:"500m"},limits:{memory:"2Gi",cpu:"2000m"}},volumeDevices:[{name:"guest-disk",devicePath:"/dev/vda"}],volumeMounts:[{name:"guestfs-tmp",mountPath:"/tmp/guestfs"},{name:"guestfs-home",mountPath:"/home/guestfs"}],workingDir:"/tmp/guestfs"}],volumes:[{name:"guest-disk",persistentVolumeClaim:{claimName:$pvc,readOnly:true}},{name:"guestfs-tmp",emptyDir:{}},{name:"guestfs-home",emptyDir:{}}]}}' | Oc apply -f - 2>/dev/null >>"${extractionLog}"
 
 podCreated=1; WaitJsonPath pod "${guestfsPod}" '{.status.phase}' Running 180 || { RecordError extraction-pod "guestfs-ntfs pod '${guestfsPod}' startup timed out"; exit 1; }
 
@@ -294,10 +400,18 @@ if ((${#ntfsPartitions[@]} > 0)); then
     done
   done
 
-  # Create EventLogs symlink for backward compatibility
-  if [ -d "${outDir}/guestFS/Windows/System32/winevt/Logs" ]; then
+  # Create EventLogs symlink for backward compatibility (point to first partition found)
+  typeset firstPartition=''
+  for partition in "${ntfsPartitions[@]}"; do
+    typeset partitionId; partitionId="${partition##*/}"
+    if [ -d "${outDir}/guestFS_${partitionId}/Windows/System32/winevt/Logs" ]; then
+      firstPartition="${partitionId}"
+      break
+    fi
+  done
+  if [ -n "${firstPartition}" ]; then
     mkdir -p "${outDir}/EventLogs"
-    ln -sf ../guestFS/Windows/System32/winevt/Logs/*.evtx "${outDir}/EventLogs/" 2>/dev/null || true
+    ln -sf ../guestFS_${firstPartition}/Windows/System32/winevt/Logs/*.evtx "${outDir}/EventLogs/" 2>/dev/null || true
   fi
 else
   Log "WARN: no NTFS partitions discovered — skipping file extraction"
