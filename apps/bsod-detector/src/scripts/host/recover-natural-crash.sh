@@ -285,6 +285,7 @@ vmiListJson="$(Oc get vmi -n "${ns}" -o json)" || Die "cannot list VMIs in names
 typeset attachedVmis
 attachedVmis="$(jq -r --arg pvc "${guestPvc}" \
   '.items[] | select(
+    .status.phase == "Running" and
     (.spec.volumes // [] | map(.persistentVolumeClaim.claimName // "", .dataVolume.name // "") | any(. == $pvc))
   ) | .metadata.name' <<<"${vmiListJson}")" || Die "cannot parse VMI list — PVC attachment state uncertain"
 if [[ -n "${attachedVmis}" ]]; then
