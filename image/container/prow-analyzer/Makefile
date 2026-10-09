@@ -49,8 +49,9 @@ help:
 		'Variables:' \
 		'  IMAGE_REGISTRY  - Container registry (default: $(IMAGE_REGISTRY))' \
 		'  IMAGE_NAMESPACE - Registry namespace (default: $(IMAGE_NAMESPACE))' \
-		'  IMAGE_NAME      - Image name (default: $(IMAGE_NAME))' \
+		'  IMAGE_REPO      - Image repository name (default: $(IMAGE_REPO))' \
 		'  IMAGE_TAG       - Image tag (default: $(IMAGE_TAG))' \
+		'  IMAGE_NAME      - Full image reference composed from the vars above (default: $(IMAGE_NAME))' \
 		'' \
 		'Example:' \
 		'  make build IMAGE_TAG=v1.0.0' \
