@@ -69,19 +69,22 @@ type Analyzer struct {
 	nextID      atomic.Int64
 	insecureTLS bool
 	debug       bool
+	timeout     time.Duration
 	jsonMarshal func(v interface{}) ([]byte, error)
 	newRequest  func(ctx context.Context, method, url string, body io.Reader) (*http.Request, error)
 }
 
-// defaultMCPTimeout is the HTTP client timeout for ship-help MCP requests. It
+// DefaultMCPTimeout is the HTTP client timeout for ship-help MCP requests. It
 // caps the ENTIRE request, including reading the streamed SSE response body, so
 // it must exceed the longest analysis. Upgrade-interop jobs can take >10 min, so
-// the default is 20 min. Override with MCP_TIMEOUT_SECONDS (see MCPTimeout).
-const defaultMCPTimeout = 1200 * time.Second
+// the default is 20 min. Override with MCP_TIMEOUT_SECONDS (see MCPTimeout) or,
+// for the bot, the --mcp-timeout flag / PROW_AN__MCP__TIMEOUT_SECONDS (see
+// WithTimeout).
+const DefaultMCPTimeout = 1200 * time.Second
 
 // MCPTimeout returns the ship-help MCP HTTP client timeout. It reads
 // MCP_TIMEOUT_SECONDS (a positive integer number of seconds) and falls back to
-// defaultMCPTimeout when the var is unset, empty, or invalid. It is exported so
+// DefaultMCPTimeout when the var is unset, empty, or invalid. It is exported so
 // callers can size behavior (e.g. the handler's dedup window) to outlast the
 // longest an analysis may run.
 func MCPTimeout() time.Duration {
@@ -90,7 +93,7 @@ func MCPTimeout() time.Duration {
 			return time.Duration(secs) * time.Second
 		}
 	}
-	return defaultMCPTimeout
+	return DefaultMCPTimeout
 }
 
 // AnalyzerOption configures optional Analyzer behavior. Existing callers that
@@ -121,6 +124,19 @@ func WithDebug(debug bool) AnalyzerOption {
 	return func(a *Analyzer) { a.debug = debug }
 }
 
+// WithTimeout overrides the HTTP client timeout for MCP/Prow requests. It lets
+// callers (e.g. the bot's --mcp-timeout flag) drive the timeout explicitly,
+// overriding the MCP_TIMEOUT_SECONDS env var default read by MCPTimeout. A
+// non-positive duration is ignored, leaving the MCPTimeout default in place. It
+// has no effect when WithHTTPClient supplies a client.
+func WithTimeout(d time.Duration) AnalyzerOption {
+	return func(a *Analyzer) {
+		if d > 0 {
+			a.timeout = d
+		}
+	}
+}
+
 // NewAnalyzer creates a new Analyzer instance
 func NewAnalyzer(mcpURL, token, promptTemplate string, opts ...AnalyzerOption) *Analyzer {
 	a := &Analyzer{
@@ -136,8 +152,12 @@ func NewAnalyzer(mcpURL, token, promptTemplate string, opts ...AnalyzerOption) *
 		opt(a)
 	}
 	if a.client == nil {
+		timeout := a.timeout
+		if timeout <= 0 {
+			timeout = MCPTimeout()
+		}
 		httpClient := &http.Client{
-			Timeout: MCPTimeout(),
+			Timeout: timeout,
 		}
 		if a.insecureTLS {
 			httpClient.Transport = &http.Transport{

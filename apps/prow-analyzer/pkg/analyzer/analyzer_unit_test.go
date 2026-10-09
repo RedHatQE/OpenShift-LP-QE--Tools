@@ -73,8 +73,8 @@ func TestNewAnalyzer(t *testing.T) {
 	httpClient, ok := analyzer.client.(*http.Client)
 	if !ok {
 		t.Error("Expected client to be *http.Client")
-	} else if httpClient.Timeout != defaultMCPTimeout {
-		t.Errorf("Expected timeout %v, got %v", defaultMCPTimeout, httpClient.Timeout)
+	} else if httpClient.Timeout != DefaultMCPTimeout {
+		t.Errorf("Expected timeout %v, got %v", DefaultMCPTimeout, httpClient.Timeout)
 	}
 	if analyzer.jsonMarshal == nil {
 		t.Error("Expected jsonMarshal to be initialized")
@@ -125,12 +125,12 @@ func TestMCPTimeout(t *testing.T) {
 		set  bool
 		want time.Duration
 	}{
-		{name: "unset uses default", set: false, want: defaultMCPTimeout},
-		{name: "empty uses default", env: "", set: true, want: defaultMCPTimeout},
+		{name: "unset uses default", set: false, want: DefaultMCPTimeout},
+		{name: "empty uses default", env: "", set: true, want: DefaultMCPTimeout},
 		{name: "valid override", env: "1800", set: true, want: 1800 * time.Second},
-		{name: "non-numeric falls back", env: "abc", set: true, want: defaultMCPTimeout},
-		{name: "zero falls back", env: "0", set: true, want: defaultMCPTimeout},
-		{name: "negative falls back", env: "-5", set: true, want: defaultMCPTimeout},
+		{name: "non-numeric falls back", env: "abc", set: true, want: DefaultMCPTimeout},
+		{name: "zero falls back", env: "0", set: true, want: DefaultMCPTimeout},
+		{name: "negative falls back", env: "-5", set: true, want: DefaultMCPTimeout},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -340,6 +340,31 @@ func TestWithDebug(t *testing.T) {
 	a := NewAnalyzer("url", "token", "tmpl", WithDebug(true))
 	if !a.debug {
 		t.Error("Expected debug to be true after WithDebug(true)")
+	}
+}
+
+// TestWithTimeout verifies the WithTimeout option overrides the default HTTP
+// client timeout for a positive duration and is ignored for a non-positive one
+// (leaving the MCPTimeout default in place).
+func TestWithTimeout(t *testing.T) {
+	a := NewAnalyzer("url", "token", "tmpl", WithTimeout(42*time.Second))
+	httpClient, ok := a.client.(*http.Client)
+	if !ok {
+		t.Fatal("Expected client to be *http.Client")
+	}
+	if httpClient.Timeout != 42*time.Second {
+		t.Errorf("Expected timeout 42s, got %v", httpClient.Timeout)
+	}
+
+	// A non-positive duration is ignored; the MCPTimeout default applies.
+	t.Setenv("MCP_TIMEOUT_SECONDS", "")
+	def := NewAnalyzer("url", "token", "tmpl", WithTimeout(0))
+	defClient, ok := def.client.(*http.Client)
+	if !ok {
+		t.Fatal("Expected client to be *http.Client")
+	}
+	if defClient.Timeout != DefaultMCPTimeout {
+		t.Errorf("Expected default timeout %v, got %v", DefaultMCPTimeout, defClient.Timeout)
 	}
 }
 

@@ -124,8 +124,8 @@ placeholders, and `oc apply`). The deployment manifest lives at
 See [doc/reference.md](doc/reference.md#environment-variables) for the full list,
 including the bot's optional vars (`PROW_AN__ALLOWED__BOT_IDS`,
 `PROW_AN__MONITOR__ALL`, `PROW_AN__PROMPT__TEMPLATE`, `PROW_AN__SLACK__DEBUG`,
-`PROW_AN__MCP__DEBUG`) and `TLS_INSECURE_SKIP_VERIFY` (read unprefixed by both the
-bot and the CLI).
+`PROW_AN__MCP__DEBUG`, `PROW_AN__MCP__TIMEOUT_SECONDS`) and `TLS_INSECURE_SKIP_VERIFY`
+(read unprefixed by both the bot and the CLI).
 
 ### Getting Tokens
 
