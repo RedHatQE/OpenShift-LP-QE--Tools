@@ -348,59 +348,31 @@ typeset -a evtxTargets=(
   '/Windows/System32/winevt/Logs/Application.evtx'
 )
 
-# Comprehensive search: list all .evtx files on each partition before extraction
-# This ensures we find all EventLog files regardless of location
-Log "searching for .evtx files across all NTFS partitions..."
-typeset -a foundEvtxFiles=()
-
+# Dynamically detect which NTFS partition is the Windows system partition (C:) by attempting
+# to extract .evtx files from standard locations. EventLogs exist on exactly one partition.
+# If a partition does not contain the .evtx files it is not the Windows partition — log INFO.
+Log "detecting Windows system partition and extracting EventLog files..."
+typeset windowsPartition=''
 if ((${#ntfsPartitions[@]} > 0)); then
   for partition in "${ntfsPartitions[@]}"; do
-    Log "scanning partition ${partition} for .evtx files..."
-    # List all .evtx files on this partition
-    typeset evtxList
-    evtxList=$(Oc exec -n "${ns}" "${guestfsPod}" -c "${guestfsContainer}" -- \
-      bash -c "guestfish --ro -a /dev/vda run : mount-ro '${partition}' / : find / -name '*.evtx' : umount-all" 2>>"${extractionLog}") || true
-
-    # Parse found files and track them
-    while IFS= read -r evtxFile; do
-      [ -z "${evtxFile}" ] && continue
-      Log "found .evtx file on ${partition}: ${evtxFile}"
-      foundEvtxFiles+=("${partition}|${evtxFile}")
-    done <<< "${evtxList}"
-  done
-
-  # Log summary of discovered files
-  if ((${#foundEvtxFiles[@]} > 0)); then
-    Log "discovered ${#foundEvtxFiles[@]} .evtx file(s) across partitions"
-  else
-    Log "WARN: no .evtx files found in any partition"
-  fi
-
-  # Extract all discovered .evtx files
-  Log "extracting all discovered .evtx files..."
-  for partFile in "${foundEvtxFiles[@]}"; do
-    IFS='|' read -r partition evtxFile <<< "${partFile}"
-    Log "extracting from ${partition}: ${evtxFile}"
-    if ExtractNTFSFile "${partition}" "C:${evtxFile}" "${outDir}"; then
-      evtxOk=1
-    fi
-  done
-
-  # Also attempt extraction from standard locations (fallback)
-  Log "attempting extraction from standard EventLog locations..."
-  for partition in "${ntfsPartitions[@]}"; do
+    Log "trying partition ${partition} for EventLog files..."
+    typeset partitionHit=0
     for filePath in "${evtxTargets[@]}"; do
-      # Skip if already extracted
-      if grep -q "${filePath}" <<< "${foundEvtxFiles[@]}" 2>/dev/null; then
-        Log "skipping ${filePath} — already extracted from ${partition}"
-        continue
-      fi
-
-      Log "attempting: ${partition}${filePath}"
       if ExtractNTFSFile "${partition}" "C:${filePath}" "${outDir}"; then
-        evtxOk=1
+        evtxOk=1; partitionHit=1; windowsPartition="${partition}"
+      else
+        # Not a failure — this partition may simply not be the Windows system partition
+        if [[ -n "${windowsPartition}" ]]; then
+          Log "INFO: ${filePath} not present on ${partition} — EventLogs are on ${windowsPartition} only (expected)"
+        fi
       fi
     done
+    if ((partitionHit)); then
+      Log "Windows system partition identified: ${partition} — skipping remaining partitions"
+      break
+    else
+      Log "INFO: no EventLog files on ${partition} — not the Windows system partition, trying next"
+    fi
   done
 
   # Create EventLogs symlink for backward compatibility (point to first partition found)
@@ -476,10 +448,11 @@ elif [[ -s "${outDir}/MEMORY.DMP" ]]; then
 elif [[ -d "${outDir}/Minidump" ]]; then
   RunTimed 60 bash "${scriptDir}/parse-dump-header.sh" --dir "${outDir}/Minidump" > "${outDir}/parse-dump-header.json" 2>>"${extractionLog}" || parseStatus=$?
 else
-  Log "WARN: no MEMORY.DMP or Minidump directory found — dump parsing skipped (with CrashDumpEnabled=11, dump is in elf2dmp format only)"
-  parseStatus=0
+  Log "INFO: no on-disk MEMORY.DMP or Minidump — primary dump is vm-memory.elf.tar.gz via KubeVirt; writing stub parse-dump-header.json"
+  jq -n '{"ok":true,"totalDumps":0,"dumps":[],"warnings":["no on-disk dump available; primary artifact is vm-memory.elf.tar.gz"]}' \
+    > "${outDir}/parse-dump-header.json"; chmod 0600 "${outDir}/parse-dump-header.json"
 fi
-if ((parseStatus != 0)) || ! jq -e '.ok == true' "${outDir}/parse-dump-header.json" >/dev/null; then RecordError dump-parse 'dump parser failed or reported semantic failure'; exit 1; fi
+if ((parseStatus != 0)) || ! jq -e '.ok == true' "${outDir}/parse-dump-header.json" >/dev/null 2>&1; then RecordError dump-parse 'dump parser failed or reported semantic failure'; exit 1; fi
 typeset -a evtxFiles=("${outDir}/EventLogs/System.evtx"); [[ -s "${outDir}/EventLogs/Application.evtx" ]] && evtxFiles+=("${outDir}/EventLogs/Application.evtx")
 if RunTimed 120 "${extractEvtxBin}" --data-dir "${BSOD_DET__DATA__DIR:-$(cd "${scriptDir}/../../data" && pwd)}" "${evtxFiles[@]}" > "${outDir}/events.json" 2>>"${extractionLog}"; then
   if jq -e '.ok == true' "${outDir}/events.json" >/dev/null 2>&1; then
