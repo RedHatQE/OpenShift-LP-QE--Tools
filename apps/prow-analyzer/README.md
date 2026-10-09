@@ -15,8 +15,8 @@ Automated Prow CI failure analysis using Red Hat's ship-help MCP (AI helpdesk).
   of every tool, API, function, and data source the agent can access.
 - [Data Flow & Architecture Diagram](doc/dataflow-architecture.md) — components,
   data flows, trust boundaries, and code/data repositories (Mermaid).
-- [Architecture & Usage](doc/architecture.md) — components, MCP protocol flow,
-  configuration, and deployment internals.
+- [Developer & Operator Reference](doc/reference.md) — components, MCP protocol
+  flow, configuration, and deployment internals.
 - [Deployment quick start](doc/deployment.md).
 
 ## Features
@@ -28,7 +28,7 @@ Automated Prow CI failure analysis using Red Hat's ship-help MCP (AI helpdesk).
   - GitHub repositories and PRs
   - Build logs and artifacts
   - Test results and history
-  - Firewatch automated triage
+  - Automated known-issue triage
   - Slack team discussions
   - Internal documentation
   - Historical failure patterns
@@ -45,12 +45,12 @@ export SHIP_HELP_MCP_TOKEN="<your-token>"
 ./prow-analyzer--cli analyze <prow-url>
 ```
 
-**Note:** Analysis takes 2-4 minutes as ship-help searches across 9+ data sources (Jira, GitHub, Firewatch, build logs, etc.).
+**Note:** Analysis takes 2-4 minutes as ship-help searches across 9+ data sources (Jira, GitHub, an internal triage system, build logs, etc.).
 
 Example:
 
 ```bash
-export SHIP_HELP_MCP_URL="https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp"
+export SHIP_HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
 export SHIP_HELP_MCP_TOKEN="eyJhbGc..."
 ./prow-analyzer--cli analyze https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-stolostron-policy-collection-main-ocp4.22-interop-opp-aws/2066255424226594816
 ```
@@ -58,10 +58,12 @@ export SHIP_HELP_MCP_TOKEN="eyJhbGc..."
 ### Slack Bot
 
 ```bash
-# Additional environment variables for Slack
-export SLACK_BOT_TOKEN="xoxb-..."
-export SLACK_APP_TOKEN="xapp-..."
-export MONITORED_CHANNELS="C12345678,C87654321"
+# The bot reads all of its environment variables under the PROW_AN__ prefix
+export PROW_AN__SHIP__HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
+export PROW_AN__SHIP__HELP_MCP_TOKEN="<your-token>"
+export PROW_AN__SLACK__BOT_TOKEN="xoxb-..."
+export PROW_AN__SLACK__APP_TOKEN="xapp-..."
+export PROW_AN__MONITORED__CHANNELS="C12345678,C87654321"
 
 # Build and run
 go build ./cmd/prow-analyzer--bot
@@ -79,15 +81,15 @@ The bot monitors configured Slack channels and automatically analyzes any Prow U
 ### Local Development
 
 ```bash
-git clone https://github.com/oramraz/prow-analyzer.git
-cd prow-analyzer
+git clone https://github.com/RedHatQE/OpenShift-LP-QE--Tools.git
+cd OpenShift-LP-QE--Tools/apps/prow-analyzer
 go mod download
 
 # Build CLI
 go build ./cmd/prow-analyzer--cli
 
 # Configure environment (required)
-export SHIP_HELP_MCP_URL="https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp"
+export SHIP_HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
 export SHIP_HELP_MCP_TOKEN="your-token-here"
 
 # Run CLI
@@ -99,34 +101,36 @@ go build ./cmd/prow-analyzer--bot
 
 ### OpenShift Deployment
 
-```bash
-# Build and push container image
-cd ../../image/container/prow-analyzer
-make build IMAGE_TAG=v1.0.0
-make push IMAGE_TAG=v1.0.0
-
-# Update secrets in apps/prow-analyzer/deploy/openshift/deployment.yaml
-# Then deploy:
-oc apply -f ../../apps/prow-analyzer/deploy/openshift/deployment.yaml
-```
+See the **[Deployment quick start](doc/deployment.md)** for the full procedure
+(build and push the image, create the namespace and Secret, edit the manifest
+placeholders, and `oc apply`). The deployment manifest lives at
+`deploy/openshift/deployment.yaml`.
 
 ## Configuration
 
 ### Environment Variables
 
-**Required:**
+**Required (CLI):**
 - `SHIP_HELP_MCP_URL` - Ship-help MCP endpoint
 - `SHIP_HELP_MCP_TOKEN` - Authentication token for ship-help MCP
 
-**Slack bot only:**
-- `SLACK_BOT_TOKEN` - Slack bot token (xoxb-...)
-- `SLACK_APP_TOKEN` - Slack app token for socket mode (xapp-...)
-- `MONITORED_CHANNELS` - Comma-separated list of channel IDs
+**Slack bot (all read under the `PROW_AN__` prefix):**
+- `PROW_AN__SHIP__HELP_MCP_URL` - Ship-help MCP endpoint
+- `PROW_AN__SHIP__HELP_MCP_TOKEN` - Authentication token for ship-help MCP
+- `PROW_AN__SLACK__BOT_TOKEN` - Slack bot token (xoxb-...)
+- `PROW_AN__SLACK__APP_TOKEN` - Slack app token for socket mode (xapp-...)
+- `PROW_AN__MONITORED__CHANNELS` - Comma-separated list of channel IDs
+
+See [doc/reference.md](doc/reference.md#environment-variables) for the full list,
+including the bot's optional vars (`PROW_AN__ALLOWED__BOT_IDS`,
+`PROW_AN__MONITOR__ALL`, `PROW_AN__PROMPT__TEMPLATE`, `PROW_AN__SLACK__DEBUG`,
+`PROW_AN__MCP__DEBUG`, `PROW_AN__MCP__TIMEOUT_SECONDS`) and `TLS_INSECURE_SKIP_VERIFY`
+(read unprefixed by both the bot and the CLI).
 
 ### Getting Tokens
 
 **Ship-help MCP Token:**
-- Contact #ship-users in Slack or
+- Contact the ship-help support channel in Slack or
 - Use existing token from ship-help-bot access
 
 **Slack Tokens:**
@@ -199,7 +203,6 @@ Analysis completed in 78.6s • Powered by ship-help MCP
 Based on the working implementation from:
 - openshift/ci-tools PR #5251 (analyzer code)
 - openshift/release PR #80559 (configuration)
-- Credit to @chaclark1974 for original Slack integration design
 
 ## License
 

@@ -19,7 +19,7 @@ ship-help**, not in this agent.
 |---|---|
 | **Writes (the only side effect)** | Posts an in-thread message to a Slack channel it is a member of. |
 | **Reads (direct)** | Slack channel message text (to detect Prow URLs). |
-| **Reads (indirect, via ship-help)** | Jira, GitHub, build logs, test results, Firewatch, Slack discussions, internal docs, historical patterns (see below). |
+| **Reads (indirect, via ship-help)** | Jira, GitHub, build logs, test results, an internal triage system, Slack discussions, internal docs, historical patterns (see below). |
 | **Not permitted** | Any write to Jira/GitHub/CI; code execution; web browsing; tools other than the single MCP `ask_persona` call. |
 
 ---
@@ -47,9 +47,9 @@ All model-driven behavior lives in the ship-help persona, not here.
 
 | API | Direction | Auth | Operations used | Notes |
 |---|---|---|---|---|
-| **ship-help MCP** (`SHIP_HELP_MCP_URL`) | Outbound | `Authorization: Bearer <SHIP_HELP_MCP_TOKEN>` + `Mcp-Session-Id` | `initialize` (protocol `2024-11-05`), `tools/call` → `ask_persona` | JSON-RPC 2.0; response is an SSE stream. Auto-recovers a stale session and retries once. 600s client timeout. |
-| **Slack Web API** | Outbound | `SLACK_BOT_TOKEN` (`xoxb-…`) | `chat.postMessage` (via `chat:write`) | Posts analysis, error, and "queue full" replies in-thread. |
-| **Slack Socket Mode** | Outbound WebSocket (WSS) | `SLACK_APP_TOKEN` (`xapp-…`) | Receives Events API callbacks; `Ack()` | No public ingress; outbound-only. |
+| **ship-help MCP** (`PROW_AN__SHIP__HELP_MCP_URL`) | Outbound | `Authorization: Bearer <PROW_AN__SHIP__HELP_MCP_TOKEN>` + `Mcp-Session-Id` | `initialize` (protocol `2024-11-05`), `tools/call` → `ask_persona` | JSON-RPC 2.0; response is an SSE stream. Auto-recovers a stale session and retries once. 1,200s (20-min) default client timeout, overridable via the bot's `--mcp-timeout` / `PROW_AN__MCP__TIMEOUT_SECONDS` or the CLI's unprefixed `MCP_TIMEOUT_SECONDS`. (CLI reads the unprefixed `SHIP_HELP_MCP_URL`/`SHIP_HELP_MCP_TOKEN`.) |
+| **Slack Web API** | Outbound | `PROW_AN__SLACK__BOT_TOKEN` (`xoxb-…`) | `chat.postMessage` (via `chat:write`) | Posts analysis, error, and "queue full" replies in-thread. |
+| **Slack Socket Mode** | Outbound WebSocket (WSS) | `PROW_AN__SLACK__APP_TOKEN` (`xapp-…`) | Receives Events API callbacks; `Ack()` | No public ingress; outbound-only. |
 
 **Slack OAuth bot scopes** (from `deploy/slack/manifest.yaml`):
 
@@ -105,7 +105,7 @@ The exported functions/constants that define the agent's behavior:
 |---|---|---|
 | Slack channel messages | `channels:history` | Only public channels the bot has been **invited to**. Reads message text to detect Prow URLs. |
 | Prow job URL | From message text / CLI arg | The URL string is passed to ship-help. |
-| Runtime configuration | Env vars / CLI flags | `SHIP_HELP_MCP_URL`, `SHIP_HELP_MCP_TOKEN`, `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `MONITORED_CHANNELS`, `PROMPT_TEMPLATE`/`-prompt`, `TLS_INSECURE_SKIP_VERIFY`. |
+| Runtime configuration | Env vars / CLI flags | Bot (`PROW_AN__`-prefixed): `PROW_AN__SHIP__HELP_MCP_URL`, `PROW_AN__SHIP__HELP_MCP_TOKEN`, `PROW_AN__SLACK__BOT_TOKEN`, `PROW_AN__SLACK__APP_TOKEN`, `PROW_AN__MONITORED__CHANNELS`, `PROW_AN__PROMPT__TEMPLATE`. CLI: `SHIP_HELP_MCP_URL`, `SHIP_HELP_MCP_TOKEN` (or `-mcp-url`/`-token`), `-prompt`. Both (unprefixed): `TLS_INSECURE_SKIP_VERIFY`. |
 
 ### Indirect (viewed by ship-help on the agent's behalf)
 
@@ -119,7 +119,7 @@ service credentials, **not** by the requesting user.
 | GitHub repositories and PRs | Code/PR context |
 | Build logs and artifacts | Failure detail |
 | Test results and history | Failure/flake context |
-| Firewatch automated triage | Known-issue correlation |
+| Automated known-issue triage | Known-issue correlation |
 | Slack team discussions | Prior discussion context |
 | Internal documentation | Guidance/runbooks |
 | Historical failure patterns | Recurring-pattern analysis |

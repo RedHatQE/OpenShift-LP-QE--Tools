@@ -1,19 +1,28 @@
 #!/bin/bash
+# test-coverage.sh — unit coverage gate, mirroring the CI "Unit Tests with
+# Coverage" step in .github/workflows/prow-analyzer--build.yaml:
+#     go test -tags unit -covermode=set -coverprofile=coverage.out ./pkg/...
+#
+# The unit suite mocks all external dependencies and spawns no goroutines, so it
+# is deterministic without the race detector; covermode=set (per-statement) keeps
+# the 100% gate reproducible. Integration tests (-tags integration -race) are run
+# separately and are not part of the coverage number (see the Makefile).
 set -euxo pipefail; shopt -s inherit_errexit
 
-typeset coverageThreshold=100.0
-typeset coverageFile='coverage.out'
-typeset coverageHTML='coverage.html'
+typeset scriptDir
+scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly scriptDir
+typeset -r buildTag='unit'
+typeset -r pkgs='./pkg/...'
+typeset -r coverageThreshold=100.0
+typeset -r coverageFile='coverage.out'
+typeset -r coverageHTML='coverage.html'
 
-: 'Running tests with coverage...'
-# Use race detector if CGO is available, otherwise skip it
-# Only test pkg/ directory (excludes cmd/main.go files)
-if [[ "${CGO_ENABLED:-1}" == "1" ]] && command -v gcc &> /dev/null; then
-    go test -v -race -coverprofile="${coverageFile}" -covermode=atomic ./pkg/...
-else
-    : 'CGO not available, running without race detector'
-    go test -v -coverprofile="${coverageFile}" -covermode=atomic ./pkg/...
-fi
+: 'Guarding that the unit build tag actually selects tests...'
+"${scriptDir}/require-tagged-tests.sh" "${buildTag}" "${pkgs}"
+
+: 'Running unit tests with coverage...'
+go test -v -tags "${buildTag}" -covermode=set -coverprofile="${coverageFile}" "${pkgs}"
 
 : 'Generating coverage report...'
 go tool cover -html="${coverageFile}" -o "${coverageHTML}"

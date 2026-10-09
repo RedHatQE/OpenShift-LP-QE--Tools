@@ -35,7 +35,7 @@ type handler struct {
 	client            *slack.Client
 	analyzer          *analyzer.Analyzer
 	monitoredChannels map[string]bool
-	monitorAll        bool            // when true, monitor every channel the bot is a member of
+	monitorAll        bool            // when true, monitor every channel the bot is a member of (explicit opt-in via WithMonitorAll)
 	allowedBotIDs     map[string]bool // bot IDs (other than self) whose messages are analyzed
 	selfBotID         string          // this bot's own bot ID, always ignored to prevent loops
 	semaphore         chan struct{}   // Limit concurrent analyses
@@ -66,6 +66,16 @@ func WithAllowedBotIDs(botIDs []string) Option {
 // ignored, even if that ID were mistakenly added to the allow-list.
 func WithSelfBotID(botID string) Option {
 	return func(h *handler) { h.selfBotID = botID }
+}
+
+// WithMonitorAll enables monitoring of every channel the bot is a member of,
+// rather than only the explicit monitored-channels allow-list. It is an explicit
+// opt-in (e.g. PROW_AN__MONITOR__ALL=true) because it broadens data collection: messages
+// from every channel the bot can see may be forwarded to ship-help under shared
+// service credentials. Without it, and with no channels configured, the handler
+// is fail-closed and monitors nothing.
+func WithMonitorAll(enabled bool) Option {
+	return func(h *handler) { h.monitorAll = enabled }
 }
 
 func (h *handler) Handle(callback *slackevents.EventsAPIEvent, logger *slog.Logger) (handled bool, err error) {
@@ -102,9 +112,10 @@ func (h *handler) Handle(callback *slackevents.EventsAPIEvent, logger *slog.Logg
 		}
 	}
 
-	// Only monitor configured channels. When no channels are configured, monitor
-	// every channel the bot receives messages from — i.e. those it's a member of —
-	// so inviting the bot to a channel automatically starts monitoring it.
+	// Only monitor configured channels. Fail-closed: a channel is monitored only
+	// if it is in the allow-list, unless monitor-all was explicitly enabled
+	// (WithMonitorAll / PROW_AN__MONITOR__ALL), in which case every joined channel is
+	// monitored so inviting the bot is enough.
 	if !h.monitorAll && !h.monitoredChannels[event.Channel] {
 		return false, nil
 	}
@@ -257,8 +268,10 @@ func (h *handler) analyzeAndRespond(ctx context.Context, event *slackevents.Mess
 		fmt.Printf("PROW-ANALYZER ERROR: Analysis failed after %s: %v\n", analyzeDur.Round(time.Millisecond), err)
 		logger.Error("Prow analyzer analysis failed", "error", err, "analyze", analyzeDur)
 		// Audit the outcome (event 3/3): analysis failed before any reply content.
+		// The error is redacted to a category so raw backend content (e.g. an MCP
+		// HTTP body) is not persisted in the immutable audit trail.
 		audit.Outcome(ctx, "failed",
-			"error", err.Error(),
+			"error", audit.RedactError(err),
 			"duration_ms", analyzeDur.Milliseconds(),
 		)
 		// Reply to user with error message (don't expose internal error details)
@@ -289,8 +302,9 @@ func (h *handler) analyzeAndRespond(ctx context.Context, event *slackevents.Mess
 	if err != nil {
 		logger.Error("Failed to post prow analyzer response", "error", err, "slackPost", postDur)
 		// Audit the outcome (event 3/3): analysis produced but delivery failed.
+		// The error is redacted to a category before it reaches the audit trail.
 		audit.Outcome(ctx, "delivery_failed",
-			"error", err.Error(),
+			"error", audit.RedactError(err),
 			"duration_ms", time.Since(overallStart).Milliseconds(),
 		)
 		return
@@ -341,7 +355,7 @@ func New(client *slack.Client, a *analyzer.Analyzer, monitoredChannels []string,
 		client:            client,
 		analyzer:          a,
 		monitoredChannels: channelMap,
-		monitorAll:        len(channelMap) == 0, // no explicit allowlist ⇒ monitor all joined channels
+		monitorAll:        false, // fail-closed: monitor only the allow-list unless WithMonitorAll opts in
 		allowedBotIDs:     make(map[string]bool),
 		semaphore:         make(chan struct{}, 5), // Limit to 5 concurrent analyses
 		dedupTTL:          dedupTTL,

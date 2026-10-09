@@ -70,7 +70,10 @@ func main() {
 
 	result, err := a.AnalyzeFailure(ctx, jobURL)
 	if err != nil {
-		audit.Outcome(ctx, "failed", "error", err.Error())
+		// The error is redacted to a category so raw backend content (e.g. an MCP
+		// HTTP body) is not persisted in the immutable audit trail; the full
+		// diagnostic still goes to the operational error output on stderr below.
+		audit.Outcome(ctx, "failed", "error", audit.RedactError(err))
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}

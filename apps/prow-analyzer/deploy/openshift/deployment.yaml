@@ -3,17 +3,10 @@ kind: Namespace
 metadata:
   name: prow-analyzer
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: prow-analyzer-secrets
-  namespace: prow-analyzer
-type: Opaque
-stringData:
-  ship-help-token: "YOUR_SHIP_HELP_TOKEN_HERE"
-  slack-bot-token: "YOUR_SLACK_BOT_TOKEN_HERE"
-  slack-app-token: "YOUR_SLACK_APP_TOKEN_HERE"
----
+# NOTE: the prow-analyzer-secrets Secret is intentionally NOT defined in this
+# manifest. Create it out-of-band with real tokens BEFORE `oc apply` (see
+# doc/deployment.md, Step 2). Shipping placeholder token values here would
+# overwrite the real Secret with invalid tokens on every `oc apply`.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -21,7 +14,7 @@ metadata:
   namespace: prow-analyzer
 data:
   monitored-channels: "C12345678,C87654321"  # Replace with actual channel IDs
-  mcp-url: "https://ship-help-mcp-continuous-release-tooling--ship-help-bot.apps.gpc.ocp-hub.prod.psi.redhat.com/personas/ocp_ai_helpdesk/mcp"
+  mcp-url: "https://<ship-help-mcp-host>/personas/<persona>/mcp"  # Replace with your ship-help MCP endpoint
   prompt-template: "Analyze this Prow CI failure in detail. Provide: (1) Root cause, (2) Related Jira issues, (3) Recurring pattern analysis, (4) Recommended actions. URL: {job_url}"
 ---
 apiVersion: apps/v1
@@ -43,8 +36,10 @@ spec:
     spec:
       containers:
       - name: bot
-        image: quay.io/oramraz/prow-analyzer-bot:v1.0.0
-        command: ["/usr/bin/prow-analyzer-bot"]
+        # Replace with the image you built and pushed in Step 1
+        # (Makefile default: images.paas.redhat.com/ieng/app/prow-analyzer:latest).
+        image: images.paas.redhat.com/ieng/app/prow-analyzer:latest
+        command: ["/usr/bin/prow-analyzer--bot"]
         securityContext:
           runAsNonRoot: true
           runAsUser: 1000
@@ -55,32 +50,36 @@ spec:
           seccompProfile:
             type: RuntimeDefault
         env:
-        - name: SHIP_HELP_MCP_URL
+        - name: PROW_AN__SHIP__HELP_MCP_URL
           valueFrom:
             configMapKeyRef:
               name: prow-analyzer-config
               key: mcp-url
-        - name: SHIP_HELP_MCP_TOKEN
+        - name: PROW_AN__SHIP__HELP_MCP_TOKEN
           valueFrom:
             secretKeyRef:
               name: prow-analyzer-secrets
               key: ship-help-token
-        - name: SLACK_BOT_TOKEN
+        - name: PROW_AN__SLACK__BOT_TOKEN
           valueFrom:
             secretKeyRef:
               name: prow-analyzer-secrets
               key: slack-bot-token
-        - name: SLACK_APP_TOKEN
+        - name: PROW_AN__SLACK__APP_TOKEN
           valueFrom:
             secretKeyRef:
               name: prow-analyzer-secrets
               key: slack-app-token
-        - name: MONITORED_CHANNELS
+        - name: PROW_AN__MONITORED__CHANNELS
           valueFrom:
             configMapKeyRef:
               name: prow-analyzer-config
               key: monitored-channels
-        - name: PROMPT_TEMPLATE
+        # Fail-closed by default: with an empty PROW_AN__MONITORED__CHANNELS the bot monitors
+        # nothing unless PROW_AN__MONITOR__ALL is set to "true" (monitors every joined channel).
+        - name: PROW_AN__MONITOR__ALL
+          value: "false"
+        - name: PROW_AN__PROMPT__TEMPLATE
           valueFrom:
             configMapKeyRef:
               name: prow-analyzer-config
@@ -97,6 +96,6 @@ spec:
             command:
             - /bin/sh
             - -c
-            - pgrep prow-analyzer-bot
+            - pgrep -f /usr/bin/prow-analyzer--bot
           initialDelaySeconds: 30
           periodSeconds: 30
