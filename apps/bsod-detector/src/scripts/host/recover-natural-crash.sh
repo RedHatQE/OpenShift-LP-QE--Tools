@@ -349,26 +349,50 @@ typeset -a evtxTargets=(
   '/Windows/System32/winevt/Logs/Application.evtx'
 )
 
-# Dynamically detect which NTFS partition is the Windows system partition (C:) by attempting
-# to extract .evtx files from standard locations. EventLogs exist on exactly one partition.
-# If a partition does not contain the .evtx files it is not the Windows partition — log INFO.
+# Dynamically detect which NTFS partition is the Windows system partition (C:) and extract
+# all target .evtx files in ONE guestfish session per partition — single QEMU startup, single
+# mount, all downloads, then unmount. Avoids repeated QEMU init that causes pod OOM on second file.
 Log "detecting Windows system partition and extracting EventLog files..."
 typeset windowsPartition=''
 if ((${#ntfsPartitions[@]} > 0)); then
   for partition in "${ntfsPartitions[@]}"; do
-    Log "trying partition ${partition} for EventLog files..."
+    Log "trying partition ${partition} for EventLog files (single guestfish session)..."
+    typeset partitionId="${partition##*/}"
     typeset partitionHit=0
+
+    # Build one guestfish command that downloads all target files in a single QEMU session
+    typeset -a podTemps=()
+    typeset batchArgs="--ro -a /dev/vda run : mount-ro ${partition} /"
     for filePath in "${evtxTargets[@]}"; do
-      if ExtractNTFSFile "${partition}" "C:${filePath}" "${outDir}"; then
+      typeset podTemp="/tmp/bsod-evtx-$$-${RANDOM}.bin"
+      batchArgs+=" : download ${filePath} ${podTemp}"
+      podTemps+=("${filePath}|${podTemp}")
+    done
+    batchArgs+=" : umount-all"
+
+    # Execute batch guestfish — if partition has no Windows files guestfish will fail individual downloads
+    Log "batch guestfish download of ${#evtxTargets[@]} files from ${partition}..."
+    Oc exec -n "${ns}" "${guestfsPod}" -c "${guestfsContainer}" -- \
+      guestfish ${batchArgs} >>"${extractionLog}" 2>&1 || true  # per-file errors handled below via oc cp
+
+    # oc cp each file from pod to host
+    for item in "${podTemps[@]}"; do
+      typeset filePath="${item%%|*}"; typeset podTemp="${item##*|}"
+      typeset outputPath="${outDir}/guestFS_${partitionId}${filePath}"
+      mkdir -p "${outputPath%/*}"
+      if oc cp "${ns}/${guestfsPod}:${podTemp}" "${outputPath}" -c "${guestfsContainer}" 2>>"${extractionLog}" && [[ -s "${outputPath}" ]]; then
+        chmod 0600 "${outputPath}"
+        Log "extracted ${filePath} → guestFS_${partitionId}${filePath} ($(du -h "${outputPath}" | cut -f1))"
         evtxOk=1; partitionHit=1; windowsPartition="${partition}"
       else
+        rm -f "${outputPath}" 2>/dev/null || true
         if ((partitionHit)); then
-          # Already confirmed this is the Windows partition — a missing file here is a genuine gap
           Log "WARN: ${filePath} not found or transfer failed on Windows partition ${partition}"
         fi
-        # If partitionHit=0 we haven't confirmed Windows partition yet — log after the loop
       fi
+      Oc exec -n "${ns}" "${guestfsPod}" -c "${guestfsContainer}" -- rm -f "${podTemp}" 2>/dev/null || true
     done
+
     if ((partitionHit)); then
       Log "Windows system partition identified: ${partition} — skipping remaining partitions"
       break
