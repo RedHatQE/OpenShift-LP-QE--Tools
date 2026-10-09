@@ -290,77 +290,42 @@ EOF
     rm -f "${temporary}"; RecordError memory 'downloaded memory dump is not a structurally valid ELF file'; return 1
   fi
   mv -f "${temporary}" "${target}"
-  # Extract and convert the inner ELF memory dump to Windows crash dump format.
-  # Extract raw ELF as backup. Primary artifact is native MEMORY.DMP from ODF snapshot
-  # (extracted offline in recover-natural-crash.sh). elf2dmp conversion is deferred/optional
-  # to avoid runtime PDB download and conversion reliability issues.
-  typeset innerDumpEntry=''
-  innerDumpEntry="$(tar -tzf "${target}" 2>/dev/null | grep -i '\.memory\.dump$' | head -1 || true)"
-  if [[ -n "${innerDumpEntry}" ]]; then
-    typeset elfRaw="${outDir}/vm-memory-raw.elf"
-    tar -xzf "${target}" -O "${innerDumpEntry}" 2>/dev/null > "${elfRaw}" || true
-    if [[ -s "${elfRaw}" ]]; then
-      Log "extracted inner ELF ($(du -sh "${elfRaw}" | cut -f1)) — keeping as backup artifact for developer re-analysis"
-      # elf2dmp conversion is now optional (deferred to recovery phase if needed)
-      if command -v elf2dmp >/dev/null 2>&1; then
-        typeset winDmp="${outDir}/vm-memory-windows.dmp"
-        if RunTimed 300 elf2dmp "${elfRaw}" "${winDmp}" >>"${pipelineLog}" 2>&1 && [[ -s "${winDmp}" ]]; then
-          Log "elf2dmp conversion complete: $(du -sh "${winDmp}" | cut -f1) (optional convenience artifact)"
-          bash "${scriptDir}/parse-dump-header.sh" "${winDmp}" > "${outDir}/parse-dump-header-memory.json" 2>/dev/null || true
-          Log "parsed dump header: bugcheck=$(jq -r '.dumps[0].bugCheckCode // "unknown"' "${outDir}/parse-dump-header-memory.json" 2>/dev/null)"
-          # Promote as the primary parse-dump-header.json — ODF snapshot rarely finds
-          # a .DMP when using kernel/filtered dump types (written below filesystem).
-          [[ -s "${outDir}/parse-dump-header-memory.json" ]] && \
-            cp "${outDir}/parse-dump-header-memory.json" "${outDir}/parse-dump-header.json"
-
-          # Extract Windows system information and minidump-equivalent data from memory dump using volatility.
-          # Requires: pip install volatility3
-          if command -v vol >/dev/null 2>&1; then
-            Log "extracting Windows system info using volatility..."
-            typeset volatilityInfo="${outDir}/volatility-windows-info.txt"
-            if RunTimed 600 vol -f "${winDmp}" windows.info.Info >"${volatilityInfo}" 2>&1; then
-              Log "windows.info.Info: $(wc -l <"${volatilityInfo}") lines"
-            else
-              Log "windows.info.Info failed or timed out"
-            fi
-
-            Log "extracting crash info (bugcheck code, stop reason)..."
-            typeset volatilityCrashinfo="${outDir}/volatility-crashinfo.txt"
-            # windows.crashinfo.CrashInfo only works on kernel/minidump format, not complete (paged) dumps.
-            # windows.bigpools.BigPools + windows.driverscan.DriverScan give richer context for complete dumps.
-            if RunTimed 120 vol -f "${winDmp}" windows.crashinfo.CrashInfo >"${volatilityCrashinfo}" 2>&1; then
-              Log "windows.crashinfo.CrashInfo: $(wc -l <"${volatilityCrashinfo}") lines"
-            else
-              Log "windows.crashinfo.CrashInfo not applicable to this dump format — trying windows.driverscan.DriverScan..."
-              typeset volatilityCrashinfo="${outDir}/volatility-driverscan.txt"
-              if RunTimed 300 vol -f "${winDmp}" windows.driverscan.DriverScan >"${volatilityCrashinfo}" 2>&1; then
-                Log "windows.driverscan.DriverScan: $(wc -l <"${volatilityCrashinfo}") lines"
-              else
-                Log "WARN: windows.driverscan.DriverScan also failed — skipping crash info extraction"
-              fi
-            fi
-
-            Log "extracting crash dump files list..."
-            typeset volatilityDumpfiles="${outDir}/volatility-dumpfiles.txt"
-            if RunTimed 600 vol -f "${winDmp}" windows.dumpfiles.DumpFiles >"${volatilityDumpfiles}" 2>&1; then
-              Log "windows.dumpfiles.DumpFiles: $(wc -l <"${volatilityDumpfiles}") lines"
-            else
-              Log "windows.dumpfiles.DumpFiles failed or timed out"
-            fi
-          else
-            Log "volatility (vol) not found — install with: pip install volatility3"
-          fi
-        else
-          Log "elf2dmp conversion failed — raw ELF kept at $(basename "${elfRaw}")"
-          mv -f "${elfRaw}" "${outDir}/vm-memory.elf.raw"
-        fi
-      else
-        Log "elf2dmp not found — raw ELF saved as vm-memory.elf.raw (install qemu-tools to convert)"
-        mv -f "${elfRaw}" "${outDir}/vm-memory.elf.raw"
-      fi
-      rm -f "${elfRaw}"
-    fi
-  fi
+  # [DEVELOPER TOOL — elf2dmp conversion, volatility analysis commented out]
+  # elf2dmp produces a 17GB vm-memory-windows.dmp consuming mount space; run offline by developer.
+  # volatility3 analysis (windows.info, crashinfo, driverscan, dumpfiles) also developer-run offline.
+  # The raw vm-memory.elf.tar.gz is the primary artifact — hand it to developer for analysis.
+  # To re-enable: uncomment the block below and ensure elf2dmp + volatility3 are installed.
+  #
+  # typeset innerDumpEntry=''
+  # innerDumpEntry="$(tar -tzf "${target}" 2>/dev/null | grep -i '\.memory\.dump$' | head -1 || true)"
+  # if [[ -n "${innerDumpEntry}" ]]; then
+  #   typeset elfRaw="${outDir}/vm-memory-raw.elf"
+  #   tar -xzf "${target}" -O "${innerDumpEntry}" 2>/dev/null > "${elfRaw}" || true
+  #   if [[ -s "${elfRaw}" ]]; then
+  #     Log "extracted inner ELF ($(du -sh "${elfRaw}" | cut -f1))"
+  #     if command -v elf2dmp >/dev/null 2>&1; then
+  #       typeset winDmp="${outDir}/vm-memory-windows.dmp"
+  #       if RunTimed 300 elf2dmp "${elfRaw}" "${winDmp}" >>"${pipelineLog}" 2>&1 && [[ -s "${winDmp}" ]]; then
+  #         Log "elf2dmp conversion complete: $(du -sh "${winDmp}" | cut -f1)"
+  #         bash "${scriptDir}/parse-dump-header.sh" "${winDmp}" > "${outDir}/parse-dump-header-memory.json" 2>/dev/null || true
+  #         [[ -s "${outDir}/parse-dump-header-memory.json" ]] && \
+  #           cp "${outDir}/parse-dump-header-memory.json" "${outDir}/parse-dump-header.json"
+  #         # volatility3 analysis — requires: pip install volatility3
+  #         # if command -v vol >/dev/null 2>&1; then
+  #         #   RunTimed 600 vol -f "${winDmp}" windows.info.Info      >"${outDir}/volatility-windows-info.txt" 2>&1 || true
+  #         #   RunTimed 120 vol -f "${winDmp}" windows.crashinfo.CrashInfo >"${outDir}/volatility-crashinfo.txt" 2>&1 || true
+  #         #   RunTimed 300 vol -f "${winDmp}" windows.driverscan.DriverScan >"${outDir}/volatility-driverscan.txt" 2>&1 || true
+  #         #   RunTimed 600 vol -f "${winDmp}" windows.dumpfiles.DumpFiles >"${outDir}/volatility-dumpfiles.txt" 2>&1 || true
+  #         # fi
+  #       else
+  #         mv -f "${elfRaw}" "${outDir}/vm-memory.elf.raw"
+  #       fi
+  #     else
+  #       mv -f "${elfRaw}" "${outDir}/vm-memory.elf.raw"
+  #     fi
+  #     rm -f "${elfRaw}"
+  #   fi
+  # fi
   RunTimed 60 virtctl memory-dump remove "${vm}" -n "${ns}" >>"${pipelineLog}" 2>&1 || { RecordError memory 'memory-dump association cleanup failed'; return 1; }
   memoryAssociated=0; Log "validated KubeVirt memory dump: $(basename "${target}")"
 }

@@ -493,39 +493,42 @@ else
   jq -n '{"ok":false,"error":"extract-evtx failed or timed out","events":[]}' > "${outDir}/events.json"
 fi
 
-# Parse individual EVTX files to JSON using python-evtx (uses high-level Evtx.Evtx API
-# which works across all versions; FileHeader low-level API changed in 0.8.0).
-Log "parsing Application.evtx and System.evtx to JSON format..."
-if command -v python3 >/dev/null 2>&1; then
-  if python3 -c 'import Evtx.Evtx' 2>/dev/null; then
-    typeset _evtx_parse_script; _evtx_parse_script="$(cat <<'PYEOF'
-import json, sys
-import Evtx.Evtx as evtx
-src = sys.argv[1]
-events = []
-try:
-  with evtx.Evtx(src) as log:
-    for record in log.records():
-      try: events.append(record.xml())
-      except: pass
-except Exception as e:
-  print(f'Error parsing {src}: {e}', file=sys.stderr)
-print(json.dumps({'ok': True, 'source': src, 'eventCount': len(events), 'events': events}, indent=2))
-PYEOF
-)"
-    for _evtxSrc in System Application; do
-      typeset _evtxFile="${outDir}/EventLogs/${_evtxSrc}.evtx"
-      typeset _evtxJson="${outDir}/EventLogs/${_evtxSrc}.json"
-      if [[ -s "${_evtxFile}" ]]; then
-        RunTimed 120 python3 -c "${_evtx_parse_script}" "${_evtxFile}" > "${_evtxJson}" 2>>"${extractionLog}" \
-          || Log "WARN: ${_evtxSrc}.evtx JSON parse failed"
-        [[ -s "${_evtxJson}" ]] && Log "${_evtxSrc}.evtx parsed: $(jq '.eventCount' "${_evtxJson}") events"
-      fi
-    done
-  else
-    Log "WARN: python-evtx not available — install with: pip install python-evtx (skipping individual EVTX JSON parse)"
-  fi
-fi
+# [DEVELOPER TOOL — EVTX-to-JSON conversion commented out]
+# Converts .evtx binary files to JSON using python-evtx; intended for offline developer analysis.
+# The raw .evtx files in EventLogs/ are the primary artifact — hand them to developer.
+# To re-enable: uncomment the block below and ensure python-evtx is installed (pip install python-evtx).
+#
+# Log "parsing Application.evtx and System.evtx to JSON format..."
+# if command -v python3 >/dev/null 2>&1; then
+#   if python3 -c 'import Evtx.Evtx' 2>/dev/null; then
+#     typeset _evtx_parse_script; _evtx_parse_script="$(cat <<'PYEOF'
+# import json, sys
+# import Evtx.Evtx as evtx
+# src = sys.argv[1]
+# events = []
+# try:
+#   with evtx.Evtx(src) as log:
+#     for record in log.records():
+#       try: events.append(record.xml())
+#       except: pass
+# except Exception as e:
+#   print(f'Error parsing {src}: {e}', file=sys.stderr)
+# print(json.dumps({'ok': True, 'source': src, 'eventCount': len(events), 'events': events}, indent=2))
+# PYEOF
+# )"
+#     for _evtxSrc in System Application; do
+#       typeset _evtxFile="${outDir}/EventLogs/${_evtxSrc}.evtx"
+#       typeset _evtxJson="${outDir}/EventLogs/${_evtxSrc}.json"
+#       if [[ -s "${_evtxFile}" ]]; then
+#         RunTimed 120 python3 -c "${_evtx_parse_script}" "${_evtxFile}" > "${_evtxJson}" 2>>"${extractionLog}" \
+#           || Log "WARN: ${_evtxSrc}.evtx JSON parse failed"
+#         [[ -s "${_evtxJson}" ]] && Log "${_evtxSrc}.evtx parsed: $(jq '.eventCount' "${_evtxJson}") events"
+#       fi
+#     done
+#   else
+#     Log "WARN: python-evtx not available — install with: pip install python-evtx"
+#   fi
+# fi
 
 # Clean up any leftover cache files (.0x image sections from guestfish or kernel operations)
 # These are disabled via LIBGUESTFS_CACHEDIR=/dev/null but clean up any that may have leaked
