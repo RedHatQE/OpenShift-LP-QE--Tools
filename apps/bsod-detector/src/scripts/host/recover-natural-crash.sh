@@ -186,7 +186,8 @@ function ExtractNTFSFile () {
   # Phase 2: Copy file from pod to host using oc cp
   Log "copying from pod to host: ${podTempFile} → ${outputPath}"
   if ! oc cp "${ns}/${guestfsPod}:${podTempFile}" "${outputPath}" -c "${guestfsContainer}" 2>>"${extractionLog}"; then
-    Log "WARN: oc cp failed for ${windowsPath}"
+    Log "WARN: oc cp failed for ${windowsPath} — removing partial destination file"
+    rm -f "${outputPath}" 2>/dev/null || true  # remove partial file left by failed oc cp
     Oc exec -n "${ns}" "${guestfsPod}" -c "${guestfsContainer}" -- rm -f "${podTempFile}" 2>/dev/null || true
     return 1
   fi
@@ -361,10 +362,11 @@ if ((${#ntfsPartitions[@]} > 0)); then
       if ExtractNTFSFile "${partition}" "C:${filePath}" "${outDir}"; then
         evtxOk=1; partitionHit=1; windowsPartition="${partition}"
       else
-        # Not a failure — this partition may simply not be the Windows system partition
-        if [[ -n "${windowsPartition}" ]]; then
-          Log "INFO: ${filePath} not present on ${partition} — EventLogs are on ${windowsPartition} only (expected)"
+        if ((partitionHit)); then
+          # Already confirmed this is the Windows partition — a missing file here is a genuine gap
+          Log "WARN: ${filePath} not found or transfer failed on Windows partition ${partition}"
         fi
+        # If partitionHit=0 we haven't confirmed Windows partition yet — log after the loop
       fi
     done
     if ((partitionHit)); then
