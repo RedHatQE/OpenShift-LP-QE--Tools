@@ -64,7 +64,7 @@ fi
 # Refuse to overwrite possible stale data from previous extraction attempts
 # Run directories may contain watcher-owned captures, but never extraction-owned artifacts
 typeset stale=''
-stale="$(find "${outDir}" -mindepth 1 \( -name MEMORY.DMP -o -name Minidump -o -name EventLogs -o -name events.json -o -name extraction-summary.json -o -name checksums.sha256 \) -print -quit)"
+stale="$(find "${outDir}" -mindepth 1 \( -name MEMORY.DMP -o -name Minidump -o -name guestFS_* -o -name events.json -o -name extraction-summary.json -o -name checksums.sha256 \) -print -quit)"
 [[ -z "${stale}" ]] || Die "pre-existing extraction artifact rejected: ${stale}"
 
 # Extract target cluster, VM, and storage configuration from metadata
@@ -401,23 +401,8 @@ if ((${#ntfsPartitions[@]} > 0)); then
     fi
   done
 
-  # Create EventLogs symlink for backward compatibility (point to first partition found)
-  typeset firstPartition=''
-  for partition in "${ntfsPartitions[@]}"; do
-    typeset partitionId; partitionId="${partition##*/}"
-    if [ -d "${outDir}/guestFS_${partitionId}/Windows/System32/winevt/Logs" ]; then
-      firstPartition="${partitionId}"
-      break
-    fi
-  done
-  if [ -n "${firstPartition}" ]; then
-    mkdir -p "${outDir}/EventLogs"
-    # Link exact extracted files (not glob) so broken links are impossible for missing files
-    for _evtxName in System.evtx Application.evtx Security.evtx; do
-      typeset _evtxSrc="${outDir}/guestFS_${firstPartition}/Windows/System32/winevt/Logs/${_evtxName}"
-      [[ -f "${_evtxSrc}" ]] && ln -sf "../guestFS_${firstPartition}/Windows/System32/winevt/Logs/${_evtxName}" "${outDir}/EventLogs/${_evtxName}" || true
-    done
-  fi
+  # .evtx files are directly accessible under guestFS_<partition>/Windows/System32/winevt/Logs/
+  # No EventLogs/ symlink layer needed — developers reference the guestFS path directly.
 else
   Log "WARN: no NTFS partitions discovered — skipping file extraction"
 fi
@@ -495,9 +480,9 @@ if ((parseStatus != 0)) || ! jq -e '.ok == true' "${outDir}/parse-dump-header.js
 #   RecordError evtx-parse 'EVTX parser failed or timed out'
 #   jq -n '{"ok":false,"error":"extract-evtx failed or timed out","events":[]}' > "${outDir}/events.json"
 # fi
-jq -n '{"ok":true,"note":"extract-evtx.py is a developer tool — run offline against EventLogs/*.evtx","events":[]}' \
+jq -n '{"ok":true,"note":"extract-evtx.py is a developer tool — run offline against guestFS_<partition>/Windows/System32/winevt/Logs/*.evtx","events":[]}' \
   > "${outDir}/events.json"; chmod 0600 "${outDir}/events.json"
-Log "INFO: events.json stub written — run extract-evtx.py offline against EventLogs/*.evtx for crash detection"
+Log "INFO: events.json stub written — run extract-evtx.py offline against guestFS_*/Windows/System32/winevt/Logs/*.evtx"
 
 # [DEVELOPER TOOL — EVTX-to-JSON conversion commented out]
 # Converts .evtx binary files to JSON using python-evtx; intended for offline developer analysis.
