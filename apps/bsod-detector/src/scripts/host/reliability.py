@@ -422,8 +422,8 @@ def write_summary(args: argparse.Namespace) -> None:
             seen_manifest_paths.add(path_key)
             manifest_hashes[path_key] = parts[0]
 
-    # Exclude checksums.sha256 (chicken-and-egg) and summary files generated after the manifest
-    excluded = excluded | {"checksums.sha256", "extraction-summary.json", "evidence-summary.json", "recovery-summary.json"}
+    # Exclude summary files generated after the manifest — they cannot be in it
+    excluded = excluded | {"extraction-summary.json", "evidence-summary.json", "recovery-summary.json"}
 
     for path in sorted(out.rglob("*")):
         # Skip symlinks — their targets in guestFS_<partition>/ are already covered as real files
@@ -441,11 +441,11 @@ def write_summary(args: argparse.Namespace) -> None:
                 semantic_error = "stage-result-reports-failure"
 
         # Verify against manifest — every non-log artifact must have a matching manifest entry.
-        # Log files are excluded from manifest generation (still being written at that point)
-        # so they are not validated against the manifest.
+        # Log files and checksums.sha256 itself are exempt: logs are still being written at
+        # manifest generation time; checksums.sha256 cannot be in its own manifest.
         actual_hash = sha256_file(path)
         relative_path = str(path.relative_to(out))
-        if manifest_present and kind != "log":
+        if manifest_present and kind != "log" and relative_path != "checksums.sha256":
             if relative_path not in manifest_hashes:
                 valid = False
                 semantic_error = semantic_error or "manifest-entry-missing"
