@@ -532,7 +532,9 @@ done || true
   # Generate canonical manifest with no leading "./" so paths match exactly in verification.
   # Include both regular files and symlinks (sha256sum follows symlinks to hash the target content).
   # Exclude checksums.sha256 itself (chicken-and-egg), temp files, and summary outputs.
-  find . \( -type f -o -type l \) ! -name '*.tmp' ! -name stage-errors.jsonl ! -name '*-summary.json' ! -name checksums.sha256 -print0 |
+  # Exclude log files — they are still being written after this point (pod deletion, watcher)
+  # so their hash cannot be stable at manifest generation time.
+  find . \( -type f -o -type l \) ! -name '*.tmp' ! -name '*.log' ! -name stage-errors.jsonl ! -name '*-summary.json' ! -name checksums.sha256 -print0 |
     sort -z | xargs -0 sha256sum | sed 's|  \./|  |' > checksums.sha256.tmp
   mv -f checksums.sha256.tmp checksums.sha256; chmod 0600 checksums.sha256
 )

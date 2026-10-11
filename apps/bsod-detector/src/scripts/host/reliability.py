@@ -440,10 +440,12 @@ def write_summary(args: argparse.Namespace) -> None:
                 valid = False
                 semantic_error = "stage-result-reports-failure"
 
-        # Verify against manifest — every artifact file must have a manifest entry (fail closed).
+        # Verify against manifest — every non-log artifact must have a matching manifest entry.
+        # Log files are excluded from manifest generation (still being written at that point)
+        # so they are not validated against the manifest.
         actual_hash = sha256_file(path)
         relative_path = str(path.relative_to(out))
-        if manifest_present:
+        if manifest_present and kind != "log":
             if relative_path not in manifest_hashes:
                 valid = False
                 semantic_error = semantic_error or "manifest-entry-missing"
