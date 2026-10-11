@@ -357,10 +357,12 @@ def classify(path: Path) -> str | None:
 
 
 REQUIRED_TYPES = {
-    "natural-rhov": {"screenshot", "memory", "dump", "evtx", "log", "json", "checksums"},
-    "intentional-rhov": {"screenshot", "memory", "dump", "log", "json"},  # ODF snapshot recovery optional; not required with elf2dmp+volatility
-    "rhov-snapshot-recovery": {"dump", "evtx", "log", "json", "checksums"},
-    "fixture": {"screenshot", "memory", "dump", "evtx", "log"},
+    "natural-rhov": {"screenshot", "memory", "evtx", "log", "json", "checksums"},
+    "intentional-rhov": {"screenshot", "memory", "log", "json"},
+    # dump removed: MEMORY.DMP blocked on KVM (pagefile.sys cannot be created with VirtIO Balloon)
+    # evtx present under guestFS_<partition>/Windows/System32/winevt/Logs/ not a top-level dir
+    "rhov-snapshot-recovery": {"memory", "evtx", "log", "json", "checksums"},
+    "fixture": {"screenshot", "memory", "evtx", "log"},
 }
 
 
@@ -420,8 +422,8 @@ def write_summary(args: argparse.Namespace) -> None:
             seen_manifest_paths.add(path_key)
             manifest_hashes[path_key] = parts[0]
 
-    # checksums.sha256 is excluded from its own manifest (chicken-and-egg); skip as artifact too
-    excluded = excluded | {"checksums.sha256"}
+    # Exclude checksums.sha256 (chicken-and-egg) and summary files generated after the manifest
+    excluded = excluded | {"checksums.sha256", "extraction-summary.json", "evidence-summary.json", "recovery-summary.json"}
 
     for path in sorted(out.rglob("*")):
         # Skip symlinks — their targets in guestFS_<partition>/ are already covered as real files
