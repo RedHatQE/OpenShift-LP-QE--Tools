@@ -266,31 +266,31 @@ EOF
   oc port-forward "svc/${svcName}" -n "${ns}" "18443:443" >>"${pipelineLog}" 2>&1 &
   pfPid=$!; sleep 3
 
-  # 6. Resumable download via curl --continue-at -
-  # Each GOAWAY just resumes from the last byte — accumulates progress across drops.
-  # Bounded retries: max 10 attempts with a 600s overall deadline.
-  # Track success explicitly so a successful attempt 10 is not misread as failure.
-  typeset dlAttempt=0; typeset maxAttempts=10; typeset dlDeadline=$((SECONDS + 600)); typeset dlSuccess=0
+  # 6. Download with retry.
+  # KubeVirt export does NOT support HTTP byte-range requests — --continue-at -
+  # fails immediately with curl error 33 on every retry, wasting all retry slots.
+  # Each attempt starts from byte 0 with a fresh port-forward (broken-but-alive
+  # port-forward causes connection timeouts even when pfPid is still running).
+  # Deadline: 3600s (~800MB at 2.6MB/s ≈ 5 min/attempt → room for 5 full attempts).
+  typeset dlAttempt=0; typeset maxAttempts=5; typeset dlDeadline=$((SECONDS + 3600)); typeset dlSuccess=0
   while ((dlAttempt < maxAttempts && SECONDS < dlDeadline)); do
     dlAttempt=$((dlAttempt + 1))
+    rm -f "${temporary}"  # restart from byte 0 — no range support on this server
     set +x
     if curl -k -f -H "x-kubevirt-export-token: ${token}" \
-        --connect-timeout 30 --retry 0 \
-        --continue-at - --output "${temporary}" \
+        --connect-timeout 30 --max-time 1800 --retry 0 \
+        --output "${temporary}" \
         "https://localhost:18443${dlPath}" >>"${pipelineLog}" 2>&1; then
       set -x
       dlSuccess=1; break
     fi
     set -x
     typeset dlSz; dlSz=$(stat -c%s "${temporary}" 2>/dev/null || echo 0)
-    Log "memory download attempt ${dlAttempt}/${maxAttempts} interrupted at $((dlSz / 1024 / 1024)) MiB — resuming..."
+    Log "memory download attempt ${dlAttempt}/${maxAttempts} failed at $((dlSz / 1024 / 1024)) MiB — restarting port-forward, retrying from byte 0"
     ((dlAttempt < maxAttempts && SECONDS < dlDeadline)) || break
-    sleep 3
-    # Re-establish port-forward if the previous one died
-    if ! kill -0 "${pfPid}" 2>/dev/null; then
-      oc port-forward "svc/${svcName}" -n "${ns}" "18443:443" >>"${pipelineLog}" 2>&1 &
-      pfPid=$!; sleep 3
-    fi
+    kill "${pfPid}" 2>/dev/null || true; pfPid=''; sleep 5
+    oc port-forward "svc/${svcName}" -n "${ns}" "18443:443" >>"${pipelineLog}" 2>&1 &
+    pfPid=$!; sleep 5
   done
   kill "${pfPid}" 2>/dev/null || true; pfPid=''
   Oc delete virtualmachineexport "${exportName}" -n "${ns}" --ignore-not-found >>"${pipelineLog}" 2>&1 || true
