@@ -4,8 +4,8 @@
 set -euxo pipefail; shopt -s inherit_errexit
 umask 077
 
-# Parse input: crash type (0x01-0x09 from NotMyFault), VM name, and namespace
-typeset crashType="${1:-0x01}"; typeset vm="${BSOD_DET__VM__NAME:-}"; typeset ns="${BSOD_DET__NAMESPACE:-}"
+# Parse input: crash type (0x01-0x09 from NotMyFault) — required, no default
+typeset crashType="${1:-}"; typeset vm="${BSOD_DET__VM__NAME:-}"; typeset ns="${BSOD_DET__NAMESPACE:-}"
 # Storage configuration: evidence root (mounted PVC), volume kind, and storage identity
 typeset evidenceRoot="${BSOD_DET__EVIDENCE__DIR:-/mnt/persistent-bsod-evidence}"; typeset evidenceKind="${BSOD_EVIDENCE_VOLUME_KIND:-pvc}"
 typeset evidenceId="${BSOD_DET__EVIDENCE__STORAGE_ID:-shared-bsod-evidence}"; typeset memoryPvc="${BSOD_DET__MEMORY__DUMP_PVC:-win2022-vm-hjoshi1-memdump}"
@@ -22,11 +22,15 @@ typeset appDir=''; appDir="$(cd "${scriptDir}/../../.." && pwd)"; typeset hostDi
 typeset projectRoot=''; projectRoot="$(cd "${appDir}/../.." && pwd)"
 typeset watcherPid=''; typeset runId=''; runId="$(date -u +%Y%m%dT%H%M%SZ)-intentional-$$-$RANDOM"
 typeset outDir="${evidenceRoot}/${runId}"; typeset metadataFile="${outDir}/recovery-metadata.json"; typeset readyFile="${outDir}/watcher-ready"
+# Run-scoped temp dir for guestfish cache — cleaned up only by this run, never touches shared paths
+typeset runTmpDir=''; runTmpDir="$(mktemp -d "${TMPDIR:-/tmp}/bsod-injector-${runId}.XXXXXX")"
 
 function Die () { echo "trigger-bsod-intentional: ERROR: $*" >&2; exit 1; }
-# Remove leftover cache files from libguestfs operations (file.0x* sections) from previous runs
-function CleanupGuestfishCache () { find "${projectRoot}" -maxdepth 5 -name "file.0x*" -type f -delete 2>/dev/null || true; find /tmp -maxdepth 2 -name "file.0x*" -type f -delete 2>/dev/null || true; }
-# Cleanup on exit: kill background watcher process and remove cache files
+# Remove only this run's scoped cache files — never touches shared /tmp or project paths
+function CleanupGuestfishCache () {
+  [[ -n "${runTmpDir}" && -d "${runTmpDir}" ]] && rm -rf "${runTmpDir}" 2>/dev/null || true
+}
+# Cleanup on exit: kill background watcher process and remove this run's cache only
 function Cleanup () {
   if [[ -n "${watcherPid}" ]]; then kill "${watcherPid}" 2>/dev/null || true; wait "${watcherPid}" 2>/dev/null || true; watcherPid=''; fi
   CleanupGuestfishCache
@@ -37,14 +41,21 @@ trap Cleanup EXIT
 trap 'OnSignal 130' INT
 trap 'OnSignal 143' TERM
 
+# Finding 1: crash type must be supplied explicitly — no silent default selects a destructive action
+[[ -n "${crashType}" ]] || Die "crash type argument is required (e.g. 0x01); no default — this is a destructive operation"
+case "${crashType}" in 0x01|0x02|0x03|0x04|0x05|0x06|0x07|0x08|0x09) ;; *) Die "unsupported NotMyFault crash type '${crashType}' — supported: 0x01..0x09" ;; esac
+
+# Finding 1: target location is not authorization — require an explicit confirmation token
+# BSOD_DET__CONFIRM_TARGET must equal BSOD_DET__VM__NAME to prove the operator intends
+# to crash this specific VM (guards against env-var typos or accidental wrong-target runs)
 [[ -n "${vm}" && -n "${ns}" ]] || Die 'BSOD_DET__VM__NAME and BSOD_DET__NAMESPACE must explicitly identify the disposable RHOV test VM'
+[[ "${BSOD_DET__CONFIRM_TARGET:-}" == "${vm}" ]] || \
+  Die "BSOD_DET__CONFIRM_TARGET must be set to '${vm}' to authorize crashing this VM (got: '${BSOD_DET__CONFIRM_TARGET:-<unset>}')"
 [[ -n "${evidenceRoot}" ]] || Die 'EVIDENCE_DIR must identify the validated persistent mount'
 [[ "${readyTimeout}" =~ ^[1-9][0-9]*$ && "${preflightTimeout}" =~ ^[1-9][0-9]*$ ]] || Die 'watch/ready/preflight timeouts must be positive integers'
-case "${crashType}" in 0x01|0x02|0x03|0x04|0x05|0x06|0x07|0x08|0x09) ;; *) Die "unsupported NotMyFault crash type '${crashType}'" ;; esac
 
-# Phase 1: Cleanup - remove any cache artifacts from previous pipeline runs
-echo "trigger-bsod-intentional: cleaning up any leftover guestfish cache files (file.0x*)..."
-CleanupGuestfishCache
+# Phase 1: export run-scoped cache dir so nested guestfish calls use it
+export LIBGUESTFS_CACHEDIR="${runTmpDir}" LIBGUESTFS_TMPDIR="${runTmpDir}"
 
 # Phase 2: Preflight validation - verify cluster state, VM existence, and mount points are valid
 mkdir "${outDir}" || Die "cannot create unique run directory ${outDir}"
