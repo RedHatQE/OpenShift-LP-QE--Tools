@@ -200,7 +200,20 @@ function CaptureMemory () {
   done
   [[ "${phase}" == Completed ]] || { RecordError memory "KubeVirt memory-dump phase timed out (last=${phase:-unset})"; return 1; }
 
-  # Step 3: Create VirtualMachineExport to stream the dumped PVC over HTTP (no direct node access)
+  # Step 3: Clean up any stale VirtualMachineExport on the same PVC from previous runs,
+  # then create a new export. A stale export prevents the new one from becoming Ready.
+  typeset staleExports
+  staleExports=$(Oc get virtualmachineexport -n "${ns}" -o json 2>/dev/null | \
+    jq -r --arg pvc "${memoryPvc}" \
+    '.items[] | select(.spec.source.name==$pvc) | .metadata.name' || true)
+  if [[ -n "${staleExports}" ]]; then
+    Log "cleaning up stale VirtualMachineExport(s) on PVC ${memoryPvc}: ${staleExports}"
+    while IFS= read -r staleName; do
+      Oc delete virtualmachineexport "${staleName}" -n "${ns}" --ignore-not-found >>"${pipelineLog}" 2>&1 || true
+    done <<< "${staleExports}"
+  fi
+
+  # Create VirtualMachineExport to stream the dumped PVC over HTTP (no direct node access)
   Oc apply -f - >>"${pipelineLog}" 2>&1 <<EOF
 apiVersion: export.kubevirt.io/v1beta1
 kind: VirtualMachineExport
