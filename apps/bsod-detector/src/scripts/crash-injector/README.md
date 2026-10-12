@@ -58,28 +58,65 @@ BSOD_DET__VM__NAME="win2022-vm-hjoshi1" BSOD_DET__NAMESPACE="windows-bsod" \
 8. Return exit code (0=success, 1=failure)
 ```
 
-**Output Structure**:
+**Evidence Directory — All Files Explained**
+
+Every file is placed in `/mnt/persistent-bsod-evidence/{TIMESTAMP}-intentional-{PID}-{RANDOM}/`.
+The table below shows what each file is, who writes it, and at which pipeline phase.
+
+| File | Size (typical) | Phase | Written by | What it contains |
+|---|---|---|---|---|
+| `watcher-ready` | 42 B | Pre-BSOD | `watch-crash.sh` | Run ID marker — written when watcher is armed and watching |
+| `recovery-metadata.json` | ~1.3 KB | Pre-BSOD | `preflight-rhov.sh` | VM name, namespace, PVC names, storage class, snapshot class, recovery image digest, armed epoch, pre-crash dump inventory |
+| `bsod-screenshot.png` | ~37 KB | At BSOD (VM still frozen) | `watch-crash.sh` → `virtctl vnc` | VNC screenshot of the Windows blue screen at crash moment |
+| `vm-memory.elf.tar.gz` | ~800 MB–1.4 GB | At BSOD (VM still frozen) | `watch-crash.sh` → `virtctl memory-dump` | **Primary dump artifact.** Full physical RAM snapshot in ELF ET_CORE format, streamed from KubeVirt via HTTP export. Contains full Windows memory: kernel, drivers, user processes, page tables. Developer converts offline with `elf2dmp` for WinDbg/Volatility |
+| `domain.xml` | ~14 KB | At BSOD (VM still frozen) | `watch-crash.sh` → `virsh dumpxml` inside virt-launcher pod | Complete libvirt XML domain definition at crash time — CPU topology, memory, all attached disks, network interfaces, QEMU devices. Richer than `oc get vmi -o yaml` as it reflects actual QEMU runtime state |
+| `launcher-compute.log` | ~100–200 KB | At BSOD (VM still frozen) | `watch-crash.sh` → `oc logs` on virt-launcher pod | Raw KVM/QEMU compute container logs — hypervisor events, device errors, split-lock traps, memory balloon events, KVM internal errors |
+| `host-signals.json` | ~1.3 KB | At BSOD (VM still frozen) | `watch-crash.sh` → `collect-host-signals.sh` | Parsed summary of `launcher-compute.log` — split-lock trap count, KVM internal error count, Hyper-V feature states (tlbflush/ipi/vapic/spinlocks/synictimer), risk assessment |
+| `parse-dump-header.json` | ~146 B | After VM stopped | `recover-natural-crash.sh` | Bugcheck code + parameters extracted from dump header. **Stub** when elf2dmp is disabled (no on-disk MEMORY.DMP on KVM). Run `parse-dump-header.sh` offline against elf2dmp output |
+| `guestFS_sda3/Windows/System32/winevt/Logs/System.evtx` | ~8–9 MB | After VM stopped | `recover-natural-crash.sh` → guestfs-ntfs pod → `guestfish` | Windows System EventLog extracted offline from NTFS partition. Contains crash event 1001 (BugCheck), dirty shutdown 6008, kernel events. `sda3` is dynamic — detected as whichever NTFS partition contains `C:\` |
+| `guestFS_sda3/Windows/System32/winevt/Logs/Application.evtx` | ~6 MB | After VM stopped | `recover-natural-crash.sh` → guestfs-ntfs pod → `guestfish` | Windows Application EventLog extracted offline from NTFS partition. Contains Application/1001 LiveKernelEvent and app-level crash records |
+| `events.json` | ~162 B | After VM stopped | `recover-natural-crash.sh` | **Stub** — run `extract-evtx.py` offline against `guestFS_*/Windows/System32/winevt/Logs/*.evtx` for crash detection JSON |
+| `checksums.sha256` | ~900 B | After VM stopped | `recover-natural-crash.sh` | SHA-256 hashes of all evidence files (except log files and summary files generated after this point). Used by reliability.py to detect tampering |
+| `extraction.log` | ~3–5 KB | After VM stopped | `recover-natural-crash.sh` | Step-by-step guestfish extraction trace — partition discovery, guestfish commands, oc cp transfers, file sizes |
+| `extraction-summary.json` | ~3 KB | After VM stopped | `reliability.py write-summary` | Artifact inventory from recovery phase — lists every file with type, format, size, sha256, valid flag. Reports missing types or invalid artifacts |
+| `stage-errors.jsonl` | 0 B (success) | Throughout | `watch-crash.sh` + `recover-natural-crash.sh` | One JSON line per stage failure — stage name, error message, timestamp. Empty on clean run |
+| `evidence-summary.json` | ~3 KB | End of pipeline | `watch-crash.sh` → `reliability.py write-summary` | Final pipeline verdict — `ok: true/false`, consolidated stage errors, missing required artifact types, invalid artifacts |
+| `watcher.log` | ~100–120 KB | Throughout | `watch-crash.sh` | Full timestamped execution trace of the entire pipeline — QGA pings, BSOD detection, memory capture, stop VM, recovery, restart |
+
+**Timing diagram**:
 ```
-/mnt/persistent-bsod-evidence/{TIMESTAMP}-intentional-{PID}-{RANDOM}/
-├── bsod-screenshot.png              VNC screenshot at crash moment
-├── vm-memory.elf.tar.gz             PRIMARY: full physical memory (~800MB ELF)
-├── domain.xml                       Libvirt domain config at crash
-├── host-signals.json                Host diagnostics
-├── launcher-compute.log             KVM virt-launcher logs
-├── parse-dump-header.json           Bugcheck code (stub when elf2dmp disabled)
-├── events.json                      Event crash detection (stub — run extract-evtx.py offline)
-├── guestFS_sda3/                    NTFS extraction (partition name is dynamic)
-│   └── Windows/System32/winevt/Logs/
-│       ├── System.evtx              Windows System EventLog (~8MB)
-│       └── Application.evtx        Windows Application EventLog (~6MB)
-├── recovery-metadata.json           VM config, storage, armed epoch
-├── checksums.sha256                 SHA-256 manifest of evidence files
-├── stage-errors.jsonl               Per-stage error log
-├── extraction.log                   guestfish extraction trace
-├── extraction-summary.json          Recovery phase artifact inventory
-├── evidence-summary.json            Final pipeline verdict (ok: true/false)
-├── watcher.log                      Full watcher execution trace
-└── watcher-ready                    Arming marker
+Pipeline start
+  │
+  ├─── [Pre-BSOD] preflight-rhov.sh runs
+  │         → recovery-metadata.json written
+  │         → watcher-ready written when armed
+  │
+  ├─── [BSOD injected] notmyfaultc64.exe /crash 0x01
+  │
+  ├─── [BSOD detected] QGA pings fail + domstate=running
+  │         → bsod-screenshot.png        (VNC, ~seconds)
+  │         → vm-memory.elf.tar.gz       (virtctl memory-dump, ~5–10 min)
+  │         → domain.xml                 (virsh dumpxml, ~seconds)
+  │         → launcher-compute.log       (oc logs, ~seconds)
+  │         → host-signals.json          (parsed from launcher-compute.log)
+  │
+  ├─── [VM stopped] virtctl stop
+  │
+  ├─── [Recovery] recover-natural-crash.sh via guestfs-ntfs pod
+  │         → guestFS_sda3/...System.evtx      (guestfish + oc cp, ~30s)
+  │         → guestFS_sda3/...Application.evtx  (same session, ~30s)
+  │         → parse-dump-header.json     (stub)
+  │         → events.json               (stub)
+  │         → checksums.sha256
+  │         → extraction.log
+  │         → extraction-summary.json
+  │
+  ├─── [VM restarted] virtctl start
+  │
+  └─── [Pipeline end]
+            → stage-errors.jsonl         (populated throughout)
+            → evidence-summary.json      (final verdict)
+            → watcher.log               (written throughout)
 ```
 
 **What is NOT captured (platform limitations)**:
