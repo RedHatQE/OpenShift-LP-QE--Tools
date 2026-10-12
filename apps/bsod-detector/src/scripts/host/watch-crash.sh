@@ -240,63 +240,18 @@ EOF
     Oc delete virtualmachineexport "${exportName}" -n "${ns}" --ignore-not-found >>"${pipelineLog}" 2>&1 || true
     return 1
   fi
-  typeset svcName token dlUrl
-  svcName="$(Oc get virtualmachineexport "${exportName}" -n "${ns}" -o jsonpath='{.status.serviceName}' 2>/dev/null)"
-  # Token secret name is reported in the VirtualMachineExport status
-  typeset tokenSecretName
-  tokenSecretName="$(Oc get virtualmachineexport "${exportName}" -n "${ns}" -o jsonpath='{.status.tokenSecretRef}' 2>/dev/null)"
-  [[ -n "${tokenSecretName}" ]] || tokenSecretName="secret-${exportName}"
-  set +x
-  token="$(Oc get secret "${tokenSecretName}" -n "${ns}" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d)"
-  set -x
-  # Pick any available format URL — prefer raw+gz or archive, fall back to first
-  dlUrl="$(Oc get virtualmachineexport "${exportName}" -n "${ns}" \
-    -o jsonpath='{.status.links.internal.volumes[0].formats[?(@.format=="tar.gz")].url}' 2>/dev/null)"
-  [[ -n "${svcName}" && -n "${token}" && -n "${dlUrl}" ]] || {
-    RecordError memory "cannot resolve export service/token/url (svc=${svcName:-empty})"
+  # virtctl vmexport download resolves token and URL internally — no manual lookup needed.
+  # 5. Download via virtctl vmexport download — pure KubeVirt API approach.
+  # No port-forward (eliminates connection drops on large files), no token
+  # exposed in logs, no curl. virtctl handles auth and streaming internally.
+  Log "downloading memory dump via virtctl vmexport download..."
+  if ! RunTimed 3600 virtctl vmexport download "${exportName}" \
+      -n "${ns}" \
+      --output "${temporary}" >>"${pipelineLog}" 2>&1; then
     Oc delete virtualmachineexport "${exportName}" -n "${ns}" --ignore-not-found >>"${pipelineLog}" 2>&1 || true
-    return 1
-  }
-  # Extract path only — port-forward replaces host:port
-  typeset dlPath="${dlUrl#*://*/}"
-  [[ "${dlPath}" == /* ]] || dlPath="/${dlPath}"
-
-  # 5. Port-forward the export service to localhost (avoids API server HTTP/2 limits)
-  # Register pfPid immediately so Cleanup() can kill it if we exit early for any reason.
-  oc port-forward "svc/${svcName}" -n "${ns}" "18443:443" >>"${pipelineLog}" 2>&1 &
-  pfPid=$!; sleep 3
-
-  # 6. Resumable download via curl --continue-at -
-  # Each GOAWAY just resumes from the last byte — accumulates progress across drops.
-  # Bounded retries: max 10 attempts with a 600s overall deadline.
-  # Track success explicitly so a successful attempt 10 is not misread as failure.
-  typeset dlAttempt=0; typeset maxAttempts=10; typeset dlDeadline=$((SECONDS + 600)); typeset dlSuccess=0
-  while ((dlAttempt < maxAttempts && SECONDS < dlDeadline)); do
-    dlAttempt=$((dlAttempt + 1))
-    set +x
-    if curl -k -f -H "x-kubevirt-export-token: ${token}" \
-        --connect-timeout 30 --retry 0 \
-        --continue-at - --output "${temporary}" \
-        "https://localhost:18443${dlPath}" >>"${pipelineLog}" 2>&1; then
-      set -x
-      dlSuccess=1; break
-    fi
-    set -x
-    typeset dlSz; dlSz=$(stat -c%s "${temporary}" 2>/dev/null || echo 0)
-    Log "memory download attempt ${dlAttempt}/${maxAttempts} interrupted at $((dlSz / 1024 / 1024)) MiB — resuming..."
-    ((dlAttempt < maxAttempts && SECONDS < dlDeadline)) || break
-    sleep 3
-    # Re-establish port-forward if the previous one died
-    if ! kill -0 "${pfPid}" 2>/dev/null; then
-      oc port-forward "svc/${svcName}" -n "${ns}" "18443:443" >>"${pipelineLog}" 2>&1 &
-      pfPid=$!; sleep 3
-    fi
-  done
-  kill "${pfPid}" 2>/dev/null || true; pfPid=''
-  Oc delete virtualmachineexport "${exportName}" -n "${ns}" --ignore-not-found >>"${pipelineLog}" 2>&1 || true
-  if ((dlSuccess == 0)); then
-    RecordError memory "memory download failed after ${dlAttempt} attempt(s) or deadline exceeded"; return 1
+    RecordError memory "virtctl vmexport download failed"; return 1
   fi
+  Oc delete virtualmachineexport "${exportName}" -n "${ns}" --ignore-not-found >>"${pipelineLog}" 2>&1 || true
 
   # 7. Validate and finalise
   if ! RunTimed 60 python3 "${scriptDir}/reliability.py" validate-artifact --type memory --path "${temporary}" >/dev/null; then
