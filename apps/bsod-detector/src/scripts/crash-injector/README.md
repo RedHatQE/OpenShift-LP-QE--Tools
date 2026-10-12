@@ -1,168 +1,140 @@
 # Crash Injector Scripts
 
-Scripts that orchestrate intentional BSOD injection for testing the detector pipeline.
+Scripts that orchestrate intentional BSOD injection for testing the BSOD detector pipeline.
 
-These scripts are designed for **deliberate, controlled crash testing** — not production use.
+Designed for **deliberate, controlled crash testing** — not production use.
 
 ## Script Overview
 
 ### `trigger-bsod-intentional.sh`
 
-**Purpose**: Main entry point for intentional BSOD testing.
-
-This script orchestrates the complete crash detection and artifact extraction pipeline:
+**Purpose**: Main entry point for end-to-end intentional BSOD pipeline.
 
 **Usage**:
 ```bash
-GA_VM="win2022-vm-hjoshi1" GA_NS="windows-bsod" \
+BSOD_DET__VM__NAME="win2022-vm-hjoshi1" BSOD_DET__NAMESPACE="windows-bsod" \
   ./trigger-bsod-intentional.sh 0x01
 ```
 
 **Arguments**:
-- `crash_type`: NotMyFault bugcheck code (0x01-0x09)
-  - `0x01`: EXCEPTION_ACCESS_VIOLATION
-  - `0x02`: INVALID_KERNEL_HANDLE
-  - `0x03`: SYSTEM_SERVICE_EXCEPTION
-  - etc (see NotMyFault documentation for full list)
+- `crash_type` — NotMyFault bugcheck code (default: `0x01`)
+  - `0x01` EXCEPTION_ACCESS_VIOLATION
+  - `0x02` INVALID_KERNEL_HANDLE
+  - `0x03` SYSTEM_SERVICE_EXCEPTION
+  - `0x09` DRIVER_IRQL_NOT_LESS_OR_EQUAL
+  - See `notmyfaultc64.exe /?` for full list
 
 **Environment Variables**:
 
-| Variable | Default | Purpose |
+| Variable | Required | Purpose |
 |---|---|---|
-| `GA_VM` | `win2022-vm-hjoshi1` | Target Windows VM name |
-| `GA_NS` | `windows-bsod` | Kubernetes namespace |
-| `BSOD_DET__EVIDENCE__DIR` | `/mnt/persistent-bsod-evidence` | Evidence storage root |
-| `BSOD_DET__SNAPSHOT__CLASS` | `ocs-storagecluster-rbdplugin-snapclass` | Storage snapshot class |
-| `BSOD_DET__READY__TIMEOUT` | `300` | Watcher readiness timeout (seconds) |
-| `BSOD_DET__PREFLIGHT__TIMEOUT` | `300` | Preflight validation timeout (seconds) |
+| `BSOD_DET__VM__NAME` | **Yes — no default** | Target Windows VM name |
+| `BSOD_DET__NAMESPACE` | **Yes — no default** | Kubernetes namespace |
+| `BSOD_DET__EVIDENCE__DIR` | No | Evidence root (default: `/mnt/persistent-bsod-evidence`) |
+| `BSOD_DET__SNAPSHOT__CLASS` | No | Storage snapshot class |
+| `BSOD_DET__MEMORY__DUMP_PVC` | No | Memory dump PVC name |
+| `BSOD_RECOVERY_IMAGE` | No | Digest-pinned guestfs recovery image |
+| `BSOD_DET__READY__TIMEOUT` | No | Watcher readiness timeout in seconds (default: 300) |
+| `BSOD_DET__PREFLIGHT__TIMEOUT` | No | Preflight timeout in seconds (default: 300) |
 
 **Execution Flow**:
-
 ```
-1. Cleanup leftover cache files (file.0x* from previous guestfish runs)
-2. Create unique run directory: /mnt/persistent-bsod-evidence/{TIMESTAMP}-intentional-{PID}-{RANDOM}/
-3. Call ../host/preflight-rhov.sh
-   ├─ Verify VM state (Running, runStrategy: Manual)
-   ├─ Check qemu-guest-agent responsive
-   ├─ Validate crash dump settings
-   ├─ Verify evidence mount
-   └─ Generate recovery-metadata.json
-4. Start ../host/watch-crash.sh in background
-   └─ Monitors for BSOD every 5 seconds
-5. Call guest-agent.py to inject crash via NotMyFault.exe
-6. wait-crash.sh detects BSOD
-   ├─ Captures memory dump via virtctl memory-dump
-   ├─ Converts ELF → Windows DMP format
-   ├─ Runs volatility3 analysis
-   ├─ Stops VM
-   └─ Calls ../host/recover-natural-crash.sh (extracts artifacts)
-7. Call reliability.py to validate all artifacts
+1. Validate BSOD_DET__VM__NAME and BSOD_DET__NAMESPACE are set (no defaults)
+2. Create run directory: /mnt/persistent-bsod-evidence/{TIMESTAMP}-intentional-{PID}-{RANDOM}/
+3. Run preflight-rhov.sh
+   ├─ QGA ping (5 retries)
+   ├─ configure-dumps.ps1 on guest → validate rebootRequired=false
+   └─ Write recovery-metadata.json
+4. Start watch-crash.sh in background
+5. Clean old dumps from guest (MEMORY.DMP, Minidump/*.dmp)
+6. Inject BSOD via guest-agent.py exec-crash notmyfaultc64.exe /crash <type>
+7. watch-crash.sh detects BSOD:
+   ├─ Captures vm-memory.elf.tar.gz via virtctl memory-dump
+   ├─ Captures screenshot, domain.xml, host-signals.json
+   ├─ Stops VM (virtctl stop)
+   ├─ Runs recover-natural-crash.sh (offline NTFS extraction)
+   ├─ Restarts VM (virtctl start)
+   └─ Writes evidence-summary.json
 8. Return exit code (0=success, 1=failure)
 ```
 
 **Output Structure**:
+```
+/mnt/persistent-bsod-evidence/{TIMESTAMP}-intentional-{PID}-{RANDOM}/
+├── bsod-screenshot.png              VNC screenshot at crash moment
+├── vm-memory.elf.tar.gz             PRIMARY: full physical memory (~800MB ELF)
+├── domain.xml                       Libvirt domain config at crash
+├── host-signals.json                Host diagnostics
+├── launcher-compute.log             KVM virt-launcher logs
+├── parse-dump-header.json           Bugcheck code (stub when elf2dmp disabled)
+├── events.json                      Event crash detection (stub — run extract-evtx.py offline)
+├── guestFS_sda3/                    NTFS extraction (partition name is dynamic)
+│   └── Windows/System32/winevt/Logs/
+│       ├── System.evtx              Windows System EventLog (~8MB)
+│       └── Application.evtx        Windows Application EventLog (~6MB)
+├── recovery-metadata.json           VM config, storage, armed epoch
+├── checksums.sha256                 SHA-256 manifest of evidence files
+├── stage-errors.jsonl               Per-stage error log
+├── extraction.log                   guestfish extraction trace
+├── extraction-summary.json          Recovery phase artifact inventory
+├── evidence-summary.json            Final pipeline verdict (ok: true/false)
+├── watcher.log                      Full watcher execution trace
+└── watcher-ready                    Arming marker
+```
 
-```
-/mnt/persistent-bsod-evidence/20261007T120000Z-intentional-12345-6789/
-├── BSOD Detection Artifacts
-│   ├── bsod-screenshot.png              (BSOD screenshot from virtctl)
-│   ├── watcher-ready                     (marker: detection began)
-│   └── watcher.log                       (detailed watcher execution log)
-│
-├── Memory Dumps
-│   ├── vm-memory-windows.dmp             (16GB Windows PAGEDU64 dump)
-│   └── vm-memory.elf.tar.gz              (compressed ELF dump from KubeVirt)
-│
-├── Volatility Analysis
-│   ├── volatility-windows-info.txt       (OS/kernel version)
-│   ├── volatility-driverscan.txt         (loaded drivers at crash)
-│   ├── volatility-dumpfiles.txt          (dump files enumeration)
-│   └── volatility-crashinfo.txt          (crash context)
-│
-├── NTFS Extraction (Offline)
-│   ├── guestFS/Windows/System32/winevt/Logs/
-│   │   ├── System.evtx                   (7.1MB System EventLog)
-│   │   └── Application.evtx              (5.1MB Application EventLog)
-│   └── EventLogs/                        (symlinks for backward compat)
-│       ├── System.json                   (parsed System EventLog)
-│       └── Application.json              (parsed Application EventLog)
-│
-├── Analysis & Validation
-│   ├── parse-dump-header.json            (bugcheck code, parameters)
-│   ├── recovery-metadata.json            (VM config, storage details)
-│   ├── extraction.log                    (guestfs extraction log)
-│   ├── extraction-summary.json           (artifact inventory)
-│   ├── evidence-summary.json             (final validation report)
-│   ├── checksums.sha256                  (integrity verification)
-│   ├── stage-errors.jsonl                (error tracking by stage)
-│   │
-│   └── Diagnostics
-│       ├── domain.xml                    (VM domain definition)
-│       ├── host-signals.json             (host diagnostics)
-│       └── launcher-compute.log          (KVM launcher logs)
-```
+**What is NOT captured (platform limitations)**:
+- `MEMORY.DMP` — `AutoReboot=0` prevents the reboot that copies DedicatedDump.sys → MEMORY.DMP
+- `Minidump/` — Requires pagefile.sys which Windows Server 2022 on KVM does not create
+- `vm-memory-windows.dmp` — elf2dmp conversion disabled (17GB, developer runs offline)
+- Volatility outputs — Developer tool, run offline against vm-memory.elf.tar.gz
 
 **Exit Codes**:
-- `0`: Success — all artifacts extracted and validated
-- `1`: Failure — see watcher.log or extraction.log for details
+- `0` — All required artifacts captured and validated
+- `1` — Pipeline failed — check `stage-errors.jsonl` then `watcher.log`
 
-**Key Features**:
-- ✅ Automatic VM state validation before crash
-- ✅ Background watcher detects BSOD via vmi.status.guestOSInfo disappearance
-- ✅ Memory dump captured at precise BSOD moment
-- ✅ Offline NTFS artifact extraction (VM stopped)
-- ✅ No PSS escalation required (runs with baseline policy)
-- ✅ Two-phase extraction for reliable file transfer
-- ✅ Automatic cleanup on success or failure (trap EXIT)
-- ✅ Comprehensive validation and error tracking
-
-**Testing Different Crash Types**:
-
+**Diagnosing failures**:
 ```bash
-# Access Violation
-./trigger-bsod-intentional.sh 0x01
-
-# Invalid Kernel Handle
-./trigger-bsod-intentional.sh 0x02
-
-# System Service Exception
-./trigger-bsod-intentional.sh 0x03
-
-# Etc - see NotMyFault.exe /crash output for available codes
+run=/mnt/persistent-bsod-evidence/<run-id>
+cat $run/stage-errors.jsonl | jq .
+cat $run/evidence-summary.json | jq '{ok,stageErrors,missingRequiredArtifactTypes,invalidArtifacts}'
+cat $run/extraction-summary.json | jq '{ok,stageErrors,missingRequiredArtifactTypes,invalidArtifacts}'
 ```
 
-## Prerequisite Configuration
+## Prerequisites
 
-Before running intentional crash tests, ensure:
+Before running the pipeline:
 
-1. **VM is Running**: `oc get vm win2022-vm-hjoshi1 -n windows-bsod` shows `Running`
-2. **Crash dumps configured**: `preflight-rhov.sh` validates this
-3. **Evidence mount exists**: `/mnt/persistent-bsod-evidence` is writable
-4. **Storage classes available**: Check `ocs-storagecluster-rbdplugin-snapclass` exists
-5. **guestfs image available**: `quay.io/konveyor/oadp-vmfr-access:latest` is pullable
+1. **VM Running**: `oc get vmi win2022-vm-hjoshi1 -n windows-bsod` shows `Running`
+2. **QGA healthy**: `python3 guest-agent.py ping` returns `{}`
+3. **Crash dump configured** (golden image settings — requires one prior reboot):
+   - `CrashDumpEnabled=7` (Automatic)
+   - `AutoReboot=0`
+   - `DedicatedDumpFile=C:\DedicatedDump.sys` (15.9GB pre-allocated)
+4. **Evidence mount**: `/mnt/persistent-bsod-evidence` writable and persistent
+5. **NotMyFault binary**: `C:\Temp\nmf\notmyfaultc64.exe` on the VM
+6. **Recovery image**: Digest-pinned `quay.io/konveyor/oadp-vmfr-access@sha256:...` pullable
+
+**If preflight fails with rebootRequired=true**:
+```bash
+virtctl stop win2022-vm-hjoshi1 -n windows-bsod
+virtctl start win2022-vm-hjoshi1 -n windows-bsod
+# Wait for VM Ready, then re-run
+```
 
 ## Troubleshooting
 
-**Pod startup timeout**:
-- Check namespace PSS is not blocking pod creation
-- Verify guestfs image is available: `oc get imagestream -A | grep guestfs`
-
-**Artifact extraction fails**:
-- Check `/mnt/persistent-bsod-evidence/{RUN}/extraction.log` for guestfish errors
-- Verify NTFS partition exists on VM disk: `guestfish list-filesystems`
-
-**Memory dump not captured**:
-- Check watcher detected BSOD: `grep "BSOD detected" watcher.log`
-- Verify virtctl memory-dump completed: `grep "elf2dmp" watcher.log`
-
-**For detailed debugging**:
-- Enable xtrace in shell options: `bash -x trigger-bsod-intentional.sh`
-- Check watcher.log for full execution trace
-- Check extraction.log for guestfish commands and errors
+| Error | Where to look | Likely cause |
+|---|---|---|
+| QGA ping failed | `watcher.log` | VM frozen from previous BSOD — restart with virtctl |
+| rebootRequired=true | preflight output | CrashDumpEnabled changed — do virtctl stop/start |
+| source PVC attached | `extraction.log` | StopVM failed or VMI still running |
+| oc cp unexpected EOF | `extraction.log` | Retry — transient network issue |
+| missing: memory | `extraction-summary.json` | vm-memory.elf.tar.gz missing — virtctl dump failed |
+| missing: evtx | `extraction-summary.json` | No System.evtx on any NTFS partition |
 
 ## Related Scripts
 
-- `../host/watch-crash.sh` — Background BSOD detection and memory capture
-- `../host/preflight-rhov.sh` — Pre-run environment validation
+- `../host/preflight-rhov.sh` — VM validation and metadata generation
+- `../host/watch-crash.sh` — BSOD detection and memory capture
 - `../host/recover-natural-crash.sh` — Offline NTFS artifact extraction
 - `../guest/configure-dumps.ps1` — Windows crash dump configuration
