@@ -8,9 +8,9 @@ umask 077
 
 # Determine script directory for helper script resolution
 typeset scriptDir=''; scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Input files: preflight metadata (from watch-crash.sh), output directory, optional extract-evtx binary
+# Input files: preflight metadata (from watch-crash.sh), output directory
+# extract-evtx.py is a developer tool (archived) — events.json is written as a stub
 typeset metadataFile=''; typeset outDir=''; typeset commandTimeout="${BSOD_DET__COMMAND__TIMEOUT:-30}"
-typeset extractEvtxBin="${BSOD_DET__EXTRACT_EVTX__BIN:-${scriptDir}/extract-evtx.py}"
 
 # Parse command-line arguments: metadata file and output directory
 while (($#)); do
