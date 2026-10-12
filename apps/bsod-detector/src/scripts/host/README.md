@@ -46,7 +46,9 @@ BSOD_DET__VM__NAME="win2022-vm-hjoshi1" BSOD_DET__NAMESPACE="windows-bsod" \
 **Responsibilities**:
 - Poll VM via QGA ping every 5s; detect BSOD when pings exceed miss threshold
 - Require `domstate` corroboration (crashed/paused/pmsuspended/running) before entering recovery
-- Capture full physical memory via `virtctl memory-dump` → `vm-memory.elf.tar.gz`
+- Capture full physical memory via `virtctl memory-dump get` → writes ELF dump to PVC
+- Download ELF dump via `virtctl vmexport download --format gzip` (no port-forward, no token in logs)
+- Clean up stale VirtualMachineExports on same PVC before creating new one
 - Capture VNC screenshot, domain XML, host signals
 - Monitor dump write progress (virsh domstats)
 - Stop VM using `virtctl stop`
@@ -54,20 +56,34 @@ BSOD_DET__VM__NAME="win2022-vm-hjoshi1" BSOD_DET__NAMESPACE="windows-bsod" \
 - Restart VM after recovery
 - Generate `evidence-summary.json`
 
+**Memory dump flow**:
+```
+virtctl memory-dump get → KubeVirt freezes VM → writes RAM to PVC (ELF ET_CORE, ~1.5GB compressed)
+Create VirtualMachineExport on PVC
+virtctl vmexport download --format gzip --port-forward --insecure → vm-memory.elf.tar.gz
+Delete VirtualMachineExport
+virtctl memory-dump remove
+```
+
+**Why virtctl vmexport download** (replaced port-forward + curl):
+- No token exposed in logs — virtctl resolves auth internally
+- virtctl manages its own port-forward — no connection drops on large files
+- Simpler — 1 command replaces 30+ lines of retry loop + pfPid management
+
 **Developer tools (commented out — run offline)**:
-- `elf2dmp` conversion → `vm-memory-windows.dmp` (17GB — removed from pipeline to save mount space)
+- `elf2dmp` conversion → `vm-memory-windows.dmp` (17GB — run offline against vm-memory.elf.tar.gz)
 - Volatility3 analysis (windows.info, crashinfo, driverscan, dumpfiles)
 
-**Primary artifact**: `vm-memory.elf.tar.gz` — raw ELF memory dump from KubeVirt, always captured regardless of Windows disk state.
+**Primary artifact**: `vm-memory.elf.tar.gz` (~1.5GB compressed from 16GB RAM) — KubeVirt captures directly from QEMU, works regardless of Windows/pagefile state.
 
 **Output**:
 ```
 bsod-screenshot.png          (VNC screenshot at crash)
-vm-memory.elf.tar.gz         (primary memory artifact ~800MB)
+vm-memory.elf.tar.gz         (primary memory artifact ~1.5GB compressed)
 domain.xml                   (libvirt domain configuration at crash)
 host-signals.json            (host diagnostics)
 launcher-compute.log         (KVM launcher logs)
-parse-dump-header.json       (bugcheck code — from elf2dmp if enabled, else stub)
+parse-dump-header.json       (bugcheck code stub — elf2dmp disabled)
 watcher.log                  (full execution trace)
 stage-errors.jsonl           (per-stage error tracking)
 evidence-summary.json        (final pipeline verdict)
