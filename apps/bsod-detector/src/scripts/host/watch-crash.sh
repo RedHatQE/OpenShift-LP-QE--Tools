@@ -242,12 +242,21 @@ EOF
   fi
   # virtctl vmexport download resolves token and URL internally — no manual lookup needed.
   # 5. Download via virtctl vmexport download — pure KubeVirt API approach.
-  # No port-forward (eliminates connection drops on large files), no token
-  # exposed in logs, no curl. virtctl handles auth and streaming internally.
+  # --port-forward: sets up its own port-forward internally (we are outside cluster).
+  # --format raw:   downloads the raw tar.gz bytes from the PVC as-is (the memory
+  #                 dump PVC contains a tar.gz ELF file written by virtctl memory-dump;
+  #                 gzip default would double-compress or serve wrong format).
+  # --keep-vme:     we delete the export ourselves after download.
+  # --insecure:     export service uses self-signed certificate.
+  # No token in logs — virtctl resolves auth internally.
   Log "downloading memory dump via virtctl vmexport download..."
   if ! RunTimed 3600 virtctl vmexport download "${exportName}" \
       -n "${ns}" \
-      --output "${temporary}" >>"${pipelineLog}" 2>&1; then
+      --output "${temporary}" \
+      --format raw \
+      --port-forward \
+      --insecure \
+      --keep-vme >>"${pipelineLog}" 2>&1; then
     Oc delete virtualmachineexport "${exportName}" -n "${ns}" --ignore-not-found >>"${pipelineLog}" 2>&1 || true
     RecordError memory "virtctl vmexport download failed"; return 1
   fi
