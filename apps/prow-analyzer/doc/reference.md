@@ -596,8 +596,8 @@ image/container/prow-analyzer/
 
 ### Development environment
 
-> **Linux is required for the `make` targets.** The build/test scripts under
-> `scripts/` use strict Bash conventions — notably `shopt -s inherit_errexit`,
+> **Linux is required for the `make` targets.** The Makefile recipes
+> use strict Bash conventions — notably `shopt -s inherit_errexit`,
 > which needs **GNU Bash 4.4+**. macOS ships Bash 3.2, so `make build`,
 > `make test`, and `make test--unit` will **not** run natively on macOS.
 >
@@ -632,6 +632,10 @@ make test
 
 # Run unit tests with the embedded 100% coverage gate
 make test--unit
+
+# Use a specific Go executable and package selection for both suites.
+# Bot command unit tests still run separately from the package coverage gate.
+make test GO=/path/to/go PKGS='./pkg/analyzer ./pkg/slack/handler'
 
 # Run specific tests — the suites are tagged, so a build tag is required or the
 # run selects zero tests. Unit suite is tagged `unit`:
