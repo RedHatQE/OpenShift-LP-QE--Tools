@@ -3,11 +3,11 @@
 load test-helper
 
 setup() {
-  SetupTemp
+  setup_temp
 }
 
 teardown() {
-  TeardownTemp
+  teardown_temp
 }
 
 create_pagedu64_dump() {
@@ -75,7 +75,7 @@ with open('$file', 'wb') as f:
   dd if=/dev/zero bs=1 count=88 >> "$dump" 2>/dev/null
 
   run "$REPO_ROOT/src/scripts/host/parse-dump-header.sh" "$dump"
-  [ "$status" -eq 0 ]
+  [ "$status" -ne 0 ]
 
   valid=$(echo "$output" | jq -r '.dumps[0].valid')
   [ "$valid" = "false" ]
