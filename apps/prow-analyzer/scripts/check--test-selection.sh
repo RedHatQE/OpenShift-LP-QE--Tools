@@ -25,7 +25,7 @@ selected="$(
 
 if ((selected < minCount)); then
     : "❌ FAIL: The \`-tags ${buildTag}\` selected ${selected} test(s) in ${pkgsTest} (expected >= ${minCount})."
-    : "    A missing or misspelled `//go:build ${buildTag}` line yields 0 test silently."
+    : "    A missing or misspelled \`//go:build ${buildTag}\` line yields 0 test silently."
     false
 else
     : "✅ PASS: The \`-tags ${buildTag}\` selected ${selected} test(s) in ${pkgsTest}."
