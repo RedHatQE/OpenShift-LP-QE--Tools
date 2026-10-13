@@ -74,6 +74,453 @@ End          → stage-errors.jsonl, evidence-summary.json, watcher.log
 
 ---
 
+## Evidence Artifacts Deep Dive
+
+This section explains what each artifact contains and how to use it, with examples from a real pipeline run: `/mnt/persistent-bsod-evidence/20261013T070250Z-intentional-837674-22539`
+
+### Pre-Crash Configuration
+
+#### `recovery-metadata.json` (1.3 KB)
+**What it contains**: Preflight validation results and infrastructure snapshot at pipeline start.
+
+**Example fields**:
+```json
+{
+  "runId": "20261013T070250Z-intentional-837674-22539",
+  "namespace": "windows-bsod",
+  "vm": "win2022-vm-hjoshi1",
+  "launcherPod": "virt-launcher-win2022-vm-hjoshi1-vtfdn",
+  "domain": "windows-bsod_win2022-vm-hjoshi1",
+  "node": "integrity-gs04.sys.eng.rdu2.dc.redhat.com",
+  "memoryDumpPvc": "win2022-vm-hjoshi1-memdump",
+  "snapshotClass": "ocs-storagecluster-rbdplugin-snapclass",
+  "recoveryImage": "image-registry.../bsod-recovery:latest@sha256:4f46...",
+  "armedEpoch": 1791875063
+}
+```
+
+**Use cases**:
+- Verify target VM and namespace correctness
+- Find exact launcher pod for manual debugging
+- Confirm recovery image version (for reproducibility)
+- Track infrastructure (node, storage class, snapshot class)
+
+#### `watcher-ready` (42 B)
+**What it contains**: Run ID; written when crash detection polling begins.
+
+**Purpose**: Signals that the VM is armed and polling for BSOD events.
+
+---
+
+### Crash Evidence (Captured At BSOD)
+
+#### `bsod-screenshot.png` (37 KB — PNG, 1280×800)
+**What it contains**: VNC screenshot of Windows blue screen at crash time.
+
+**Visual verification**:
+- Blue screen appears → confirms BSOD was captured visually
+- Windows error code visible (if legible) → helps forensic analysis
+- Desktop state frozen → confirms VM-in-crash state
+
+**How to view**:
+```bash
+file bsod-screenshot.png  # Verify PNG format
+display bsod-screenshot.png  # View in X11
+scp evidence/.../bsod-screenshot.png . && open bsod-screenshot.png
+```
+
+#### `vm-memory.elf.tar.gz` (787 MB — Gzipped TAR of ELF ET_CORE)
+**What it contains**: **Full physical RAM dump** in ELF ET_CORE format.
+
+**Example metadata**:
+```
+Format:  tar.gz[elf]
+Size:    824,374,006 bytes (~824 MB)
+Type:    memory
+Valid:   true
+SHA256:  077051eba4d8a9f9d6ed8059dadd38e875c2ca2d151472bd701bbe0d82b8fd89
+```
+
+**What's inside**:
+```bash
+tar -tzf vm-memory.elf.tar.gz
+  # Output example:
+  # 20261013T070250Z-intentional-837674-22539/memory.dump
+  # (ELF core file containing full 16GB physical RAM)
+```
+
+**How to analyze**:
+```bash
+# 1. Extract the ELF dump
+tar -xzf vm-memory.elf.tar.gz
+inner_file=$(tar -tzf vm-memory.elf.tar.gz | grep '.dump$' | head -1)
+tar -xzf vm-memory.elf.tar.gz -O "$inner_file" > memory.dump
+
+# 2. Convert ELF → Windows DMP (offline, requires elf2dmp)
+elf2dmp memory.dump memory-windows.dmp
+
+# 3. Analyze with Volatility3
+vol -f memory-windows.dmp windows.info.Info
+vol -f memory-windows.dmp windows.crashinfo.CrashInfo
+vol -f memory-windows.dmp windows.driverscan.DriverScan
+```
+
+**Why this is primary**: KubeVirt captures RAM directly from QEMU — independent of Windows pagefile, BSOD staging, or reboot state. **Always works.**
+
+#### `domain.xml` (14 KB — Libvirt domain definition)
+**What it contains**: Complete QEMU/KVM configuration at crash time.
+
+**Key sections**:
+```xml
+<domain type='kvm' id='1'>
+  <name>windows-bsod_win2022-vm-hjoshi1</name>
+  <uuid>01ef375f-60c1-44d5-94a9-c91122957409</uuid>
+  <memory unit='KiB'>16777216</memory>  <!-- 16 GB -->
+  <currentMemory unit='KiB'>16777216</currentMemory>
+  <vcpu placement='static' current='4'>16</vcpu>
+  <cpu>
+    <model fallback='allow'>EPYC-Genoa</model>
+    <feature policy='require' name='topoext'/>
+    <!-- CPU flags at crash time -->
+  </cpu>
+  <devices>
+    <emulator>/usr/libexec/qemu-kvm</emulator>
+    <disk type='block' device='disk'>
+      <!-- Block device mappings, PVCs, images -->
+    </disk>
+    <interface type='bridge'>
+      <!-- Network devices, MAC addresses -->
+    </interface>
+    <balloon model='virtio'>
+      <!-- VirtIO balloon config -->
+    </balloon>
+  </devices>
+</domain>
+```
+
+**Forensic value**:
+- CPU model and flags → determine instruction set capabilities
+- Memory and vCPU counts → validate test environment configuration
+- Device order → map disk devices to Windows mount points
+- BIOS/UEFI settings → secure boot state, firmware version
+- PCI device assignments → hardware validation
+
+**How to query**:
+```bash
+# Extract specific fields
+grep -A5 "<cpu>" domain.xml  # CPU config
+grep "<driver" domain.xml     # Disk/device drivers
+grep "<emulator>" domain.xml  # QEMU version
+```
+
+#### `launcher-compute.log` (138 KB — Raw virt-launcher/QEMU logs)
+**What it contains**: Timestamped compute logs from virt-launcher pod (QEMU stderr/stdout).
+
+**What to look for**:
+```
+Split-lock AC traps (WRMSR events on locked memory access)
+KVM internal errors (vcpu fault, page fault anomalies)
+Device errors (disk I/O timeouts, NIC resets)
+Hyper-V enlightenment interactions
+Guest instruction emulation failures
+```
+
+**Example search**:
+```bash
+grep -i "split-lock" launcher-compute.log  # CPU lock issues
+grep -i "kvm error" launcher-compute.log    # Hypervisor errors
+grep -i "vcpu" launcher-compute.log         # vCPU state
+```
+
+#### `host-signals.json` (1.3 KB — Parsed kernel signals)
+**What it contains**: Structured analysis of `launcher-compute.log` for forensic signals.
+
+**Example content**:
+```json
+{
+  "ok": true,
+  "vm": "windows-bsod_win2022-vm-hjoshi1",
+  "collectedAt": "2026-10-13T07:12:08Z",
+  "kernelSignals": [
+    {
+      "id": "split-lock-trap",
+      "count": 0,
+      "relatedBugCheck": "0x00020001",
+      "matches": []
+    },
+    {
+      "id": "kvm-internal-error",
+      "count": 0,
+      "relatedBugCheck": null,
+      "matches": []
+    }
+  ],
+  "splitLockDetected": false,
+  "hyperv": {
+    "features": [
+      { "name": "tlbflush", "state": "absent", "risk": "high", "present": false },
+      { "name": "ipi", "state": "on", "risk": "high", "present": true },
+      { "name": "vapic", "state": "on", "risk": "low", "present": true }
+    ]
+  }
+}
+```
+
+**Interpretation**:
+- `split-lock-trap.count > 0` → CPU memory locking issues; may affect Windows thread synchronization
+- `kvm-internal-error.count > 0` → Hypervisor-level faults; potential infrastructure instability
+- `hyperv.features.tlbflush = "absent"` and `risk = "high"` → Translation lookaside buffer flush optimization unavailable; performance impact
+- `hyperv.ipi = "present"` → Inter-processor interrupts optimized
+
+---
+
+### Windows Crash Event Logs (Extracted After VM Shutdown)
+
+#### `guestFS_sda3/Windows/System32/winevt/Logs/System.evtx` (11 MB)
+**What it contains**: Windows System EventLog — kernel events, crashes, shutdowns.
+
+**Key events**:
+- **Event 1001 (BugCheck)**: BSOD event with bugcheck code, parameters, and timestamp
+- **Event 6008 (Dirty shutdown)**: Ungraceful shutdown (triggered by AutoReboot=0)
+- **Event 7000-7009**: Driver load failures, service errors around crash
+
+**How to parse (offline)**:
+```bash
+# Extract into JSON (run developer tool offline)
+python3 extract-evtx.py guestFS_sda3/Windows/System32/winevt/Logs/System.evtx
+
+# Or use Windows Event Viewer if analyzing on Windows
+```
+
+**What to look for in Event 1001**:
+```
+BugCheckCode: 0x01  (APC_INDEX_MISMATCH) or other code
+BugCheckParameter1, 2, 3, 4: Faulting address, context, CPU state
+DumpFile: C:\Windows\MEMORY.DMP or C:\DedicatedDump.sys (if written)
+TimestampUTC: Exact crash time
+```
+
+#### `guestFS_sda3/Windows/System32/winevt/Logs/Application.evtx` (6.4 MB)
+**What it contains**: Windows Application EventLog — app-level events.
+
+**Key events**:
+- **Application/1001 (LiveKernelEvent)**: System health data logged by crashed process
+- **Application/1000**: Generic app crash events
+- **.NET Framework events** (if applicable): CLR faults
+
+**How to analyze**:
+Same as System.evtx — run extract-evtx.py offline.
+
+#### `parse-dump-header.json` (146 B)
+**What it contains**: Stub for bugcheck code extraction (developer tool disabled in pipeline).
+
+**Example**:
+```json
+{
+  "ok": true,
+  "totalDumps": 0,
+  "dumps": [],
+  "warnings": [
+    "no on-disk dump available; primary artifact is vm-memory.elf.tar.gz"
+  ]
+}
+```
+
+**Purpose**: Placeholder for offline elf2dmp analysis. Developers run elf2dmp on vm-memory.elf.tar.gz to extract bugcheck details.
+
+#### `events.json` (162 B)
+**What it contains**: Stub for EventLog parsing (developer tool disabled in pipeline).
+
+**Example**:
+```json
+{
+  "ok": true,
+  "note": "extract-evtx.py is a developer tool — run offline against guestFS_<partition>/Windows/System32/winevt/Logs/*.evtx",
+  "events": []
+}
+```
+
+**Purpose**: Developers run extract-evtx.py offline to parse System.evtx and Application.evtx into JSON.
+
+---
+
+### Metadata and Validation
+
+#### `checksums.sha256` (915 B)
+**What it contains**: SHA-256 manifest of all evidence files for integrity verification.
+
+**Example**:
+```
+077051eba4d8a9f9d6ed8059dadd38e875c2ca2d151472bd701bbe0d82b8fd89  vm-memory.elf.tar.gz
+42d27f087986031ee07523a8b44a1f6dad46d138f06c5727d5647cfa454988fc  bsod-screenshot.png
+36db7f84419faf026f535626bb2b6a2d76ef9be8ded7f960bed2a46bbf1ce9fb  domain.xml
+...
+```
+
+**How to verify**:
+```bash
+cd /mnt/persistent-bsod-evidence/20261013T070250Z-intentional-837674-22539
+sha256sum -c checksums.sha256  # Verify all files
+```
+
+#### `extraction.log` (3.6 KB)
+**What it contains**: Step-by-step trace of guestfish NTFS extraction.
+
+**Example**:
+```
+[12:53:12] Starting guestfish extraction for partition sda3
+[12:53:13] Mounting /dev/sda3 (NTFS) read-only
+[12:53:14] Downloading /Windows/System32/winevt/Logs/System.evtx
+[12:53:25] Downloaded 11M in 11 seconds (1.0 MB/s)
+[12:53:25] Downloading /Windows/System32/winevt/Logs/Application.evtx
+[12:53:35] Downloaded 6.1M in 10 seconds (0.6 MB/s)
+[12:53:35] Unmounting /dev/sda3
+[12:53:36] Extraction complete
+```
+
+**Use for**: Troubleshooting failed NTFS reads, verifying partition detection, monitoring extraction performance.
+
+#### `extraction-summary.json` (3.2 KB)
+**What it contains**: Recovery phase artifact manifest with integrity validation.
+
+**Key fields per artifact**:
+```json
+{
+  "artifacts": [
+    {
+      "type": "memory",
+      "format": "tar.gz[elf]",
+      "path": "vm-memory.elf.tar.gz",
+      "size": 824374006,
+      "sha256": "077051eba4d8a9f9d6ed8059dadd38e875c2ca2d151472bd701bbe0d82b8fd89",
+      "valid": true
+    },
+    {
+      "type": "evtx",
+      "format": "evtx",
+      "path": "guestFS_sda3/Windows/System32/winevt/Logs/System.evtx",
+      "size": 10555392,
+      "sha256": "162deb75eeaa6525499281b1b42b4d48d2761d77c0579d9cf1833e8d25faa1f1",
+      "valid": true
+    }
+  ],
+  "invalidArtifacts": [],
+  "missingRequiredArtifactTypes": [],
+  "ok": true
+}
+```
+
+**Interpretation**:
+- `valid: true` → File structure validated (PNG is valid PNG, ELF is valid ELF, etc.)
+- `invalidArtifacts: []` → No corrupt files
+- `missingRequiredArtifactTypes: []` → All required artifact types present
+
+#### `stage-errors.jsonl` (0 B on success)
+**What it contains**: JSONL file — one line per pipeline stage failure.
+
+**Example (on failure)**:
+```json
+{"stage":"preflight","error":"qemu guest agent became unavailable","at":"2026-10-13T07:12:00Z"}
+{"stage":"memory-capture","error":"virtctl vmexport download failed","at":"2026-10-13T07:25:00Z"}
+```
+
+**Interpretation**: Empty file (0 B) = clean run. Non-empty = failures to investigate.
+
+#### `evidence-summary.json` (3.2 KB)
+**What it contains**: Final pipeline verdict and complete artifact inventory.
+
+**Example**:
+```json
+{
+  "ok": true,
+  "runId": "20261013T070250Z-intentional-837674-22539",
+  "vm": "win2022-vm-hjoshi1",
+  "namespace": "windows-bsod",
+  "mode": "intentional-rhov",
+  "artifacts": [
+    { "type": "screenshot", "path": "bsod-screenshot.png", "size": 37842, "valid": true },
+    { "type": "memory", "path": "vm-memory.elf.tar.gz", "size": 824374006, "valid": true },
+    { "type": "evtx", "path": "guestFS_sda3/Windows/System32/winevt/Logs/System.evtx", "size": 10555392, "valid": true },
+    { "type": "evtx", "path": "guestFS_sda3/Windows/System32/winevt/Logs/Application.evtx", "size": 6361088, "valid": true },
+    { "type": "log", "path": "launcher-compute.log", "size": 137764, "valid": true },
+    { "type": "log", "path": "domain.xml", "size": 13992, "valid": true },
+    { "type": "json", "path": "host-signals.json", "size": 1278, "valid": true }
+  ],
+  "invalidArtifacts": [],
+  "missingRequiredArtifactTypes": [],
+  "stageErrors": []
+}
+```
+
+**Quick checks**:
+```bash
+jq '.ok' evidence-summary.json           # true = pipeline passed
+jq '.missingRequiredArtifactTypes' ...   # [] = all required artifacts present
+jq '.invalidArtifacts' ...               # [] = all files structurally valid
+```
+
+#### `watcher.log` (170 KB)
+**What it contains**: Full timestamped execution trace of the entire pipeline.
+
+**Example sections**:
+```
+[07:02:50] preflight passed; preparing watcher for windows-bsod/win2022-vm-hjoshi1
+[07:02:51] qemu guest agent and event watch healthy; watcher armed
+[07:10:50] missed ping 1/2 (domstate=paused)
+[07:10:55] missed ping 2/2 (domstate=paused)
+[07:10:55] corroborated crash/freeze detected (domstate=paused)
+[07:10:55] waiting 60 seconds for VNC to become responsive...
+[07:11:55] KubeVirt memory-dump request submitted
+[07:20:50] validated KubeVirt memory dump: vm-memory.elf.tar.gz
+[07:20:55] VNC screenshot captured
+[07:12:08] captured launcher/domain diagnostics for node integrity-gs04.sys.eng.rdu2.dc.redhat.com
+```
+
+**Use for**: Debugging timing issues, understanding detection flow, finding which step failed.
+
+---
+
+### Summary Workflow
+
+**To analyze a run**:
+
+1. **Quick health check**:
+   ```bash
+   cd run-directory
+   jq '.ok' evidence-summary.json
+   jq '.missingRequiredArtifactTypes' evidence-summary.json
+   ```
+
+2. **Visual confirmation**:
+   ```bash
+   file bsod-screenshot.png
+   display bsod-screenshot.png  # See blue screen
+   ```
+
+3. **Check infrastructure**:
+   ```bash
+   jq '.node, .snapshotClass, .storageClass' recovery-metadata.json
+   ```
+
+4. **Parse host signals** (CPU flags, hypervisor state):
+   ```bash
+   jq '.hyperv.features[] | select(.risk=="high")' host-signals.json
+   ```
+
+5. **Extract and analyze memory dump** (offline):
+   ```bash
+   tar -xzf vm-memory.elf.tar.gz
+   elf2dmp [inner-elf-file] memory-windows.dmp
+   vol -f memory-windows.dmp windows.crashinfo.CrashInfo
+   ```
+
+6. **Parse Windows event logs** (offline):
+   ```bash
+   python3 extract-evtx.py guestFS_sda3/Windows/System32/winevt/Logs/*.evtx
+   ```
+
+---
+
 ## Platform Limitations (KVM + VirtIO Balloon)
 
 | Artifact | Status | Reason |
