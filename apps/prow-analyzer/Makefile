@@ -31,7 +31,9 @@ build--bot:
 test: test--unit test--integration
 
 # Unit tests with the embedded 100% coverage gate (single shell invocation via the
-# shared script, which also guards that the unit build tag selects tests).
+# shared script, which also guards that the unit build tag selects tests). The
+# script additionally runs the bot command package's env-consumer unit tests,
+# outside the coverage gate (main() is not unit-testable).
 test--unit:
 	$(SCRIPTS)/test-coverage.sh
 

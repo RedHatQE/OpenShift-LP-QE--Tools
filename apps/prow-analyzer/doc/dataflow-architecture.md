@@ -23,7 +23,7 @@ flowchart TB
             H["Socket-mode client + handler<br/>• filter chain (URL/bot/channel)<br/>• semaphore: max 5 concurrent"]
             A["analyzer (MCP client)<br/>• session init/recover<br/>• HAP guardrails*<br/>• compliance notices"]
         end
-        SEC["Secret / env vars<br/>PROW_AN__SHIP__HELP_MCP_TOKEN<br/>PROW_AN__SLACK__BOT_TOKEN / PROW_AN__SLACK__APP_TOKEN"]
+        SEC["Secret / env vars<br/>PROW_AN__MCP__TOKEN__SHIP_HELP<br/>PROW_AN__SLACK__BOT_TOKEN / PROW_AN__SLACK__APP_TOKEN"]
     end
 
     subgraph SH["ship-help MCP (AI helpdesk) — persona: <persona>"]
@@ -108,16 +108,16 @@ flowchart LR
 
 ## 4. Code & Data Repositories / Stores
 
-| Kind | Name / location | Role | Sensitive? |
-|---|---|---|---|
-| **Source code repo** | `github.com/RedHatQE/OpenShift-LP-QE--Tools` (module path) | All agent code under `apps/prow-analyzer/` | No |
-| **Container image repo** | `images.paas.redhat.com/ieng/app/prow-analyzer` (deployed tag: `<tag>`) | Built runtime image (both bot + CLI binaries) | No (but do not bake secrets) |
-| **Deployment manifests** | `apps/prow-analyzer/deploy/openshift/`, `deploy/slack/` | K8s resources + Slack app manifest | No |
-| **Runtime config store** | ConfigMap `prow-analyzer-config` in ns `<your-namespace>`, surfaced to the container as env vars via `configMapKeyRef` | `PROW_AN__SHIP__HELP_MCP_URL` (`mcp-url`), `PROW_AN__MONITORED__CHANNELS` (`monitored-channels`), `PROW_AN__PROMPT__TEMPLATE` (`prompt-template`); `PROW_AN__MONITOR__ALL` is a literal env value | No |
-| **Secrets store** | K8s Secret / env in ns `<your-namespace>` | `PROW_AN__SHIP__HELP_MCP_TOKEN`, `PROW_AN__SLACK__BOT_TOKEN`, `PROW_AN__SLACK__APP_TOKEN` | **Yes** |
-| **Ephemeral state** | In-memory only (MCP session ID, semaphore) | No database; nothing persisted by the bot | No |
-| **Logs** | Pod stdout (`oc logs`) | Timing + error + (proposed) HAP-redaction counts | Low; avoid logging payloads |
-| **Backend data stores** | Inside **ship-help** (Jira, GitHub, logs, an internal triage system, etc.) | Read by ship-help, **not** by the bot | Governed by ship-help |
+| Kind                     | Name / location                                                                                                        | Role                                                                                                                                                                                              | Sensitive?                   |
+|--------------------------|------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------|
+| **Source code repo**     | `github.com/RedHatQE/OpenShift-LP-QE--Tools` (module path)                                                             | All agent code under `apps/prow-analyzer/`                                                                                                                                                        | No                           |
+| **Container image repo** | `images.paas.redhat.com/ieng/app/prow-analyzer` (deployed tag: `<tag>`)                                                | Built runtime image (both bot + CLI binaries)                                                                                                                                                     | No (but do not bake secrets) |
+| **Deployment manifests** | `apps/prow-analyzer/deploy/openshift/`, `deploy/slack/`                                                                | K8s resources + Slack app manifest                                                                                                                                                                | No                           |
+| **Runtime config store** | ConfigMap `prow-analyzer-config` in ns `<your-namespace>`, surfaced to the container as env vars via `configMapKeyRef` | `PROW_AN__MCP__URL__SHIP_HELP` (`mcp-url`), `PROW_AN__MONITORED_CHANNELS` (`monitored-channels`), `PROW_AN__PROMPT__TEMPLATE` (`prompt-template`); `PROW_AN__MONITOR__ALL` is a literal env value | No                           |
+| **Secrets store**        | K8s Secret / env in ns `<your-namespace>`                                                                              | `PROW_AN__MCP__TOKEN__SHIP_HELP`, `PROW_AN__SLACK__BOT_TOKEN`, `PROW_AN__SLACK__APP_TOKEN`                                                                                                        | **Yes**                      |
+| **Ephemeral state**      | In-memory only (MCP session ID, semaphore)                                                                             | No database; nothing persisted by the bot                                                                                                                                                         | No                           |
+| **Logs**                 | Pod stdout (`oc logs`)                                                                                                 | Timing + error + (proposed) HAP-redaction counts                                                                                                                                                  | Low; avoid logging payloads  |
+| **Backend data stores**  | Inside **ship-help** (Jira, GitHub, logs, an internal triage system, etc.)                                             | Read by ship-help, **not** by the bot                                                                                                                                                             | Governed by ship-help        |
 
 **Key data-handling facts**
 - The bot is **stateless**: it holds only an in-memory MCP session ID and a
@@ -131,7 +131,7 @@ flowchart LR
 ## 5. Status & accuracy notes
 
 - **Persona:** the ship-help persona used at runtime is selected via the
-  `PROW_AN__SHIP__HELP_MCP_URL` (`/personas/<persona>/mcp`) and may differ from the
+  `PROW_AN__MCP__URL__SHIP_HELP` (`/personas/<persona>/mcp`) and may differ from the
   `<persona>` default in the committed manifest — set it for your environment.
 - **Config source:** the committed manifest ships a `prow-analyzer-config`
   ConfigMap and surfaces its keys to the container as env vars via

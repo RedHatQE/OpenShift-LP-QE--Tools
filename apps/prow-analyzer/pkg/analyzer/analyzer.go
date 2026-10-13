@@ -78,7 +78,7 @@ type Analyzer struct {
 // caps the ENTIRE request, including reading the streamed SSE response body, so
 // it must exceed the longest analysis. Upgrade-interop jobs can take >10 min, so
 // the default is 20 min. Override with MCP_TIMEOUT_SECONDS (see MCPTimeout) or,
-// for the bot, the --mcp-timeout flag / PROW_AN__MCP__TIMEOUT_SECONDS (see
+// for the bot, the --mcp-timeout flag / PROW_AN__MCP__TIMEOUT_SEC (see
 // WithTimeout).
 const DefaultMCPTimeout = 1200 * time.Second
 
@@ -94,6 +94,19 @@ func MCPTimeout() time.Duration {
 		}
 	}
 	return DefaultMCPTimeout
+}
+
+// Timeout returns the effective HTTP client timeout this Analyzer uses for
+// MCP/Prow requests: the value supplied via WithTimeout when positive, otherwise
+// the MCPTimeout default. Callers that must outlast a single analysis (e.g. the
+// Slack handler sizing its dedup window) should read this rather than MCPTimeout
+// directly, so an explicit per-instance override (the bot's --mcp-timeout /
+// PROW_AN__MCP__TIMEOUT_SEC) is honored instead of the unprefixed env default.
+func (a *Analyzer) Timeout() time.Duration {
+	if a.timeout > 0 {
+		return a.timeout
+	}
+	return MCPTimeout()
 }
 
 // AnalyzerOption configures optional Analyzer behavior. Existing callers that
@@ -115,11 +128,11 @@ func WithInsecureSkipVerify(insecure bool) AnalyzerOption {
 	return func(a *Analyzer) { a.insecureTLS = insecure }
 }
 
-// WithDebug enables verbose logging of the MCP SSE stream that includes payload
-// content (a preview of each data line and the full text of non-data lines). It
-// is an explicit opt-in because SSE data lines carry the (potentially internal)
-// MCP response; when disabled (the default), only safe metadata (line and byte
-// counts) is logged. It overrides the MCP_DEBUG env var default.
+// WithDebug enables verbose per-line logging of the MCP SSE stream. The logs
+// carry only safe metadata (line and byte counts), never payload content, so the
+// (potentially internal) MCP response is never exposed in either mode; the flag
+// only controls verbosity. When disabled (the default), per-line logging is
+// suppressed entirely. It overrides the MCP_DEBUG env var default.
 func WithDebug(debug bool) AnalyzerOption {
 	return func(a *Analyzer) { a.debug = debug }
 }
@@ -359,8 +372,18 @@ func (a *Analyzer) doAnalysis(ctx context.Context, jobURL string, startTime time
 
 	// Check HTTP status code before reading body
 	if resp.StatusCode != http.StatusOK {
+		// Drain the error body for its size only. Its content may carry internal
+		// payload and this error reaches the operational logs verbatim, so the body
+		// is never embedded — only payload-free metadata (status + byte count).
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
+		// Exception: a stale session surfaces as a fixed "Session not found" token in
+		// the body. Preserve just that marker (re-emitted from a constant, not from
+		// the raw body) so the session-recovery retry can detect it; everything else
+		// is elided.
+		if bytes.Contains(body, []byte("Session not found")) {
+			return nil, fmt.Errorf("HTTP %d: Session not found", resp.StatusCode)
+		}
+		return nil, fmt.Errorf("HTTP %d (%d-byte body elided)", resp.StatusCode, len(body))
 	}
 
 	// Read SSE stream line by line, skipping pings and comments
@@ -379,9 +402,17 @@ func (a *Analyzer) doAnalysis(ctx context.Context, jobURL string, startTime time
 	}
 	parseDur := time.Since(parseStart)
 
-	// Check for errors
+	// Check for errors. The MCP error message may carry backend/internal content
+	// and this error reaches the operational logs verbatim, so the message is not
+	// surfaced — only the numeric JSON-RPC code (payload-free metadata). The sole
+	// exception is the session-not-found marker: a fixed protocol token the retry
+	// logic matches on, re-emitted here from a constant rather than from backend
+	// text, so it never carries payload.
 	if mcpResp.Error != nil {
-		return nil, fmt.Errorf("MCP error %d: %s", mcpResp.Error.Code, mcpResp.Error.Message)
+		if strings.Contains(mcpResp.Error.Message, "Session not found") {
+			return nil, fmt.Errorf("MCP error %d: Session not found", mcpResp.Error.Code)
+		}
+		return nil, fmt.Errorf("MCP error %d (message elided)", mcpResp.Error.Code)
 	}
 
 	// Extract analysis text
@@ -598,15 +629,17 @@ func (a *Analyzer) initializeSession(ctx context.Context) error {
 		return fmt.Errorf("read response: %w", err)
 	}
 
-	// Check HTTP status code first
+	// Check HTTP status code first. The response body may carry internal payload and
+	// these errors reach the operational logs verbatim, so the body is never
+	// embedded — only payload-free metadata (status + byte count).
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("init request failed (HTTP %d): %s", resp.StatusCode, string(body))
+		return fmt.Errorf("init request failed (HTTP %d, %d-byte body elided)", resp.StatusCode, len(body))
 	}
 
 	// Extract session ID from response header
 	sessionID := resp.Header.Get("Mcp-Session-Id")
 	if sessionID == "" {
-		return fmt.Errorf("no session ID in response (HTTP %d): %s", resp.StatusCode, string(body))
+		return fmt.Errorf("no session ID in response (HTTP %d, %d-byte body elided)", resp.StatusCode, len(body))
 	}
 
 	a.sessionMtx.Lock()
@@ -615,14 +648,15 @@ func (a *Analyzer) initializeSession(ctx context.Context) error {
 	return nil
 }
 
-// readSSEData reads an SSE stream line by line, skipping comment/ping lines,
-// and returns the first "data:" payload containing JSON.
+// readSSEData reads an SSE stream line by line, skipping comment/ping and empty
+// lines, and returns the first "data:" payload containing JSON.
 //
-// Logging is data-minimized by default: it records only safe metadata (line and
-// byte counts), never payload content, because SSE data lines carry the MCP
-// response (potentially internal job/analysis content). The payload preview and
-// the full text of non-data lines are logged only when debug is enabled — an
-// explicit opt-in (WithDebug / MCP_DEBUG).
+// Logging is data-minimized: it never records payload content — only safe
+// metadata (line and byte counts) — because SSE lines carry the MCP response
+// (potentially internal job/analysis content). Even that metadata is emitted
+// only under the explicit debug opt-in (WithDebug / MCP_DEBUG); the default path
+// is quiet. Debug therefore controls log verbosity, not whether content is
+// exposed: content is never logged in either mode.
 func readSSEData(r io.Reader, debug bool) (string, error) {
 	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 1024*1024), 10*1024*1024)
@@ -634,26 +668,24 @@ func readSSEData(r io.Reader, debug bool) (string, error) {
 		if line == "" {
 			continue
 		}
-		// Log SSE comments/pings for debugging (no payload content)
+		// SSE comment/ping line — metadata only, never content.
 		if strings.HasPrefix(line, ":") {
-			fmt.Printf("PROW-ANALYZER SSE: ping received (line %d)\n", lineCount)
+			if debug {
+				fmt.Printf("PROW-ANALYZER SSE: ping received (line %d)\n", lineCount)
+			}
 			continue
 		}
 		if data, found := strings.CutPrefix(line, "data:"); found {
 			data = strings.TrimSpace(data)
-			// Safe metadata always; payload preview only under explicit debug opt-in.
+			// Metadata only (line + byte counts); never the payload content.
 			if debug {
-				fmt.Printf("PROW-ANALYZER SSE: data line received (line %d, %d bytes, starts=%q)\n", lineCount, len(data), data[:min(len(data), 40)])
-			} else {
 				fmt.Printf("PROW-ANALYZER SSE: data line received (line %d, %d bytes)\n", lineCount, len(data))
 			}
 			if len(data) > 0 {
 				return data, nil
 			}
 		} else if debug {
-			// Non-data lines may carry stream content, so log their text only under debug.
-			fmt.Printf("PROW-ANALYZER SSE: other line received (line %d, %d bytes): %s\n", lineCount, len(line), line)
-		} else {
+			// Non-data line — metadata only; its text may carry stream content.
 			fmt.Printf("PROW-ANALYZER SSE: other line received (line %d, %d bytes)\n", lineCount, len(line))
 		}
 	}

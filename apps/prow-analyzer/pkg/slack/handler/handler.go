@@ -343,10 +343,13 @@ func New(client *slack.Client, a *analyzer.Analyzer, monitoredChannels []string,
 		}
 	}
 
-	// Size the dedup window to outlast a single analysis (bounded by the MCP
-	// timeout) plus a grace margin, so a duplicate event arriving mid-analysis
-	// cannot expire the entry and trigger a second, concurrent run of the same job.
-	dedupTTL := analyzer.MCPTimeout() + dedupGrace
+	// Size the dedup window to outlast a single analysis (bounded by this
+	// analyzer's effective timeout) plus a grace margin, so a duplicate event
+	// arriving mid-analysis cannot expire the entry and trigger a second,
+	// concurrent run of the same job. Read the analyzer's effective timeout (not
+	// MCPTimeout() directly) so a per-instance override such as the bot's
+	// --mcp-timeout / PROW_AN__MCP__TIMEOUT_SEC widens the window to match.
+	dedupTTL := a.Timeout() + dedupGrace
 	if dedupTTL < minDedupTTL {
 		dedupTTL = minDedupTTL
 	}

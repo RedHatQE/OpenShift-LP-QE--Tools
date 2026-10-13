@@ -126,20 +126,20 @@ Prow Analyzer has exactly **one** outbound capability of its own: it calls the
 ship-help MCP `ask_persona` tool over JSON-RPC/SSE. All richer data access
 happens **inside ship-help**, not in this agent.
 
-| Layer | Item | Notes |
-|---|---|---|
-| Agent tool | ship-help MCP `ask_persona` | The only tool this agent calls. Sends a prompt containing the Prow URL. |
-| Agent input | Prow URL extraction (regex) | Recognizes the three URL patterns listed above. |
-| Agent output | Slack message (`chat:write`) / stdout | Posts an in-thread reply, or prints to terminal. |
-| Slack read | `channels:history` | Reads messages in channels it is a member of, to detect Prow URLs. |
-| Data sources (via ship-help) | Jira issues | Active, historical, and related issues. |
-| Data sources (via ship-help) | GitHub repositories and PRs | |
-| Data sources (via ship-help) | Build logs and artifacts | |
-| Data sources (via ship-help) | Test results and history | |
-| Data sources (via ship-help) | Automated known-issue triage | |
-| Data sources (via ship-help) | Slack team discussions | |
-| Data sources (via ship-help) | Internal documentation | |
-| Data sources (via ship-help) | Historical failure patterns | |
+| Layer                        | Item                                  | Notes                                                                   |
+|------------------------------|---------------------------------------|-------------------------------------------------------------------------|
+| Agent tool                   | ship-help MCP `ask_persona`           | The only tool this agent calls. Sends a prompt containing the Prow URL. |
+| Agent input                  | Prow URL extraction (regex)           | Recognizes the three URL patterns listed above.                         |
+| Agent output                 | Slack message (`chat:write`) / stdout | Posts an in-thread reply, or prints to terminal.                        |
+| Slack read                   | `channels:history`                    | Reads messages in channels it is a member of, to detect Prow URLs.      |
+| Data sources (via ship-help) | Jira issues                           | Active, historical, and related issues.                                 |
+| Data sources (via ship-help) | GitHub repositories and PRs           |                                                                         |
+| Data sources (via ship-help) | Build logs and artifacts              |                                                                         |
+| Data sources (via ship-help) | Test results and history              |                                                                         |
+| Data sources (via ship-help) | Automated known-issue triage          |                                                                         |
+| Data sources (via ship-help) | Slack team discussions                |                                                                         |
+| Data sources (via ship-help) | Internal documentation                |                                                                         |
+| Data sources (via ship-help) | Historical failure patterns           |                                                                         |
 
 > The agent does **not** have its own direct connection to Jira, GitHub, or CI.
 > It cannot browse the web, run arbitrary tools, or execute code. Its knowledge
@@ -333,17 +333,17 @@ What actually gates access:
 
 ## Troubleshooting
 
-| Symptom | Likely cause | What to do |
-|---|---|---|
-| Bot doesn't reply at all | Bot not in the channel, or URL not recognized | Confirm the bot is a member (`/invite @Prow Analyzer`); confirm the URL is one of the three supported patterns. |
-| Bot doesn't reply to your reply | The message was from a bot, or had no Prow URL | Post the URL as a human message; messages from bots (including the analyzer's own replies) are ignored. |
-| `Analysis failed. Please retry shortly...` | Backend/network/session error | Retry once. If it persists, escalate (the real error is in the pod logs). |
-| `Analysis queue is currently full.` | 5 concurrent analyses already running | Wait a moment and retry. |
-| CLI: `init request failed (HTTP 401)` | Invalid/expired MCP token | Get a new token from the ship-help support channel. |
-| CLI: `init request failed (HTTP 403)` | Token lacks permissions | Contact ship-help admins via the ship-help support channel. |
-| CLI: `send init request: <network error>` | MCP URL unreachable | Check VPN/network/DNS and `SHIP_HELP_MCP_URL`. |
-| `context deadline exceeded` | Analysis exceeded the 1,200s timeout | Retry; if persistent, ship-help may be overloaded. |
-| Analysis is thin or vague | Logs expired, or novel failure with no history | Check the Prow artifacts still exist; add human context and retry. |
+| Symptom                                    | Likely cause                                   | What to do                                                                                                      |
+|--------------------------------------------|------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| Bot doesn't reply at all                   | Bot not in the channel, or URL not recognized  | Confirm the bot is a member (`/invite @Prow Analyzer`); confirm the URL is one of the three supported patterns. |
+| Bot doesn't reply to your reply            | The message was from a bot, or had no Prow URL | Post the URL as a human message; messages from bots (including the analyzer's own replies) are ignored.         |
+| `Analysis failed. Please retry shortly...` | Backend/network/session error                  | Retry once. If it persists, escalate (the real error is in the pod logs).                                       |
+| `Analysis queue is currently full.`        | 5 concurrent analyses already running          | Wait a moment and retry.                                                                                        |
+| CLI: `init request failed (HTTP 401)`      | Invalid/expired MCP token                      | Get a new token from the ship-help support channel.                                                             |
+| CLI: `init request failed (HTTP 403)`      | Token lacks permissions                        | Contact ship-help admins via the ship-help support channel.                                                     |
+| CLI: `send init request: <network error>`  | MCP URL unreachable                            | Check VPN/network/DNS and `SHIP_HELP_MCP_URL`.                                                                  |
+| `context deadline exceeded`                | Analysis exceeded the 1,200s timeout           | Retry; if persistent, ship-help may be overloaded.                                                              |
+| Analysis is thin or vague                  | Logs expired, or novel failure with no history | Check the Prow artifacts still exist; add human context and retry.                                              |
 
 Maintainers: the user-visible message is intentionally generic; the real error
 is logged with the `PROW-ANALYZER ERROR` / `PROW-ANALYZER` prefix. See the

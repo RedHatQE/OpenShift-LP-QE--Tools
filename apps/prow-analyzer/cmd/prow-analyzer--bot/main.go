@@ -58,15 +58,15 @@ func main() {
 	var (
 		slackToken  = flag.String("slack-token", os.Getenv("PROW_AN__SLACK__BOT_TOKEN"), "Slack bot token (defaults to env. var. PROW_AN__SLACK__BOT_TOKEN, if set).")
 		appToken    = flag.String("app-token", os.Getenv("PROW_AN__SLACK__APP_TOKEN"), "Slack app token for socket mode (defaults to env. var. PROW_AN__SLACK__APP_TOKEN, if set).")
-		mcpURL      = flag.String("mcp-url", os.Getenv("PROW_AN__SHIP__HELP_MCP_URL"), "Ship-help MCP URL (defaults to env. var. PROW_AN__SHIP__HELP_MCP_URL, if set).")
-		mcpToken    = flag.String("mcp-token", os.Getenv("PROW_AN__SHIP__HELP_MCP_TOKEN"), "Ship-help MCP token (defaults to env. var. PROW_AN__SHIP__HELP_MCP_TOKEN, if set).")
-		channels    = flag.String("channels", os.Getenv("PROW_AN__MONITORED__CHANNELS"), "Comma-separated list of channel IDs to monitor (defaults to env. var. PROW_AN__MONITORED__CHANNELS, if set).")
-		allowedBots = flag.String("allowed-bots", os.Getenv("PROW_AN__ALLOWED__BOT_IDS"), "Comma-separated list of bot IDs (B...) whose Prow URLs should be analyzed (defaults to env. var. PROW_AN__ALLOWED__BOT_IDS, if set).")
+		mcpURL      = flag.String("mcp-url", os.Getenv("PROW_AN__MCP__URL__SHIP_HELP"), "Ship-help MCP URL (defaults to env. var. PROW_AN__MCP__URL__SHIP_HELP, if set).")
+		mcpToken    = flag.String("mcp-token", os.Getenv("PROW_AN__MCP__TOKEN__SHIP_HELP"), "Ship-help MCP token (defaults to env. var. PROW_AN__MCP__TOKEN__SHIP_HELP, if set).")
+		channels    = flag.String("channels", os.Getenv("PROW_AN__MONITORED_CHANNELS"), "Comma-separated list of channel IDs to monitor (defaults to env. var. PROW_AN__MONITORED_CHANNELS, if set).")
+		allowedBots = flag.String("allowed-bots", os.Getenv("PROW_AN__ALLOWED_BOT_IDS"), "Comma-separated list of bot IDs (B...) whose Prow URLs should be analyzed (defaults to env. var. PROW_AN__ALLOWED_BOT_IDS, if set).")
 		prompt      = flag.String("prompt", envStr("PROW_AN__PROMPT__TEMPLATE", defaultPrompt), "Analysis prompt template with a {job_url} placeholder (defaults to env. var. PROW_AN__PROMPT__TEMPLATE, if set).")
 		monitorAll  = flag.Bool("monitor-all", envBool("PROW_AN__MONITOR__ALL", false), "Monitor every channel the bot is a member of instead of only --channels. Fail-closed: without this and with no --channels, no channel is monitored (defaults to env. var. PROW_AN__MONITOR__ALL; set it to \"true\" to enable).")
 		slackDebug  = flag.Bool("slack-debug", envBool("PROW_AN__SLACK__DEBUG", false), "Enable verbose Slack SDK and Socket Mode debug logging (defaults to env. var. PROW_AN__SLACK__DEBUG; set it to \"true\" to enable).")
-		mcpDebug    = flag.Bool("mcp-debug", envBool("PROW_AN__MCP__DEBUG", false), "Enable verbose MCP SSE logging that includes response payload previews; off by default for data minimization (defaults to env. var. PROW_AN__MCP__DEBUG; set it to \"true\" to enable).")
-		mcpTimeout  = flag.Int("mcp-timeout", envInt("PROW_AN__MCP__TIMEOUT_SECONDS", int(analyzer.DefaultMCPTimeout/time.Second)), "MCP/Prow HTTP request timeout in seconds; must exceed the longest analysis (defaults to env. var. PROW_AN__MCP__TIMEOUT_SECONDS, if set).")
+		mcpDebug    = flag.Bool("mcp-debug", envBool("PROW_AN__MCP__SHIP_HELP__DEBUG", false), "Enable verbose MCP SSE logging (metadata only: per-line and byte counts, never payload content); off by default (defaults to env. var. PROW_AN__MCP__SHIP_HELP__DEBUG; set it to \"true\" to enable).")
+		mcpTimeout  = flag.Int("mcp-timeout", envInt("PROW_AN__MCP__TIMEOUT_SEC", int(analyzer.DefaultMCPTimeout/time.Second)), "MCP/Prow HTTP request timeout in seconds; must exceed the longest analysis (defaults to env. var. PROW_AN__MCP__TIMEOUT_SEC, if set).")
 		tlsInsecure = flag.Bool("tls-insecure", envBool("TLS_INSECURE_SKIP_VERIFY", false), "Skip TLS certificate verification for MCP/Prow HTTP requests (defaults to env. var. TLS_INSECURE_SKIP_VERIFY; set it to \"true\" to enable).")
 	)
 
@@ -82,7 +82,7 @@ func main() {
 		os.Exit(1)
 	}
 	if *mcpURL == "" || *mcpToken == "" {
-		slog.Error("Both --mcp-url and --mcp-token are required (or set PROW_AN__SHIP__HELP_MCP_URL and PROW_AN__SHIP__HELP_MCP_TOKEN)")
+		slog.Error("Both --mcp-url and --mcp-token are required (or set PROW_AN__MCP__URL__SHIP_HELP and PROW_AN__MCP__TOKEN__SHIP_HELP)")
 		os.Exit(1)
 	}
 
@@ -115,7 +115,7 @@ func main() {
 		slog.Warn("PROW_AN__MONITOR__ALL enabled: monitoring EVERY channel the bot is a member of; messages from all such channels may be forwarded to ship-help under shared service credentials",
 			"channels_configured", len(monitoredChannels))
 	case len(monitoredChannels) == 0:
-		slog.Warn("No channels configured and PROW_AN__MONITOR__ALL not set: fail-closed, the bot will not monitor any channel. Set PROW_AN__MONITORED__CHANNELS or PROW_AN__MONITOR__ALL=true")
+		slog.Warn("No channels configured and PROW_AN__MONITOR__ALL not set: fail-closed, the bot will not monitor any channel. Set PROW_AN__MONITORED_CHANNELS or PROW_AN__MONITOR__ALL=true")
 	default:
 		slog.Info("Monitoring channels", "channels", monitoredChannels)
 	}

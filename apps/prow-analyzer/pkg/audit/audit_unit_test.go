@@ -3,10 +3,28 @@
 package audit
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 )
+
+// captureAudit redirects the package audit logger to a buffer for the duration of
+// fn and returns everything it wrote. Being an in-package test lets us swap the
+// unexported logger without changing the production API, so assertions can run
+// against the real emitted JSON.
+func captureAudit(fn func()) string {
+	var buf bytes.Buffer
+	saved := logger
+	logger = slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo})).
+		With("log_type", "audit", "component", "prow-analyzer")
+	defer func() { logger = saved }()
+	fn()
+	return buf.String()
+}
 
 // TestWithInteractionID verifies WithInteractionID stores the ID and that
 // InteractionID reads it back (present branch).
@@ -68,10 +86,75 @@ func TestRedactError(t *testing.T) {
 	}
 }
 
-// TestReceived covers the Received emitter (lifecycle event 1/3).
+// TestReceived asserts the pseudonymization schema on the real emitted audit
+// line: the raw actor value and the raw "actor" key are both absent, and
+// actor_sha256 equals the intended fingerprint. This makes the minimization
+// requirement a regression test, not coverage-only execution.
 func TestReceived(t *testing.T) {
-	ctx := WithInteractionID(context.Background(), "test-id")
-	Received(ctx, "slack", "U1", "C1", "https://prow.ci.openshift.org/view/x")
+	// A distinctive raw value that cannot collide with a hex digest or any other
+	// field, so a Contains check reliably detects a leak.
+	const rawActor = "U_RAW_ACTOR_SECRET"
+	ctx := WithInteractionID(context.Background(), "C1/123.45")
+
+	out := captureAudit(func() {
+		Received(ctx, "slack", rawActor, "C1", "https://prow.ci.openshift.org/view/x")
+	})
+
+	// The raw actor value must never appear anywhere in the emitted line.
+	if strings.Contains(out, rawActor) {
+		t.Errorf("raw actor value leaked into audit output:\n%s", out)
+	}
+
+	var fields map[string]any
+	if err := json.Unmarshal([]byte(out), &fields); err != nil {
+		t.Fatalf("audit line is not valid JSON: %v\n%s", err, out)
+	}
+
+	// The raw "actor" key must not be emitted — only the pseudonym.
+	if _, present := fields["actor"]; present {
+		t.Errorf("raw \"actor\" key present in audit output:\n%s", out)
+	}
+
+	// The pseudonym must equal the intended fingerprint of the raw actor.
+	if got, want := fields["actor_sha256"], Hash(rawActor); got != want {
+		t.Errorf("actor_sha256 = %v, want %q", got, want)
+	}
+
+	// Sanity: this is the received lifecycle event, correlated by interaction_id.
+	if fields["event"] != "interaction_received" {
+		t.Errorf("event = %v, want interaction_received", fields["event"])
+	}
+	if fields["interaction_id"] != "C1/123.45" {
+		t.Errorf("interaction_id = %v, want C1/123.45", fields["interaction_id"])
+	}
+}
+
+// TestReceived_EmptyActor asserts the documented empty-actor behavior on the real
+// emitted line: actor_sha256 is the empty string (not a hash of ""), and the raw
+// "actor" key is still absent.
+func TestReceived_EmptyActor(t *testing.T) {
+	ctx := WithInteractionID(context.Background(), "cli:url")
+
+	out := captureAudit(func() {
+		Received(ctx, "cli", "", "", "https://prow.ci.openshift.org/view/x")
+	})
+
+	var fields map[string]any
+	if err := json.Unmarshal([]byte(out), &fields); err != nil {
+		t.Fatalf("audit line is not valid JSON: %v\n%s", err, out)
+	}
+
+	if _, present := fields["actor"]; present {
+		t.Errorf("raw \"actor\" key present in audit output:\n%s", out)
+	}
+
+	got, ok := fields["actor_sha256"].(string)
+	if !ok {
+		t.Fatalf("actor_sha256 missing or not a string:\n%s", out)
+	}
+	if got != "" {
+		t.Errorf("actor_sha256 = %q, want empty string for empty actor (not a hash of \"\")", got)
+	}
 }
 
 // TestToolQuery covers the ToolQuery emitter (lifecycle event 2/3), including the

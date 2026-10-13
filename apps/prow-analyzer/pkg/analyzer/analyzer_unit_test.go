@@ -290,10 +290,11 @@ func TestReadSSEData(t *testing.T) {
 			expected: "{\"result\":\"success\"}",
 		},
 		{
-			// debug=true exercises the payload-preview and full non-data-line
-			// logging branches (event: line + data: line).
+			// debug=true exercises the verbose metadata-only logging branches for
+			// all line kinds: ping (":"), non-data ("event:"), and data lines. None
+			// log payload content.
 			name:     "valid SSE with debug logging",
-			input:    "event: message\ndata: {\"result\":\"success\"}\n\n",
+			input:    ": ping\nevent: message\ndata: {\"result\":\"success\"}\n\n",
 			debug:    true,
 			expected: "{\"result\":\"success\"}",
 		},
@@ -365,6 +366,24 @@ func TestWithTimeout(t *testing.T) {
 	}
 	if defClient.Timeout != DefaultMCPTimeout {
 		t.Errorf("Expected default timeout %v, got %v", DefaultMCPTimeout, defClient.Timeout)
+	}
+}
+
+// TestAnalyzer_Timeout verifies the effective-timeout accessor: a positive
+// WithTimeout override is returned directly, otherwise it falls back to the
+// MCPTimeout default. Callers (e.g. the Slack handler's dedup window) rely on
+// this to honor a per-instance override rather than the unprefixed env var.
+func TestAnalyzer_Timeout(t *testing.T) {
+	override := 90 * time.Second
+	a := NewAnalyzer("url", "token", "tmpl", WithTimeout(override))
+	if got := a.Timeout(); got != override {
+		t.Errorf("Timeout() with override = %v, want %v", got, override)
+	}
+
+	t.Setenv("MCP_TIMEOUT_SECONDS", "")
+	def := NewAnalyzer("url", "token", "tmpl")
+	if got := def.Timeout(); got != DefaultMCPTimeout {
+		t.Errorf("Timeout() without override = %v, want %v", got, DefaultMCPTimeout)
 	}
 }
 
@@ -827,6 +846,44 @@ func TestAnalyzeFailure(t *testing.T) {
 		}
 		if result.Analysis != "recovered" {
 			t.Errorf("Analysis = %q, want %q", result.Analysis, "recovered")
+		}
+		if initCount != 2 || callCount != 2 {
+			t.Errorf("Expected 2 init + 2 tools/call, got %d + %d", initCount, callCount)
+		}
+	})
+
+	t.Run("stale session recovery via MCP error message", func(t *testing.T) {
+		initCount, callCount := 0, 0
+		client := &mockHTTPClient{doFunc: func(req *http.Request) (*http.Response, error) {
+			var mcpReq MCPRequest
+			json.NewDecoder(req.Body).Decode(&mcpReq)
+			if mcpReq.Method == "initialize" {
+				initCount++
+				resp := &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{}`)), Header: make(http.Header)}
+				resp.Header.Set("Mcp-Session-Id", "session-"+strings.Repeat("y", initCount))
+				return resp, nil
+			}
+			callCount++
+			if callCount == 1 {
+				// HTTP 200, but the MCP payload reports the session is gone — this
+				// drives the MCP-error session-not-found branch (distinct from the 404
+				// HTTP-body path above).
+				sse := `data: {"jsonrpc":"2.0","id":1,"error":{"code":-32001,"message":"Session not found"}}` + "\n"
+				return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(sse)), Header: make(http.Header)}, nil
+			}
+			sse := `data: {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"recovered-via-mcp"}]}}` + "\n"
+			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(sse)), Header: make(http.Header)}, nil
+		}}
+		a := &Analyzer{
+			mcpURL: "http://test.com", token: "token", client: client,
+			template: "template", jsonMarshal: json.Marshal, newRequest: http.NewRequestWithContext,
+		}
+		result, err := a.AnalyzeFailure(context.Background(), "url")
+		if err != nil {
+			t.Fatalf("Expected successful retry via MCP session recovery, got: %v", err)
+		}
+		if result.Analysis != "recovered-via-mcp" {
+			t.Errorf("Analysis = %q, want %q", result.Analysis, "recovered-via-mcp")
 		}
 		if initCount != 2 || callCount != 2 {
 			t.Errorf("Expected 2 init + 2 tools/call, got %d + %d", initCount, callCount)

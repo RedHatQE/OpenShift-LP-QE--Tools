@@ -200,6 +200,21 @@ func TestNew_DedupTTLFromTimeout(t *testing.T) {
 	}
 }
 
+func TestNew_DedupTTLFollowsWithTimeoutOverride(t *testing.T) {
+	// Regression: the bot drives the analyzer timeout via WithTimeout
+	// (--mcp-timeout / PROW_AN__MCP__TIMEOUT_SEC) while the unprefixed
+	// MCP_TIMEOUT_SECONDS env var is unset. The dedup window must track the
+	// effective override, not the env/default, so a repeated URL cannot start a
+	// second concurrent run while the first (longer) analysis is still in flight.
+	t.Setenv("MCP_TIMEOUT_SECONDS", "") // bare env would otherwise be DefaultMCPTimeout
+	override := 3600 * time.Second
+	a := analyzer.NewAnalyzer("", "", "", analyzer.WithTimeout(override))
+	hh := New(&slack.Client{}, a, []string{"C123"}).(*handler)
+	if want := override + dedupGrace; hh.dedupTTL != want {
+		t.Errorf("dedupTTL = %v, want %v (must follow WithTimeout override, not MCP_TIMEOUT_SECONDS)", hh.dedupTTL, want)
+	}
+}
+
 func TestNew_DedupTTLFloor(t *testing.T) {
 	t.Setenv("MCP_TIMEOUT_SECONDS", "1")
 	hh := New(&slack.Client{}, analyzer.NewAnalyzer("", "", ""), []string{"C123"}).(*handler)

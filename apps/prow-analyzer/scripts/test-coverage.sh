@@ -7,6 +7,11 @@
 # is deterministic without the race detector; covermode=set (per-statement) keeps
 # the 100% gate reproducible. Integration tests (-tags integration -race) are run
 # separately and are not part of the coverage number (see the Makefile).
+#
+# The bot command package (./cmd/prow-analyzer--bot) also carries unit tests for
+# its environment consumers. They run here so `test--unit` covers them too, but
+# outside the 100% gate: main() wires up Slack/MCP and is not unit-testable, so
+# the package cannot reach 100% and is excluded from the coverage number.
 set -euxo pipefail; shopt -s inherit_errexit
 
 typeset scriptDir
@@ -14,6 +19,7 @@ scriptDir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly scriptDir
 typeset -r buildTag='unit'
 typeset -r pkgs='./pkg/...'
+typeset -r botPkg='./cmd/prow-analyzer--bot'
 typeset -r coverageThreshold=100.0
 typeset -r coverageFile='coverage.out'
 typeset -r coverageHTML='coverage.html'
@@ -48,5 +54,11 @@ fi
 
 : "✅ PASS: Coverage ${totalCoverage}% meets threshold ${coverageThreshold}%"
 : "Coverage report: ${coverageHTML}"
+
+: 'Guarding that the unit build tag selects bot tests...'
+"${scriptDir}/require-tagged-tests.sh" "${buildTag}" "${botPkg}"
+
+: 'Running bot env-consumer unit tests (outside the coverage gate)...'
+go test -v -tags "${buildTag}" "${botPkg}"
 
 true

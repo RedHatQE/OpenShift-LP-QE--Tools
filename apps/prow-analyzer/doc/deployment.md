@@ -20,11 +20,11 @@
 
 ```bash
 # Set environment variables
-export PROW_AN__SHIP__HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
-export PROW_AN__SHIP__HELP_MCP_TOKEN="$(cat /path/to/token.txt | tr -d '\n')"
+export PROW_AN__MCP__URL__SHIP_HELP="https://<ship-help-mcp-host>/personas/<persona>/mcp"
+export PROW_AN__MCP__TOKEN__SHIP_HELP="$(cat /path/to/token.txt | tr -d '\n')"
 export PROW_AN__SLACK__BOT_TOKEN="xoxb-..."
 export PROW_AN__SLACK__APP_TOKEN="xapp-..."
-export PROW_AN__MONITORED__CHANNELS="C12345678"  # Your channel ID
+export PROW_AN__MONITORED_CHANNELS="C12345678"  # Your channel ID
 
 # Build (requires Go 1.22+)
 go build ./cmd/prow-analyzer--bot

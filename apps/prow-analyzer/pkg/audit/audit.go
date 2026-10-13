@@ -10,9 +10,12 @@
 // (e.g. OpenShift Logging / ClusterLogForwarder) is responsible for shipping them
 // to a centralized, immutable store with retention. See doc/audit-logging.md.
 //
-// Audit events deliberately record metadata about the response (length, hash,
-// redaction counts) rather than the response text itself, to avoid persisting
-// potentially sensitive payloads in the audit trail.
+// Audit events are data-minimized: they record metadata about the response
+// (length, hash, redaction counts) rather than the response text itself, map raw
+// backend errors to coarse payload-free categories (see RedactError), and
+// pseudonymize the requester identity (actor_sha256) rather than persisting the
+// raw actor. This avoids persisting potentially sensitive payloads or raw
+// identities in the immutable audit trail while preserving correlation.
 package audit
 
 import (
@@ -48,12 +51,21 @@ func InteractionID(ctx context.Context) string {
 
 // Received records the trigger that started an interaction (lifecycle event 1/3):
 // who/what initiated it and the prompt/trigger content.
+//
+// The actor is pseudonymized (SHA-256, emitted as actor_sha256) so the immutable
+// audit trail keeps per-actor correlation and forward-verification — hash a
+// suspected actor and search — without persisting the raw requester identity
+// (notably the CLI's OS username). An empty actor is recorded as "".
 func Received(ctx context.Context, source, actor, channel, trigger string) {
+	actorHash := ""
+	if actor != "" {
+		actorHash = Hash(actor)
+	}
 	logger.LogAttrs(ctx, slog.LevelInfo, "interaction_received",
 		slog.String("event", "interaction_received"),
 		slog.String("interaction_id", InteractionID(ctx)),
 		slog.String("source", source),
-		slog.String("actor", actor),
+		slog.String("actor_sha256", actorHash),
 		slog.String("channel", channel),
 		slog.String("trigger", trigger),
 	)
@@ -85,10 +97,12 @@ func Outcome(ctx context.Context, status string, attrs ...any) {
 }
 
 // RedactError maps an error to a coarse, payload-free category safe to persist in
-// the immutable audit trail. Raw backend error strings can embed internal job or
-// response content (e.g. an MCP HTTP error carries the response body verbatim), so
-// the audit trail records only the category; the full error still reaches the
-// operational logs for debugging. It returns "" for a nil error.
+// the immutable audit trail. It is defense-in-depth: the analyzer already
+// constructs its errors payload-free (HTTP response bodies and MCP error messages
+// are elided to metadata — status/code and byte counts — at the source in
+// pkg/analyzer), so the operational logs that receive the full error are payload-
+// free too. This function coarsens those errors further to a small, stable set of
+// categories for the immutable trail. It returns "" for a nil error.
 func RedactError(err error) string {
 	if err == nil {
 		return ""

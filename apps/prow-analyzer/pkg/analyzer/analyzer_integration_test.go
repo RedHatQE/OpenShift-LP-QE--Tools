@@ -3,11 +3,16 @@
 package analyzer
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -257,4 +262,301 @@ func TestAnalyzeFailure_Errors(t *testing.T) {
 			t.Errorf("Expected init request failed error, got: %v", err)
 		}
 	})
+}
+
+// TestNextID_ConcurrentUniqueness verifies the per-request JSON-RPC id counter
+// hands out unique ids under heavy concurrency. A fixed or racily-incremented id
+// would let the shared MCP session cross-correlate concurrent requests, so this
+// guards the atomic counter directly (runs under -race).
+func TestNextID_ConcurrentUniqueness(t *testing.T) {
+	a := NewAnalyzer("url", "token", "template")
+
+	const goroutines = 64
+	const perGoroutine = 200
+	ids := make([]int64, goroutines*perGoroutine)
+
+	var wg sync.WaitGroup
+	for g := 0; g < goroutines; g++ {
+		wg.Add(1)
+		go func(base int) {
+			defer wg.Done()
+			for i := 0; i < perGoroutine; i++ {
+				ids[base+i] = a.nextID.Add(1) // distinct index per goroutine: race-free write
+			}
+		}(g * perGoroutine)
+	}
+	wg.Wait()
+
+	seen := make(map[int64]struct{}, len(ids))
+	for _, id := range ids {
+		if _, dup := seen[id]; dup {
+			t.Fatalf("duplicate JSON-RPC id %d handed out under concurrency", id)
+		}
+		seen[id] = struct{}{}
+	}
+	if len(seen) != len(ids) {
+		t.Fatalf("got %d unique ids, want %d", len(seen), len(ids))
+	}
+}
+
+// TestAnalyzeFailure_ConcurrentCallerMarkerCorrelation runs many concurrent
+// analyses over the shared MCP session and verifies end-to-end request/response
+// correlation using a CALLER-CONTROLLED marker, independent of the JSON-RPC id
+// mechanism. Each caller passes a distinct job URL; the analyzer carries it into
+// the prompt the server receives, the server echoes that marker back in its
+// response content, and each caller asserts the response it got carries its OWN
+// marker. Because the marker is chosen by the caller (not derived from the
+// server-assigned id), a correct result proves no cross-delivery, duplication, or
+// loss without assuming anything about how ids are allocated.
+//
+// The id-uniqueness property is checked separately, as its own invariant: every
+// tools/call id the server observed must be distinct and number one per caller.
+// Runs under -race.
+func TestAnalyzeFailure_ConcurrentCallerMarkerCorrelation(t *testing.T) {
+	const callers = 32
+
+	var mu sync.Mutex
+	toolCallIDs := make(map[int]int) // JSON-RPC id -> times seen (uniqueness invariant)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			ID     int    `json:"id"`
+			Method string `json:"method"`
+			Params struct {
+				Arguments struct {
+					Question string `json:"question"`
+				} `json:"arguments"`
+			} `json:"params"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode request: %v", err)
+			return
+		}
+		if req.Method == "initialize" {
+			w.Header().Set("Mcp-Session-Id", "marker-session")
+			json.NewEncoder(w).Encode(MCPResponse{JSONRPC: "2.0", ID: req.ID})
+			return
+		}
+		// tools/call: record the id for the separate uniqueness invariant, and echo
+		// the caller-supplied marker (its job URL, carried in the prompt) back in the
+		// response content so delivery is verified independently of the id.
+		mu.Lock()
+		toolCallIDs[req.ID]++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "text/event-stream")
+		resp := MCPResponse{JSONRPC: "2.0", ID: req.ID}
+		resp.Result.Content = []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		}{{Type: "text", Text: "echo:" + req.Params.Arguments.Question}}
+		data, _ := json.Marshal(resp)
+		w.Write([]byte("event: message\ndata: " + string(data) + "\n\n"))
+	}))
+	defer server.Close()
+
+	// The template places the caller's distinct job URL into the prompt the server
+	// receives, giving each caller a unique, self-chosen marker.
+	a := NewAnalyzer(server.URL, "token", "Analyze {job_url}")
+
+	markers := make([]string, callers)
+	results := make([]string, callers)
+	errs := make([]error, callers)
+	var wg sync.WaitGroup
+	for i := 0; i < callers; i++ {
+		markers[i] = fmt.Sprintf("https://prow.ci.openshift.org/view/caller-%d", i)
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			res, err := a.AnalyzeFailure(context.Background(), markers[idx])
+			if err != nil {
+				errs[idx] = err
+				return
+			}
+			results[idx] = res.Analysis
+		}(i)
+	}
+	wg.Wait()
+
+	// Primary invariant: each caller received the response carrying its OWN marker.
+	for i := range results {
+		if errs[i] != nil {
+			t.Errorf("caller %d failed: %v", i, errs[i])
+			continue
+		}
+		want := "echo:Analyze " + markers[i]
+		if results[i] != want {
+			t.Errorf("caller %d got %q, want %q (cross-delivery, duplication, or loss)", i, results[i], want)
+		}
+	}
+
+	// Separate invariant: every tools/call id the server saw was unique and there
+	// was exactly one per caller — no two concurrent requests shared an id.
+	for id, n := range toolCallIDs {
+		if n != 1 {
+			t.Errorf("server saw tools/call id %d %d times, want exactly 1", id, n)
+		}
+	}
+	if len(toolCallIDs) != callers {
+		t.Fatalf("server saw %d distinct tools/call ids, want %d", len(toolCallIDs), callers)
+	}
+}
+
+// TestAnalyzeFailure_MismatchedResponseID documents the client's correlation
+// contract: it pairs a response to its request by the HTTP round-trip, NOT by
+// matching the JSON-RPC response id to the request id. A response whose id
+// deliberately differs from the request's is still accepted and its content
+// returned. (Uniqueness of the request-side ids still matters so a shared backend
+// session cannot cross-deliver — that is covered by the tests above. If the
+// client is ever changed to validate response ids, update this test with it.)
+func TestAnalyzeFailure_MismatchedResponseID(t *testing.T) {
+	const wrongID = 999999
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req MCPRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode request: %v", err)
+			return
+		}
+		if req.Method == "initialize" {
+			w.Header().Set("Mcp-Session-Id", "mismatch-session")
+			// Even the initialize response carries a deliberately mismatched id.
+			json.NewEncoder(w).Encode(MCPResponse{JSONRPC: "2.0", ID: wrongID})
+			return
+		}
+		if req.ID == wrongID {
+			t.Fatalf("request id unexpectedly equal to the deliberate wrong id %d", wrongID)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		resp := MCPResponse{JSONRPC: "2.0", ID: wrongID} // deliberately != req.ID
+		resp.Result.Content = []struct {
+			Type string `json:"type"`
+			Text string `json:"text"`
+		}{{Type: "text", Text: "analysis despite mismatched id"}}
+		data, _ := json.Marshal(resp)
+		w.Write([]byte("event: message\ndata: " + string(data) + "\n\n"))
+	}))
+	defer server.Close()
+
+	a := NewAnalyzer(server.URL, "token", "Analyze {job_url}")
+	res, err := a.AnalyzeFailure(context.Background(), "https://prow.ci.openshift.org/view/test")
+	if err != nil {
+		t.Fatalf("AnalyzeFailure failed on mismatched response id: %v", err)
+	}
+	if res.Analysis != "analysis despite mismatched id" {
+		t.Errorf("got %q, want the echoed analysis (response accepted despite id mismatch)", res.Analysis)
+	}
+}
+
+// TestAnalyzeFailure_ErrorsArePayloadFree plants sentinel content in the HTTP
+// response body and the MCP error message, drives the failing analysis paths, and
+// captures BOTH the returned error and everything the analyzer writes to stdout
+// (its operational logging, e.g. logTimings). It then asserts the sentinels never
+// surface. This guards the boundary RedactError alone does not cover: the raw
+// error that reaches the operational logs must itself be payload-free. It is a
+// source-level path exercise, not a live leak reproduction.
+func TestAnalyzeFailure_ErrorsArePayloadFree(t *testing.T) {
+	const httpSentinel = "SENSITIVE-HTTP-BODY-a1b2c3d4"
+	const mcpSentinel = "SENSITIVE-MCP-MESSAGE-e5f6a7b8"
+
+	initOK := func(w http.ResponseWriter) {
+		w.Header().Set("Mcp-Session-Id", "payload-free-session")
+		json.NewEncoder(w).Encode(MCPResponse{JSONRPC: "2.0"})
+	}
+
+	cases := []struct {
+		name    string
+		handler http.HandlerFunc
+	}{
+		{
+			name: "tools/call HTTP error body",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				var req MCPRequest
+				json.NewDecoder(r.Body).Decode(&req)
+				if req.Method == "initialize" {
+					initOK(w)
+					return
+				}
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(httpSentinel))
+			},
+		},
+		{
+			name: "MCP protocol error message",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				var req MCPRequest
+				json.NewDecoder(r.Body).Decode(&req)
+				if req.Method == "initialize" {
+					initOK(w)
+					return
+				}
+				resp := MCPResponse{JSONRPC: "2.0", ID: req.ID}
+				resp.Error = &struct {
+					Code    int    `json:"code"`
+					Message string `json:"message"`
+				}{Code: -32000, Message: mcpSentinel}
+				data, _ := json.Marshal(resp)
+				w.Header().Set("Content-Type", "text/event-stream")
+				w.Write([]byte("event: message\ndata: " + string(data) + "\n\n"))
+			},
+		},
+		{
+			name: "initialize HTTP error body",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(httpSentinel))
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(tc.handler)
+			defer server.Close()
+
+			var analyzeErr error
+			stdout := captureStdout(t, func() {
+				a := NewAnalyzer(server.URL, "token", "Analyze {job_url}")
+				_, analyzeErr = a.AnalyzeFailure(context.Background(), "https://prow.ci.openshift.org/view/test")
+			})
+
+			if analyzeErr == nil {
+				t.Fatal("expected a failure, got nil error")
+			}
+			for _, sentinel := range []string{httpSentinel, mcpSentinel} {
+				if strings.Contains(analyzeErr.Error(), sentinel) {
+					t.Errorf("returned error leaked sentinel %q: %v", sentinel, analyzeErr)
+				}
+				if strings.Contains(stdout, sentinel) {
+					t.Errorf("operational stdout leaked sentinel %q; captured output:\n%s", sentinel, stdout)
+				}
+			}
+		})
+	}
+}
+
+// captureStdout redirects os.Stdout for the duration of fn and returns everything
+// written to it. The analyzer logs operational metadata via fmt.Print* (stdout),
+// so this lets a test assert on that output. Not safe for parallel use.
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	orig := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	os.Stdout = w
+	done := make(chan string, 1)
+	go func() {
+		var buf bytes.Buffer
+		io.Copy(&buf, r)
+		done <- buf.String()
+	}()
+
+	fn()
+
+	w.Close()
+	os.Stdout = orig
+	out := <-done
+	r.Close()
+	return out
 }
