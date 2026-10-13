@@ -1,55 +1,32 @@
 #!/bin/bash
-set -euxo pipefail
-shopt -s inherit_errexit
+# Fail when a build tag selects fewer tests than required; a zero-test run
+# can otherwise succeed without exercising the intended suite.
+# Usage: check--test-selection.sh <build-tag> [packages] [minCount]
+set -euxo pipefail; shopt -s inherit_errexit
 
-typeset goCommand="${GO-go}"
-typeset -r goCommand
-typeset packageText="${PKGS-./pkg/...}"
+typeset buildTag="${1:?usage: check--test-selection.sh <buildTag> [packages] [minCount]}"; (($#)) && shift
+typeset packageText="${1:-./pkg/...}"; (($#)) && shift
 packageText="${packageText//$'\n'/ }"
-typeset -r packageText
-typeset -a suitePackagesArr=()
-read -r -a suitePackagesArr <<< "${packageText}"
-typeset -r suitePackagesArr
+typeset -i minCount="${1:-1}"; (($#)) && shift
+typeset goCommand="${GO-go}"
+typeset -a packageArr=()
+read -r -a packageArr <<< "${packageText}"
 
-typeset isCheckOnly=false
-case "${#}" in
-    0) ;;
-    1)
-        if [[ "${1}" != '--check-only' ]]; then
-            printf 'Unsupported argument: %s\n' "${1}" >&2
-            exit 2
-        fi
-        isCheckOnly=true
-        ;;
-    *)
-        printf 'Expected no arguments or --check-only\n' >&2
-        exit 2
-        ;;
-esac
-typeset -r isCheckOnly
+: "Checking that -tags ${buildTag} selects at least ${minCount} test(s) in ${packageText}..."
 
-function CheckTestSelection() {
-    typeset tag="${1}"
-    typeset -r tag
-    typeset -i minimum="${2}"
-    typeset -r minimum
-    shift 2
-    typeset -a selectedPackagesArr=("${@}")
-    typeset -r selectedPackagesArr
-    : "Checking that -tags ${tag} selects at least ${minimum} test(s) in ${selectedPackagesArr[*]}..."
-    typeset testList=''
-    testList=$("${goCommand}" test -tags "${tag}" -list '.*' "${selectedPackagesArr[@]}")
-    typeset -r testList
-    typeset -i selected=0
-    selected=$(printf '%s\n' "${testList}" | awk '/^(Test|Benchmark|Fuzz|Example)/ {count++} END {print count+0}')
-    typeset -r selected
-    if (( selected < minimum )); then
-        : "❌ FAIL: -tags ${tag} selected ${selected} test(s) in ${selectedPackagesArr[*]} (expected >= ${minimum})."
-        : "        A missing or misspelled //go:build ${tag} line yields 0 tests silently."
-        exit 1
-    fi
-    : "✅ PASS: -tags ${tag} selected ${selected} test(s) in ${selectedPackagesArr[*]}."
-    true
-}
+# `go test -list` compiles the (tagged) test binaries and prints one function
+# name per line, plus a per-package summary line. Count only the function names.
+typeset testList=''
+testList=$("${goCommand}" test -tags "${buildTag}" -list '.*' "${packageArr[@]}")
+typeset -i selected=0
+selected=$(printf '%s\n' "${testList}" | awk '/^(Test|Benchmark|Fuzz|Example)/ {count++} END {print count+0}')
+
+if (( selected < minCount )); then
+    : "❌ FAIL: -tags ${buildTag} selected ${selected} test(s) in ${packageText} (expected >= ${minCount})."
+    : "        A missing or misspelled //go:build ${buildTag} line yields 0 tests silently."
+    exit 1
+fi
+
+: "✅ PASS: -tags ${buildTag} selected ${selected} test(s) in ${packageText}."
 
 true

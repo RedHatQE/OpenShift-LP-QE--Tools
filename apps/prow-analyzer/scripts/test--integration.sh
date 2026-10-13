@@ -3,14 +3,20 @@ set -euxo pipefail
 shopt -s inherit_errexit
 
 typeset suiteTag='integration'
-typeset -r suiteTag
 typeset scriptDir=''
 scriptDir=$(dirname -- "${BASH_SOURCE[0]}")
-typeset -r scriptDir
-source "${scriptDir}/check--test-selection.sh"
+typeset goCommand="${GO-go}"
+typeset packageText="${PKGS-./pkg/...}"
+packageText="${packageText//$'\n'/ }"
+typeset -a suitePackagesArr=()
+read -r -a suitePackagesArr <<< "${packageText}"
+case "${#}:${1-}" in
+    '0:'|'1:--check-only') ;;
+    *) printf 'Expected no arguments or --check-only\n' >&2; exit 2 ;;
+esac
 
-CheckTestSelection "${suiteTag}" 1 "${suitePackagesArr[@]}"
-if [[ "${isCheckOnly}" == true ]]; then
+GO="${goCommand}" "${scriptDir}/check--test-selection.sh" "${suiteTag}" "${suitePackagesArr[*]}" 1
+if [[ "${1-}" == '--check-only' ]]; then
     exit 0
 fi
 "${goCommand}" test -v -tags "${suiteTag}" -race "${suitePackagesArr[@]}"

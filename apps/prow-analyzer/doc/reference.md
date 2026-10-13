@@ -627,9 +627,10 @@ make clean
 ### Testing
 
 Make delegates to `scripts/test--unit.sh` and `scripts/test--integration.sh`.
-Both source `scripts/check--test-selection.sh` for shared configuration and selection
-checks. Each suite defines its tag once and uses the same immutable package array
-for its guard and test command. `make check-tags` calls each suite with `--check-only`;
+Each wrapper owns its configuration and calls the standalone
+`scripts/check--test-selection.sh <tag> [packages] [minCount]` guard. Each suite
+defines its tag once and passes the same package selection to its guard and test
+command. `make check-tags` calls each suite with `--check-only`;
 it lists selected tests without running the suites. The guard counts selected
 test/benchmark/fuzz/example names; it does not prove every test file has a tag.
 

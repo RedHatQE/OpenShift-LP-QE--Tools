@@ -6,7 +6,7 @@ SHELL   := /bin/bash
 GO      ?= go
 PKGS    ?= ./pkg/...
 
-export GO PKGS
+SCRIPTS := ./scripts
 
 # Build both binaries
 build: build--cli build--bot
@@ -24,16 +24,16 @@ test: test--unit test--integration
 
 # Gate ./pkg/... at 100% coverage and run bot command tests separately.
 test--unit:
-	./scripts/test--unit.sh
+	GO='$(GO)' PKGS='$(strip $(PKGS))' '$(SCRIPTS)/test--unit.sh'
 
 # Integration tests: real HTTP servers and the async Handle() path, under -race.
 test--integration:
-	./scripts/test--integration.sh
+	GO='$(GO)' PKGS='$(strip $(PKGS))' '$(SCRIPTS)/test--integration.sh'
 
 # Fail if either build tag selects no tests (guards against silent 0-test runs)
 check-tags:
-	./scripts/test--unit.sh --check-only
-	./scripts/test--integration.sh --check-only
+	GO='$(GO)' PKGS='$(strip $(PKGS))' '$(SCRIPTS)/test--unit.sh' --check-only
+	GO='$(GO)' PKGS='$(strip $(PKGS))' '$(SCRIPTS)/test--integration.sh' --check-only
 
 # Clean build artifacts
 clean:

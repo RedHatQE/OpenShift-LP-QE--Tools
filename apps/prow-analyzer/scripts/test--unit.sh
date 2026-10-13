@@ -3,24 +3,26 @@ set -euxo pipefail
 shopt -s inherit_errexit
 
 typeset suiteTag='unit'
-typeset -r suiteTag
 typeset scriptDir=''
 scriptDir=$(dirname -- "${BASH_SOURCE[0]}")
-typeset -r scriptDir
-source "${scriptDir}/check--test-selection.sh"
+typeset goCommand="${GO-go}"
+typeset packageText="${PKGS-./pkg/...}"
+packageText="${packageText//$'\n'/ }"
+typeset -a suitePackagesArr=()
+read -r -a suitePackagesArr <<< "${packageText}"
+case "${#}:${1-}" in
+    '0:'|'1:--check-only') ;;
+    *) printf 'Expected no arguments or --check-only\n' >&2; exit 2 ;;
+esac
 
 typeset coverageThreshold='100.0'
-typeset -r coverageThreshold
 typeset coverageFile='coverage.out'
-typeset -r coverageFile
 typeset coverageHTML='coverage.html'
-typeset -r coverageHTML
 typeset -a botPackagesArr=('./cmd/prow-analyzer--bot')
-typeset -r botPackagesArr
 
 : 'Guarding that the unit build tag actually selects tests...'
-CheckTestSelection "${suiteTag}" 1 "${suitePackagesArr[@]}"
-if [[ "${isCheckOnly}" == true ]]; then
+GO="${goCommand}" "${scriptDir}/check--test-selection.sh" "${suiteTag}" "${suitePackagesArr[*]}" 1
+if [[ "${1-}" == '--check-only' ]]; then
     exit 0
 fi
 : 'Running unit tests with coverage...'
@@ -30,16 +32,13 @@ fi
 : 'Calculating coverage percentage...'
 typeset coverageOutput=''
 coverageOutput=$("${goCommand}" tool cover -func="${coverageFile}")
-typeset -r coverageOutput
 : "${coverageOutput}"
 typeset totalCoverage=''
 totalCoverage=$(printf '%s\n' "${coverageOutput}" | grep 'total:' | awk '{print $3}' | sed 's/%//')
-typeset -r totalCoverage
 : "Total coverage: ${totalCoverage}%"
 : "Required coverage: ${coverageThreshold}%"
 typeset -i isBelowThreshold=0
 isBelowThreshold=$(printf '%s\n' "${totalCoverage} < ${coverageThreshold}" | bc -l)
-typeset -r isBelowThreshold
 if (( isBelowThreshold )); then
     : "❌ FAIL: Coverage ${totalCoverage}% is below threshold ${coverageThreshold}%"
     : "Coverage report: ${coverageHTML}"
@@ -48,7 +47,7 @@ fi
 : "✅ PASS: Coverage ${totalCoverage}% meets threshold ${coverageThreshold}%"
 : "Coverage report: ${coverageHTML}"
 : 'Guarding that the unit build tag selects bot tests...'
-CheckTestSelection "${suiteTag}" 1 "${botPackagesArr[@]}"
+GO="${goCommand}" "${scriptDir}/check--test-selection.sh" "${suiteTag}" "${botPackagesArr[*]}" 1
 : 'Running bot env-consumer unit tests (outside the coverage gate)...'
 "${goCommand}" test -v -tags "${suiteTag}" "${botPackagesArr[@]}"
 true
