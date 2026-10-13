@@ -93,22 +93,70 @@ evidence-summary.json        (final pipeline verdict)
 
 ### `preflight-rhov.sh`
 
-**Purpose**: Fail-closed pre-run validation before crash injection.
+**Purpose**: Fail-closed pre-run validation. Every check is a hard `Die` — no partial arming allowed.
 
-**Responsibilities**:
-- Verify VMI exists and is in Running state with `runStrategy: Manual`
-- Verify QGA is responsive (5 retries × 3s sleep)
-- Upload and run `configure-dumps.ps1` on guest — validates crash dump registry
-- **Die if `rebootRequired=true`** — CrashDumpEnabled or pagefile changes only take effect after reboot; arming with stale config produces no dump
-- Verify `matchesRecommended=true`, `AutoReboot=0`, `pageFile.adequate=true`
-- Verify evidence mount matches preflight snapshot (identity marker or mount attributes)
-- Validate digest-pinned recovery image contract (`bash+guestfish-v1`)
-- Generate `recovery-metadata.json` for downstream phases
+**All checks performed (in order)**:
 
-**Critical checks**:
-- `BSOD_DET__VM__NAME` and `BSOD_DET__NAMESPACE` must be explicitly set (no defaults)
-- Recovery image must be digest-pinned (`@sha256:...`)
-- `rebootRequired=false` in configure-dumps output — if true: `virtctl stop && virtctl start` then re-run
+**1. Input validation**
+- `--ns`, `--vm`, `--out`, `--metadata`, `--run-id` all required
+- `runId` must match DNS label pattern `^[a-zA-Z0-9][a-zA-Z0-9._-]{5,80}$`
+- `ns`, `vm`, `snapClass`, `memoryPvc` must be valid Kubernetes DNS labels
+- Recovery image must be digest-pinned (`@sha256:[64 hex chars]`)
+- Evidence volume kind must be `pvc`, `network`, or `csi` (hostPath/emptyDir forbidden)
+- Evidence storage ID must be stable (alphanumeric + safe chars)
+- Snapshot class, memory dump PVC both required
+- `BSOD_DET__COMMAND__TIMEOUT` must be a positive integer
+
+**2. Helper scripts present**
+- All pipeline helpers must exist and be readable: `guest-agent.py`, `reliability.py`, `recover-natural-crash.sh`, `collect-host-signals.sh`, `parse-dump-header.sh`
+- Guest config inputs must exist: `configure-dumps.ps1`, `crash-control.json`
+
+**3. Evidence mount validation**
+- Evidence root must be an existing non-symlink directory
+- Filesystem must not be ephemeral (`overlay`, `tmpfs`, `ramfs`, `rootfs` all forbidden)
+- Network kind requires a network filesystem (`nfs`, `cifs`, `ceph`, etc.)
+- Evidence PVC must be `Bound` and `Filesystem` mode
+- Run output dir must be a unique direct child of evidence root (not nested)
+- Run output basename must equal the run ID
+- Run output dir must be empty (no stale artifacts)
+
+**4. VM and VMI state**
+- VM `runStrategy` must be `Manual` (not `Always` — would auto-restart after BSOD)
+- Exactly one running `virt-launcher` pod must exist for the VM
+- Guest PVC must be `Block` mode with storage class and size (required for snapshot recovery)
+- Memory dump PVC must be `Bound`, `Filesystem` mode, and different from the guest PVC
+- Snapshot class driver must match the guest PVC provisioner
+
+**5. Recovery image capability probe**
+- Creates a temporary pod from the recovery image
+- Runs `bash -c 'guestfish --version'` to verify the image has the `bash+guestfish-v1` contract
+- Pod must complete with `Succeeded` — die if `Failed` or timeout
+
+**6. QGA liveness**
+- QGA ping via `guest-agent.py ping` — 5 retries × 3s sleep
+- Die if all retries fail (VM not ready for crash injection)
+
+**7. Guest crash dump configuration**
+- Upload `configure-dumps.ps1` + `crash-control.json` to VM via guest-agent
+- Run `configure-dumps.ps1 -DataFile crash-control.json`
+- Die if output fails any of:
+  - `ok == true` — script ran successfully
+  - `matchesRecommended == true` — all registry values match expected
+  - `current.AutoReboot == 0` — VM will stay frozen after BSOD
+  - `pageFile.adequate == true` — DedicatedDumpFile or pagefile is adequate
+  - `rebootRequired == false` — no pending reboot needed; if true, do `virtctl stop && virtctl start`
+
+**8. Guest path verification**
+- `C:\Windows` exists
+- `C:\Windows\Minidump` exists
+- If `--require-trigger`: `C:\Temp\nmf\notmyfaultc64.exe` exists (NotMyFault binary)
+
+**9. Pre-crash dump inventory**
+- Records all existing dump files (`MEMORY.DMP`, `Minidump\*.dmp`) with path/size/mtime
+- Stored in `recovery-metadata.json` as `preCrashInventory` for post-crash comparison
+
+**10. Generate recovery-metadata.json**
+Writes all collected VM/storage/config data needed by downstream scripts.
 
 **Environment Variables**:
 
@@ -119,7 +167,7 @@ evidence-summary.json        (final pipeline verdict)
 | `BSOD_DET__COMMAND__TIMEOUT` | Command timeout (default: 30s) |
 | `BSOD_DET__PREFLIGHT__TIMEOUT` | Preflight timeout (default: 300s) |
 
-**Output**: `recovery-metadata.json` (VM config, storage details, armed epoch, pre-crash inventory)
+**Output**: `recovery-metadata.json` — VM name, namespace, pod, domain, PVC names, storage class, storage size, volume mode, recovery image digest, armed epoch, pre-crash dump inventory, evidence mount details
 
 ---
 
