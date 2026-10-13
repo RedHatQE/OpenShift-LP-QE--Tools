@@ -1,12 +1,4 @@
-# ------------------------------------------------------------------------------
-# prow-analyzer image (CLI + Slack bot).
-#
-# Unlike the OTE plugin image, this one is built by GitHub Actions
-# (docker/build-push-action) and pushed to images.paas.redhat.com. That runner
-# has no credentials for registry.ci.openshift.org, so pulling the OCP CI builder
-# there fails with HTTP 401. We therefore use the publicly pullable Red Hat base
-# images (registry.access.redhat.com), which need no authentication.
-# ------------------------------------------------------------------------------
+# CLI and Slack bot image using public Red Hat base images.
 FROM registry.access.redhat.com/ubi9/go-toolset:1.22 AS builder
 # bash so the RUN heredoc can use `shopt -s inherit_errexit` per Best Practices.
 SHELL ["/bin/bash", "-c"]

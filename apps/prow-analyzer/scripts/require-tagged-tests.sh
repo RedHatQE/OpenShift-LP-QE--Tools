@@ -1,11 +1,6 @@
 #!/bin/bash
-# require-tagged-tests.sh — fail if a Go build tag selects no tests.
-#
-# Build tags are silent: a missing or misspelled `//go:build <tag>` line makes
-# `go test -tags <tag> ./...` compile with zero matching tests and exit 0 (green),
-# hiding the fact that the suite never ran. This guard turns that into a hard
-# failure so the CI/Make contract can trust that a tagged suite actually exists.
-#
+# Fail when a build tag selects fewer tests than required; a zero-test run
+# can otherwise succeed without exercising the intended suite.
 # Usage: require-tagged-tests.sh <build-tag> [packages] [minCount]
 set -euxo pipefail; shopt -s inherit_errexit
 

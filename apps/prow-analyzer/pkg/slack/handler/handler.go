@@ -14,15 +14,11 @@ import (
 	"github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/audit"
 )
 
-// dedupGrace is added to the MCP request timeout when sizing the dedup window
-// (see New). The window must outlast a single analysis so a duplicate event
-// arriving mid-analysis cannot expire the dedup entry and spawn a second,
-// concurrent run of the same job. The grace covers the pre-analysis
-// JobOutcomeFor probe and post-analysis Slack posting on top of the MCP timeout.
+// dedupGrace adds a margin to the effective HTTP request timeout when sizing
+// the duplicate-suppression window; it does not bound total analysis time.
 const dedupGrace = 5 * time.Minute
 
-// minDedupTTL is the floor for the dedup window, preserving the original
-// short-succession dedup behavior even when the MCP timeout is configured low.
+// minDedupTTL suppresses short-succession duplicates even with a low MCP timeout.
 const minDedupTTL = 10 * time.Minute
 
 // PartialHandler processes Slack events
@@ -40,7 +36,7 @@ type handler struct {
 	selfBotID         string          // this bot's own bot ID, always ignored to prevent loops
 	semaphore         chan struct{}   // Limit concurrent analyses
 
-	dedupTTL     time.Duration        // how long a (channel|prowURL) pair is remembered; sized to outlast one analysis
+	dedupTTL     time.Duration        // elapsed-time suppression window for a (channel|prowURL) pair
 	mu           sync.Mutex           // guards recentlySeen
 	recentlySeen map[string]time.Time // (channel|prowURL) -> last time analysis was triggered
 }
@@ -148,7 +144,6 @@ func (h *handler) Handle(callback *slackevents.EventsAPIEvent, logger *slog.Logg
 	// Acquire semaphore before spawning goroutine to prevent unbounded buildup
 	select {
 	case h.semaphore <- struct{}{}:
-		// Analyze async (can take 30-60s)
 		go h.analyzeAndRespond(ctx, msg, prowURL, logger)
 	default:
 		// The request was not enqueued, so undo the dedup mark: otherwise the URL
@@ -267,9 +262,8 @@ func (h *handler) analyzeAndRespond(ctx context.Context, event *slackevents.Mess
 	if err != nil {
 		fmt.Printf("PROW-ANALYZER ERROR: Analysis failed after %s: %v\n", analyzeDur.Round(time.Millisecond), err)
 		logger.Error("Prow analyzer analysis failed", "error", err, "analyze", analyzeDur)
-		// Audit the outcome (event 3/3): analysis failed before any reply content.
-		// The error is redacted to a category so raw backend content (e.g. an MCP
-		// HTTP body) is not persisted in the immutable audit trail.
+		// Record an audit category, not the operational diagnostic. Analyzer HTTP/MCP
+		// errors already omit backend payloads before reaching this boundary.
 		audit.Outcome(ctx, "failed",
 			"error", audit.RedactError(err),
 			"duration_ms", analyzeDur.Milliseconds(),
@@ -343,12 +337,8 @@ func New(client *slack.Client, a *analyzer.Analyzer, monitoredChannels []string,
 		}
 	}
 
-	// Size the dedup window to outlast a single analysis (bounded by this
-	// analyzer's effective timeout) plus a grace margin, so a duplicate event
-	// arriving mid-analysis cannot expire the entry and trigger a second,
-	// concurrent run of the same job. Read the analyzer's effective timeout (not
-	// MCPTimeout() directly) so a per-instance override such as the bot's
-	// --mcp-timeout / PROW_AN__MCP__TIMEOUT_SEC widens the window to match.
+	// Track per-instance HTTP timeout overrides, with a grace margin and floor.
+	// Multiple requests, retries and posting can outlast this suppression window.
 	dedupTTL := a.Timeout() + dedupGrace
 	if dedupTTL < minDedupTTL {
 		dedupTTL = minDedupTTL

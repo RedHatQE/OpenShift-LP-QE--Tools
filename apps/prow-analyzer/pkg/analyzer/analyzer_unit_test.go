@@ -948,7 +948,6 @@ func TestAnalyzeFailure(t *testing.T) {
 		}
 	})
 
-	// mcpDoer helper is exercised here so success-path plumbing has a direct user.
 	t.Run("success via mcpDoer helper", func(t *testing.T) {
 		sse := `data: {"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"ok"}]}}` + "\n"
 		a := &Analyzer{

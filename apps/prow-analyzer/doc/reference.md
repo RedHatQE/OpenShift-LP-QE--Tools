@@ -561,17 +561,25 @@ oc set image deployment/prow-analyzer-bot -n <your-namespace> \
 ```
 apps/prow-analyzer/
   cmd/
-    prow-analyzer--bot/main.go         Bot entrypoint (Slack socket mode)
+    prow-analyzer--bot/
+      main.go                          Bot entrypoint (Slack socket mode)
+      main_test.go                     Environment helper tests
+      main_unit_test.go                Flag and environment contract tests
     prow-analyzer--cli/main.go         CLI entrypoint (single URL analysis)
   pkg/
     analyzer/
       analyzer.go                      Core MCP client and analysis logic
-      analyzer_test.go                 Unit tests (21 tests)
-      mocks_test.go                    Test helpers and mock types
+      analyzer_unit_test.go            Unit tests (unit build tag)
+      analyzer_integration_test.go     HTTP/SSE tests (integration build tag)
+      mocks_test.go                    Shared analyzer test helpers
+    audit/
+      audit.go                         Audit schema and error categorization
+      audit_unit_test.go               Audit contract tests (unit build tag)
     slack/
       handler/
         handler.go                     Slack event handler
-        handler_test.go                Handler unit tests (10 tests)
+        handler_unit_test.go           Unit tests and in-memory mock helpers
+        handler_integration_test.go    Async handler tests (integration build tag)
   deploy/
     openshift/deployment.yaml          OpenShift deployment manifest
     slack/manifest.yaml                Slack app manifest
@@ -579,10 +587,10 @@ apps/prow-analyzer/
     reference.md                       This file (developer & operator reference)
     deployment.md                      Deployment quick-start guide
   Makefile                             Local build targets
-  go.mod                              Go module definition
+  go.mod                               Go module definition
 
 image/container/prow-analyzer/
-  Dockerfile                           Multi-stage build (RHEL 9, Go 1.25)
+  Dockerfile                           Multi-stage build with public Red Hat bases
   Makefile                             Container build/push targets
 ```
 
@@ -619,7 +627,7 @@ make clean
 ### Testing
 
 ```bash
-# Run all tests with race detector
+# Run unit tests with coverage, then integration tests with the race detector
 make test
 
 # Run unit tests with the embedded 100% coverage gate

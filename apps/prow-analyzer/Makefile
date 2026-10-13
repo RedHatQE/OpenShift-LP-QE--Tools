@@ -1,14 +1,5 @@
-# Local development Makefile for Go binaries
-# For container builds, see image/container/prow-analyzer/Makefile
-#
-# GitHub Actions invokes these same targets (see
-# .github/workflows/prow-analyzer--build.yaml) so local and CI runs cannot
-# diverge:
-#   test--unit        -> unit suite with the embedded 100% coverage gate
-#                        (all deps mocked, deterministic, no race)
-#   test--integration -> integration suite under -race (real servers + async Handle)
-# Our philosophy is that unit tests MUST reach 100% coverage, so the coverage
-# gate lives inside test--unit rather than in a separate target.
+# Local and GitHub Actions entry points for application builds and tests.
+# For container builds, see image/container/prow-analyzer/Makefile.
 .PHONY: build build--cli build--bot test test--unit test--integration check-tags clean help
 
 SHELL   := /bin/bash
@@ -30,10 +21,7 @@ build--bot:
 # Run the full suite: unit (with coverage gate) then integration (mirrors CI ordering)
 test: test--unit test--integration
 
-# Unit tests with the embedded 100% coverage gate (single shell invocation via the
-# shared script, which also guards that the unit build tag selects tests). The
-# script additionally runs the bot command package's env-consumer unit tests,
-# outside the coverage gate (main() is not unit-testable).
+# Gate ./pkg/... at 100% coverage and run bot command tests separately.
 test--unit:
 	$(SCRIPTS)/test-coverage.sh
 

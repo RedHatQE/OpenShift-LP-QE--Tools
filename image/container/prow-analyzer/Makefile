@@ -12,8 +12,7 @@ IMAGE_LATEST     = $(IMAGE_REGISTRY)/$(IMAGE_NAMESPACE)/$(IMAGE_REPO):latest
 # Application source directory (relative to repo root)
 APP_DIR = apps/prow-analyzer
 
-# Build container image. xtrace (-x) renders each command after Make/shell
-# interpolation, so `:` no-ops double as progress messages.
+# Build the application image with both requested and latest tags.
 build:
 	{ set -euxo pipefail; shopt -s inherit_errexit;\
 	    : 'Building container image: $(IMAGE_NAME) (also tagged $(IMAGE_LATEST))';\

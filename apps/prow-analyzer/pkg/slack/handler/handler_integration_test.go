@@ -18,10 +18,7 @@ import (
 	"github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/analyzer"
 )
 
-// These tests drive Handle down its async path (which launches a goroutine) and
-// analyzeAndRespond against real net/http/httptest servers for Slack and the MCP
-// backend. They run under -race with no coverage threshold; the equivalent branch
-// coverage is provided by the in-memory unit tests in handler_unit_test.go.
+// Real HTTP test servers exercise async Slack handling and MCP analysis.
 
 // newCapturingSlackServer returns a Slack client whose posted message texts are
 // recorded. When ok is false, chat.postMessage returns an error so the caller's
@@ -225,7 +222,8 @@ func TestHandle_EditedMessageResolved(t *testing.T) {
 	}
 }
 
-// TestAnalyzeAndRespond_WithMockServer tests the async path with real HTTP servers.
+// TestAnalyzeAndRespond_WithMockServer exercises MCP analysis and Slack posting
+// by invoking the response worker directly against real HTTP test servers.
 func TestAnalyzeAndRespond_WithMockServer(t *testing.T) {
 	sessionID := "test-session"
 	mcpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
