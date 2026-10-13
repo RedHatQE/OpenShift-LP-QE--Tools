@@ -23,7 +23,8 @@ if (( selected < minCount )); then \
     : "        A missing or misspelled //go:build $${buildTag} line yields 0 tests silently."; \
     exit 1; \
 fi; \
-: "✅ PASS: -tags $${buildTag} selected $${selected} test(s) in $(strip $(2))."
+: "✅ PASS: -tags $${buildTag} selected $${selected} test(s) in $(strip $(2))."; \
+true
 endef
 
 # Build both binaries
@@ -48,8 +49,9 @@ test--unit:
 	    typeset -r coverageHTML='coverage.html';\
 	    : 'Guarding that the unit build tag actually selects tests...';\
 	    $(call require-tagged-tests,unit,$(PKGS),1);\
+	    typeset -a coveragePkgs=("$${pkgsArr[@]}");\
 	    : 'Running unit tests with coverage...';\
-	    "$(GO)" test -v -tags unit -covermode=set -coverprofile="$${coverageFile}" "$${pkgsArr[@]}";\
+	    "$(GO)" test -v -tags unit -covermode=set -coverprofile="$${coverageFile}" "$${coveragePkgs[@]}";\
 	    : 'Generating coverage report...';\
 	    "$(GO)" tool cover -html="$${coverageFile}" -o "$${coverageHTML}";\
 	    : 'Calculating coverage percentage...';\
@@ -72,7 +74,8 @@ test--unit:
 	    : 'Guarding that the unit build tag selects bot tests...';\
 	    $(call require-tagged-tests,unit,./cmd/prow-analyzer--bot,1);\
 	    : 'Running bot env-consumer unit tests (outside the coverage gate)...';\
-	    "$(GO)" test -v -tags unit "$${pkgsArr[@]}";\
+	    "$(GO)" test -v -tags unit ./cmd/prow-analyzer--bot;\
+	    true;\
 	}
 
 # Integration tests: real HTTP servers and the async Handle() path, under -race.
@@ -80,6 +83,7 @@ test--integration:
 	{ set -euxo pipefail; shopt -s inherit_errexit;\
 	    $(call require-tagged-tests,integration,$(PKGS),1);\
 	    "$(GO)" test -v -tags integration -race "$${pkgsArr[@]}";\
+	    true;\
 	}
 
 # Fail if either build tag selects no tests (guards against silent 0-test runs)
@@ -87,6 +91,7 @@ check-tags:
 	{ set -euxo pipefail; shopt -s inherit_errexit;\
 	    $(call require-tagged-tests,unit,$(PKGS),1);\
 	    $(call require-tagged-tests,integration,$(PKGS),1);\
+	    true;\
 	}
 
 # Clean build artifacts
@@ -94,6 +99,7 @@ clean:
 	{ set -euxo pipefail; shopt -s inherit_errexit;\
 	    rm -f prow-analyzer--cli prow-analyzer--bot;\
 	    rm -f coverage.out coverage.html;\
+	    true;\
 	}
 
 # Help
