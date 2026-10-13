@@ -1,959 +1,836 @@
 # BSOD Detector
 
 Detect, capture, and analyze Blue Screen of Death (BSOD) events on Windows VMs
-running under KVM/libvirt or KubeVirt/OpenShift Virtualization.
+running under KubeVirt / OpenShift Virtualization (RHOV).
+
+---
+
+## What the Pipeline Does
+
+1. **Detects** BSOD by polling the qemu-guest-agent; confirms via `virsh domstate`
+2. **Captures** full physical memory via `virtctl memory-dump` → `vm-memory.elf.tar.gz`
+3. **Extracts** offline forensics from the stopped VM disk:
+   - Windows EventLogs (`System.evtx`, `Application.evtx`) via guestfish NTFS read
+   - VNC screenshot of the blue screen
+   - Libvirt domain XML, host signals (split-lock, KVM errors, Hyper-V features)
+4. **Validates** all artifacts and generates `evidence-summary.json`
+
+---
 
 ## Architecture
 
-**Offline-first:** the guest is a pure crash target. After a BSOD, the host
-stops the VM, mounts the guest disk via guestfs, and extracts crash dumps +
-event logs offline. No guest-side scripts, staging, or SSH needed for evidence
-collection.
-
-**Backend-abstracted:** VM operations go through a dispatch layer that selects
-`virsh` (KVM) or `virtctl`/`oc` (KubeVirt) based on the `BSOD_DET__HYP_PROV`
-environment variable.
-
-## What It Captures
-
-- Bug-check (stop) code and parameters, resolved via `data/bugcheck-codes.json`
-- Crash dump files (`MEMORY.DMP`, minidumps) extracted offline from the guest disk
-- Windows event log entries (System/Application `.evtx`) parsed offline
-- Host-side signals (kernel log split-lock `#AC`, Hyper-V enlightenments)
-- Raw VM memory backup (ELF format, via `virsh dump --memory-only`)
-- BSOD screenshot (framebuffer capture)
-
-Keep it simple. Prefer a small, well-defined tool over a broad framework.
-
-- Bug-check (stop) code and parameters, resolved via `data/bugcheck-codes.json`
-- Crash dump files (`MEMORY.DMP`, minidumps) extracted offline from the guest disk
-- Windows event log entries (System/Application `.evtx`) parsed offline
-- Host-side signals (kernel log split-lock `#AC`, Hyper-V enlightenments)
-- Raw VM memory backup (ELF format, via `virsh dump --memory-only`)
-- BSOD screenshot (framebuffer capture)
-
----
-
-## Deployment Model: Where Scripts Run
-
-BSOD detection is a **3-tier distributed system**:
-
 ```
-┌─────────────────────────┐
-│   CI Operator           │  Orchestration host: manages test execution
-│   (Local/CI Agent)      │
-│                         │
-│ • watch-crash.sh        │
-│ • guest-agent.py        │
-│ • collect-from-host.sh  │
-│ • crash-injector/       │
-│                         │
-└────────────┬────────────┘
-             │ oc exec / SSH
-             ↓
-┌─────────────────────────┐
-│ Virt-Launcher Pod       │  Kubernetes: manages the VM
-│ (or KVM Host)           │
-│                         │
-│ • virsh commands        │
-│ • VM lifecycle mgmt     │
-│ • Evidence extraction   │
-│                         │
-└────────────┬────────────┘
-             │ qemu-guest-agent
-             ↓
-┌─────────────────────────┐
-│ Windows VM (Guest)      │  Test target: configuration and monitoring
-│                         │
-│ • configure-dumps.ps1   │
-│ • clear-dumps.ps1       │
-│ • NotMyFault.exe        │
-│ (crash trigger)         │
-└─────────────────────────┘
-```
-
-### CI Operator (CI/CD System or Orchestration Host)
-
-Scripts executed on the orchestration layer to coordinate the entire test pipeline:
-
-- `watch-crash.sh` — natural BSOD detection with automatic escalation
-- `guest-agent.py` — tunnel PowerShell commands into the VM
-- `collect-from-host.sh` — coordinate detection → capture → analysis
-- `src/scripts/crash-injector/` — intentional crash triggers
-
-**Execution context:**
-- **KubeVirt:** Via `oc exec` into virt-launcher pod
-- **KVM/libvirt:** Directly on the hypervisor host via SSH
-
----
-
-### Virt-Launcher Pod (Kubernetes) or KVM Host
-
-The hypervisor layer that manages the VM. Scripts here are invoked **indirectly** by the CI Operator:
-
-- `virsh` commands (executed inside the pod or on the KVM host)
-- VM lifecycle management (start, stop, snapshot)
-- Evidence extraction from disk images
-- Memory/screen capture
-
-**Execution method:**
-- **KubeVirt:** Inside the `virt-launcher-<vm>-*` pod
-- **KVM/libvirt:** On the Linux host directly
-
----
-
-### Windows VM (Guest)
-
-PowerShell scripts **inside** the Windows guest for one-time configuration:
-
-- `configure-dumps.ps1` — enable full crash dumps (CrashControl registry)
-- `clear-dumps.ps1` — clear existing crash dumps before test
-- NotMyFault.exe — optional crash trigger utility
-
-**Execution context:**
-- **KubeVirt:** Via qemu-guest-agent protocol (SSH not available)
-- **KVM/libvirt:** Via SSH connection to Windows guest
-
----
-
-## Testing Workflow: Commands by Layer
-
-This section shows **exactly which commands run on each layer** during a complete test.
-
-### Complete Test Sequence: Intentional Crash Injection
-
-```
-╔════════════════════════════════════════════════════════════════════════════╗
-║                         INTENTIONAL CRASH INJECTION FLOW                   ║
-╚════════════════════════════════════════════════════════════════════════════╝
-
-PHASE 1: SETUP (One-Time)
-─────────────────────────────────────────────────────────────────────────────
-┌─────────────────────────────┐
-│ CI Operator (Orchestration)  │
-│  - Stage toolkit            │
-│  - Configure dumps          │
-│  - Setup NotMyFault injector│
-└──────────────┬──────────────┘
-               │ guest-agent.py psfile
-               ↓
-┌──────────────────────────────┐
-│ Virt-Launcher Pod            │
-│  - Forward via qemu-agent    │
-└──────────────┬───────────────┘
-               │ virsh qemu-agent-command
-               ↓
-┌──────────────────────────────┐
-│ Windows VM (Guest)           │
-│  [Setup Scripts Execute]     │
-│  - Directories created       │
-│  - Registry configured       │
-│  - NotMyFault.exe installed  │
-└──────────────────────────────┘
-
-PHASE 2: CRASH TRIGGER (Per-Test)
-─────────────────────────────────────────────────────────────────────────────
-┌─────────────────────────────┐
-│ CI Operator                  │
-│  - Clear old dumps (optional)│
-│  - Execute crash command     │
-└──────────────┬──────────────┘
-               │ guest-agent.py exec
-               ↓
-┌──────────────────────────────┐
-│ Virt-Launcher Pod            │
-│  - Forward crash trigger     │
-└──────────────┬───────────────┘
-               │ virsh qemu-agent-command
-               ↓
-┌──────────────────────────────┐
-│ Windows VM (Guest)           │
-│  [CRASH OCCURS]              │
-│  notmyfaultc64.exe /crash    │
-│  ↓ BSOD triggered (0x01)     │
-│  ↓ MEMORY.DMP written        │
-│  ↓ Agent unresponsive        │
-└──────────────────────────────┘
-
-PHASE 3: EVIDENCE COLLECTION (Offline)
-─────────────────────────────────────────────────────────────────────────────
-┌─────────────────────────────┐
-│ CI Operator                  │
-│  - Run host-tools extraction │
-└──────────────┬──────────────┘
-               │ libguestfs container
-               ↓
-┌──────────────────────────────┐
-│ Disk Image (Offline Mount)   │
-│  [Read-Only NTFS Access]     │
-│  - Extract MEMORY.DMP        │
-│  - Extract Minidump/*.dmp    │
-│  - Extract System.evtx       │
-│  - Extract Application.evtx  │
-└──────────────┬───────────────┘
-               │
-               ↓
-┌──────────────────────────────┐
-│ Evidence Directory           │
-│  ./evidence/                 │
-│  ├── MEMORY.DMP              │
-│  ├── Minidump/               │
-│  ├── winevt/System.evtx      │
-│  ├── winevt/Application.evtx │
-│  └── evidence-summary.json   │
-└──────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│               CI / Orchestration Host                       │
+│           trigger-bsod-intentional.sh                       │
+└────────┬───────────────────────────────────────────────────┘
+         │
+   ┌─────▼──────┐     ┌─────────────────┐     ┌────────────────────┐
+   │ preflight  │     │  watch-crash.sh │     │recover-natural-    │
+   │ -rhov.sh   │──►  │  (background)   │──►  │crash.sh            │
+   └─────┬──────┘     └────────┬────────┘     └──────────┬─────────┘
+         │                     │                          │
+   QGA ping             virtctl memory-dump          guestfs-ntfs pod
+   configure-dumps      VNC screenshot               guestfish NTFS mount
+   recovery-metadata    domain.xml / host-signals    oc cp → evidence dir
 ```
 
 ---
 
-### Layer-by-Layer Commands
+## Evidence Directory Contents
 
-#### Layer 1: CI Operator (Operator Workstation)
+Every pipeline run produces a directory under `/mnt/persistent-bsod-evidence/`:
 
-**What runs:** Bash/Python orchestration scripts
+| File | Typical Size | Phase | Produced by | Description |
+|---|---|---|---|---|
+| `recovery-metadata.json` | ~1.3 KB | Pre-BSOD | `preflight-rhov.sh` | VM name, namespace, PVC names, storage class, recovery image digest, armed epoch |
+| `watcher-ready` | 42 B | Pre-BSOD | `watch-crash.sh` | Arming marker — written when watcher begins polling |
+| `bsod-screenshot.png` | ~37 KB | At BSOD (VM frozen) | `watch-crash.sh` → `virtctl vnc` | VNC screenshot of the Windows blue screen |
+| `vm-memory.elf.tar.gz` | ~1.5 GB | At BSOD (VM frozen) | `watch-crash.sh` → `virtctl memory-dump get` + `virtctl vmexport download --format gzip` | **Primary dump artifact.** Full physical RAM in ELF ET_CORE format via KubeVirt. KubeVirt freezes VM and captures RAM directly from QEMU — works regardless of Windows/pagefile state. Run `elf2dmp` offline to convert for WinDbg / Volatility |
+| `domain.xml` | ~14 KB | At BSOD (VM frozen) | `watch-crash.sh` → `virsh dumpxml` inside virt-launcher | Complete libvirt XML at crash time — CPU, memory, disks, devices. Richer than `oc get vmi -o yaml` |
+| `launcher-compute.log` | ~100–200 KB | At BSOD (VM frozen) | `watch-crash.sh` → `oc logs` on virt-launcher | Raw QEMU/KVM compute logs — split-lock traps, KVM internal errors, device events |
+| `host-signals.json` | ~1.3 KB | At BSOD (VM frozen) | `watch-crash.sh` → `collect-host-signals.sh` | Parsed from `launcher-compute.log` — split-lock count, KVM error count, Hyper-V feature states (tlbflush/ipi/vapic/spinlocks/synictimer), risk assessment |
+| `guestFS_sda3/Windows/System32/winevt/Logs/System.evtx` | ~8–9 MB | After VM stopped | `recover-natural-crash.sh` → guestfs-ntfs pod | Windows System EventLog from NTFS. Contains crash event 1001 (BugCheck), dirty shutdown 6008. Partition name (`sda3`) is **detected dynamically** |
+| `guestFS_sda3/Windows/System32/winevt/Logs/Application.evtx` | ~6 MB | After VM stopped | `recover-natural-crash.sh` → guestfs-ntfs pod | Windows Application EventLog — Application/1001 LiveKernelEvent and app-level crash events |
+| `parse-dump-header.json` | ~146 B | After VM stopped | `recover-natural-crash.sh` | Bugcheck code stub (elf2dmp disabled in pipeline — run offline for actual bugcheck) |
+| `events.json` | ~162 B | After VM stopped | `recover-natural-crash.sh` | Crash detection stub — run `extract-evtx.py` offline against `guestFS_*/Windows/System32/winevt/Logs/*.evtx` |
+| `checksums.sha256` | ~900 B | After VM stopped | `recover-natural-crash.sh` | SHA-256 manifest of all evidence files (integrity verification) |
+| `extraction.log` | ~3–5 KB | After VM stopped | `recover-natural-crash.sh` | Step-by-step guestfish extraction trace |
+| `extraction-summary.json` | ~3 KB | After VM stopped | `reliability.py write-summary` | Recovery phase artifact inventory — type, format, size, sha256, valid flag per file |
+| `stage-errors.jsonl` | 0 B (success) | Throughout | `watch-crash.sh` + `recover-natural-crash.sh` | One JSON line per stage failure. Empty on clean run |
+| `evidence-summary.json` | ~3 KB | End of pipeline | `watch-crash.sh` → `reliability.py write-summary` | Final pipeline verdict: `ok: true/false`, missing artifact types, invalid artifacts |
+| `watcher.log` | ~100–120 KB | Throughout | `watch-crash.sh` | Full timestamped execution trace of the entire pipeline |
 
-**Location:** The operator workstation, CI/CD pipeline, or anywhere with `oc`/SSH access to cluster
+**Timing overview**:
+```
+Pre-BSOD     → recovery-metadata.json, watcher-ready
+At BSOD      → bsod-screenshot.png, vm-memory.elf.tar.gz (~5–10 min),
+               domain.xml, launcher-compute.log, host-signals.json
+After stop   → guestFS_sda3/.../System.evtx, Application.evtx,
+               parse-dump-header.json, events.json, checksums.sha256,
+               extraction.log, extraction-summary.json
+End          → stage-errors.jsonl, evidence-summary.json, watcher.log
+```
 
-**Commands executed at this layer:**
+---
+
+## Evidence Artifacts Deep Dive
+
+This section explains what each artifact contains and how to use it, with examples from a real pipeline run: `/mnt/persistent-bsod-evidence/20261013T070250Z-intentional-837674-22539`
+
+### Pre-Crash Configuration
+
+#### `recovery-metadata.json` (1.3 KB)
+**What it contains**: Preflight validation results and infrastructure snapshot at pipeline start.
+
+**Example fields**:
+```json
+{
+  "runId": "20261013T070250Z-intentional-837674-22539",
+  "namespace": "windows-bsod",
+  "vm": "win2022-vm-hjoshi1",
+  "launcherPod": "virt-launcher-win2022-vm-hjoshi1-vtfdn",
+  "domain": "windows-bsod_win2022-vm-hjoshi1",
+  "node": "integrity-gs04.sys.eng.rdu2.dc.redhat.com",
+  "memoryDumpPvc": "win2022-vm-hjoshi1-memdump",
+  "snapshotClass": "ocs-storagecluster-rbdplugin-snapclass",
+  "recoveryImage": "image-registry.../bsod-recovery:latest@sha256:4f46...",
+  "armedEpoch": 1791875063
+}
+```
+
+**Use cases**:
+- Verify target VM and namespace correctness
+- Find exact launcher pod for manual debugging
+- Confirm recovery image version (for reproducibility)
+- Track infrastructure (node, storage class, snapshot class)
+
+#### `watcher-ready` (42 B)
+**What it contains**: Run ID; written when crash detection polling begins.
+
+**Purpose**: Signals that the VM is armed and polling for BSOD events.
+
+---
+
+### Crash Evidence (Captured At BSOD)
+
+#### `bsod-screenshot.png` (37 KB — PNG, 1280×800)
+**What it contains**: VNC screenshot of Windows blue screen at crash time.
+
+**Visual verification**:
+- Blue screen appears → confirms BSOD was captured visually
+- Windows error code visible (if legible) → helps forensic analysis
+- Desktop state frozen → confirms VM-in-crash state
+
+**How to view**:
+```bash
+file bsod-screenshot.png  # Verify PNG format
+display bsod-screenshot.png  # View in X11
+scp evidence/.../bsod-screenshot.png . && open bsod-screenshot.png
+```
+
+#### `vm-memory.elf.tar.gz` (787 MB — Gzipped TAR of ELF ET_CORE)
+**What it contains**: **Full physical RAM dump** in ELF ET_CORE format.
+
+**Example metadata**:
+```
+Format:  tar.gz[elf]
+Size:    824,374,006 bytes (~824 MB)
+Type:    memory
+Valid:   true
+SHA256:  077051eba4d8a9f9d6ed8059dadd38e875c2ca2d151472bd701bbe0d82b8fd89
+```
+
+**What's inside**:
+```bash
+tar -tzf vm-memory.elf.tar.gz
+  # Output example:
+  # 20261013T070250Z-intentional-837674-22539/memory.dump
+  # (ELF core file containing full 16GB physical RAM)
+```
+
+**How to analyze**:
+```bash
+# 1. Extract the ELF dump
+tar -xzf vm-memory.elf.tar.gz
+inner_file=$(tar -tzf vm-memory.elf.tar.gz | grep '.dump$' | head -1)
+tar -xzf vm-memory.elf.tar.gz -O "$inner_file" > memory.dump
+
+# 2. Convert ELF → Windows DMP (offline, requires elf2dmp)
+elf2dmp memory.dump memory-windows.dmp
+
+# 3. Analyze with Volatility3
+vol -f memory-windows.dmp windows.info.Info
+vol -f memory-windows.dmp windows.crashinfo.CrashInfo
+vol -f memory-windows.dmp windows.driverscan.DriverScan
+```
+
+**Why this is primary**: KubeVirt captures RAM directly from QEMU — independent of Windows pagefile, BSOD staging, or reboot state. **Always works.**
+
+#### `domain.xml` (14 KB — Libvirt domain definition)
+**What it contains**: Complete QEMU/KVM configuration at crash time.
+
+**Key sections**:
+```xml
+<domain type='kvm' id='1'>
+  <name>windows-bsod_win2022-vm-hjoshi1</name>
+  <uuid>01ef375f-60c1-44d5-94a9-c91122957409</uuid>
+  <memory unit='KiB'>16777216</memory>  <!-- 16 GB -->
+  <currentMemory unit='KiB'>16777216</currentMemory>
+  <vcpu placement='static' current='4'>16</vcpu>
+  <cpu>
+    <model fallback='allow'>EPYC-Genoa</model>
+    <feature policy='require' name='topoext'/>
+    <!-- CPU flags at crash time -->
+  </cpu>
+  <devices>
+    <emulator>/usr/libexec/qemu-kvm</emulator>
+    <disk type='block' device='disk'>
+      <!-- Block device mappings, PVCs, images -->
+    </disk>
+    <interface type='bridge'>
+      <!-- Network devices, MAC addresses -->
+    </interface>
+    <balloon model='virtio'>
+      <!-- VirtIO balloon config -->
+    </balloon>
+  </devices>
+</domain>
+```
+
+**Forensic value**:
+- CPU model and flags → determine instruction set capabilities
+- Memory and vCPU counts → validate test environment configuration
+- Device order → map disk devices to Windows mount points
+- BIOS/UEFI settings → secure boot state, firmware version
+- PCI device assignments → hardware validation
+
+**How to query**:
+```bash
+# Extract specific fields
+grep -A5 "<cpu>" domain.xml  # CPU config
+grep "<driver" domain.xml     # Disk/device drivers
+grep "<emulator>" domain.xml  # QEMU version
+```
+
+#### `launcher-compute.log` (138 KB — Raw virt-launcher/QEMU logs)
+**What it contains**: Timestamped compute logs from virt-launcher pod (QEMU stderr/stdout).
+
+**What to look for**:
+```
+Split-lock AC traps (WRMSR events on locked memory access)
+KVM internal errors (vcpu fault, page fault anomalies)
+Device errors (disk I/O timeouts, NIC resets)
+Hyper-V enlightenment interactions
+Guest instruction emulation failures
+```
+
+**Example search**:
+```bash
+grep -i "split-lock" launcher-compute.log  # CPU lock issues
+grep -i "kvm error" launcher-compute.log    # Hypervisor errors
+grep -i "vcpu" launcher-compute.log         # vCPU state
+```
+
+#### `host-signals.json` (1.3 KB — Parsed kernel signals)
+**What it contains**: Structured analysis of `launcher-compute.log` for forensic signals.
+
+**Example content**:
+```json
+{
+  "ok": true,
+  "vm": "windows-bsod_win2022-vm-hjoshi1",
+  "collectedAt": "2026-10-13T07:12:08Z",
+  "kernelSignals": [
+    {
+      "id": "split-lock-trap",
+      "count": 0,
+      "relatedBugCheck": "0x00020001",
+      "matches": []
+    },
+    {
+      "id": "kvm-internal-error",
+      "count": 0,
+      "relatedBugCheck": null,
+      "matches": []
+    }
+  ],
+  "splitLockDetected": false,
+  "hyperv": {
+    "features": [
+      { "name": "tlbflush", "state": "absent", "risk": "high", "present": false },
+      { "name": "ipi", "state": "on", "risk": "high", "present": true },
+      { "name": "vapic", "state": "on", "risk": "low", "present": true }
+    ]
+  }
+}
+```
+
+**Interpretation**:
+- `split-lock-trap.count > 0` → CPU memory locking issues; may affect Windows thread synchronization
+- `kvm-internal-error.count > 0` → Hypervisor-level faults; potential infrastructure instability
+- `hyperv.features.tlbflush = "absent"` and `risk = "high"` → Translation lookaside buffer flush optimization unavailable; performance impact
+- `hyperv.ipi = "present"` → Inter-processor interrupts optimized
+
+---
+
+### Windows Crash Event Logs (Extracted After VM Shutdown)
+
+#### `guestFS_sda3/Windows/System32/winevt/Logs/System.evtx` (11 MB)
+**What it contains**: Windows System EventLog — kernel events, crashes, shutdowns.
+
+**Key events**:
+- **Event 1001 (BugCheck)**: BSOD event with bugcheck code, parameters, and timestamp
+- **Event 6008 (Dirty shutdown)**: Ungraceful shutdown (triggered by AutoReboot=0)
+- **Event 7000-7009**: Driver load failures, service errors around crash
+
+**How to parse (offline)**:
+```bash
+# Extract into JSON (run developer tool offline)
+python3 extract-evtx.py guestFS_sda3/Windows/System32/winevt/Logs/System.evtx
+
+# Or use Windows Event Viewer if analyzing on Windows
+```
+
+**What to look for in Event 1001**:
+```
+BugCheckCode: 0x01  (APC_INDEX_MISMATCH) or other code
+BugCheckParameter1, 2, 3, 4: Faulting address, context, CPU state
+DumpFile: C:\Windows\MEMORY.DMP or C:\DedicatedDump.sys (if written)
+TimestampUTC: Exact crash time
+```
+
+#### `guestFS_sda3/Windows/System32/winevt/Logs/Application.evtx` (6.4 MB)
+**What it contains**: Windows Application EventLog — app-level events.
+
+**Key events**:
+- **Application/1001 (LiveKernelEvent)**: System health data logged by crashed process
+- **Application/1000**: Generic app crash events
+- **.NET Framework events** (if applicable): CLR faults
+
+**How to analyze**:
+Same as System.evtx — run extract-evtx.py offline.
+
+#### `parse-dump-header.json` (146 B)
+**What it contains**: Stub for bugcheck code extraction (developer tool disabled in pipeline).
+
+**Example**:
+```json
+{
+  "ok": true,
+  "totalDumps": 0,
+  "dumps": [],
+  "warnings": [
+    "no on-disk dump available; primary artifact is vm-memory.elf.tar.gz"
+  ]
+}
+```
+
+**Purpose**: Placeholder for offline elf2dmp analysis. Developers run elf2dmp on vm-memory.elf.tar.gz to extract bugcheck details.
+
+#### `events.json` (162 B)
+**What it contains**: Stub for EventLog parsing (developer tool disabled in pipeline).
+
+**Example**:
+```json
+{
+  "ok": true,
+  "note": "extract-evtx.py is a developer tool — run offline against guestFS_<partition>/Windows/System32/winevt/Logs/*.evtx",
+  "events": []
+}
+```
+
+**Purpose**: Developers run extract-evtx.py offline to parse System.evtx and Application.evtx into JSON.
+
+---
+
+### Metadata and Validation
+
+#### `checksums.sha256` (915 B)
+**What it contains**: SHA-256 manifest of all evidence files for integrity verification.
+
+**Example**:
+```
+077051eba4d8a9f9d6ed8059dadd38e875c2ca2d151472bd701bbe0d82b8fd89  vm-memory.elf.tar.gz
+42d27f087986031ee07523a8b44a1f6dad46d138f06c5727d5647cfa454988fc  bsod-screenshot.png
+36db7f84419faf026f535626bb2b6a2d76ef9be8ded7f960bed2a46bbf1ce9fb  domain.xml
+...
+```
+
+**How to verify**:
+```bash
+cd /mnt/persistent-bsod-evidence/20261013T070250Z-intentional-837674-22539
+sha256sum -c checksums.sha256  # Verify all files
+```
+
+#### `extraction.log` (3.6 KB)
+**What it contains**: Step-by-step trace of guestfish NTFS extraction.
+
+**Example**:
+```
+[12:53:12] Starting guestfish extraction for partition sda3
+[12:53:13] Mounting /dev/sda3 (NTFS) read-only
+[12:53:14] Downloading /Windows/System32/winevt/Logs/System.evtx
+[12:53:25] Downloaded 11M in 11 seconds (1.0 MB/s)
+[12:53:25] Downloading /Windows/System32/winevt/Logs/Application.evtx
+[12:53:35] Downloaded 6.1M in 10 seconds (0.6 MB/s)
+[12:53:35] Unmounting /dev/sda3
+[12:53:36] Extraction complete
+```
+
+**Use for**: Troubleshooting failed NTFS reads, verifying partition detection, monitoring extraction performance.
+
+#### `extraction-summary.json` (3.2 KB)
+**What it contains**: Recovery phase artifact manifest with integrity validation.
+
+**Key fields per artifact**:
+```json
+{
+  "artifacts": [
+    {
+      "type": "memory",
+      "format": "tar.gz[elf]",
+      "path": "vm-memory.elf.tar.gz",
+      "size": 824374006,
+      "sha256": "077051eba4d8a9f9d6ed8059dadd38e875c2ca2d151472bd701bbe0d82b8fd89",
+      "valid": true
+    },
+    {
+      "type": "evtx",
+      "format": "evtx",
+      "path": "guestFS_sda3/Windows/System32/winevt/Logs/System.evtx",
+      "size": 10555392,
+      "sha256": "162deb75eeaa6525499281b1b42b4d48d2761d77c0579d9cf1833e8d25faa1f1",
+      "valid": true
+    }
+  ],
+  "invalidArtifacts": [],
+  "missingRequiredArtifactTypes": [],
+  "ok": true
+}
+```
+
+**Interpretation**:
+- `valid: true` → File structure validated (PNG is valid PNG, ELF is valid ELF, etc.)
+- `invalidArtifacts: []` → No corrupt files
+- `missingRequiredArtifactTypes: []` → All required artifact types present
+
+#### `stage-errors.jsonl` (0 B on success)
+**What it contains**: JSONL file — one line per pipeline stage failure.
+
+**Example (on failure)**:
+```json
+{"stage":"preflight","error":"qemu guest agent became unavailable","at":"2026-10-13T07:12:00Z"}
+{"stage":"memory-capture","error":"virtctl vmexport download failed","at":"2026-10-13T07:25:00Z"}
+```
+
+**Interpretation**: Empty file (0 B) = clean run. Non-empty = failures to investigate.
+
+#### `evidence-summary.json` (3.2 KB)
+**What it contains**: Final pipeline verdict and complete artifact inventory.
+
+**Example**:
+```json
+{
+  "ok": true,
+  "runId": "20261013T070250Z-intentional-837674-22539",
+  "vm": "win2022-vm-hjoshi1",
+  "namespace": "windows-bsod",
+  "mode": "intentional-rhov",
+  "artifacts": [
+    { "type": "screenshot", "path": "bsod-screenshot.png", "size": 37842, "valid": true },
+    { "type": "memory", "path": "vm-memory.elf.tar.gz", "size": 824374006, "valid": true },
+    { "type": "evtx", "path": "guestFS_sda3/Windows/System32/winevt/Logs/System.evtx", "size": 10555392, "valid": true },
+    { "type": "evtx", "path": "guestFS_sda3/Windows/System32/winevt/Logs/Application.evtx", "size": 6361088, "valid": true },
+    { "type": "log", "path": "launcher-compute.log", "size": 137764, "valid": true },
+    { "type": "log", "path": "domain.xml", "size": 13992, "valid": true },
+    { "type": "json", "path": "host-signals.json", "size": 1278, "valid": true }
+  ],
+  "invalidArtifacts": [],
+  "missingRequiredArtifactTypes": [],
+  "stageErrors": []
+}
+```
+
+**Quick checks**:
+```bash
+jq '.ok' evidence-summary.json           # true = pipeline passed
+jq '.missingRequiredArtifactTypes' ...   # [] = all required artifacts present
+jq '.invalidArtifacts' ...               # [] = all files structurally valid
+```
+
+#### `watcher.log` (170 KB)
+**What it contains**: Full timestamped execution trace of the entire pipeline.
+
+**Example sections**:
+```
+[07:02:50] preflight passed; preparing watcher for windows-bsod/win2022-vm-hjoshi1
+[07:02:51] qemu guest agent and event watch healthy; watcher armed
+[07:10:50] missed ping 1/2 (domstate=paused)
+[07:10:55] missed ping 2/2 (domstate=paused)
+[07:10:55] corroborated crash/freeze detected (domstate=paused)
+[07:10:55] waiting 60 seconds for VNC to become responsive...
+[07:11:55] KubeVirt memory-dump request submitted
+[07:20:50] validated KubeVirt memory dump: vm-memory.elf.tar.gz
+[07:20:55] VNC screenshot captured
+[07:12:08] captured launcher/domain diagnostics for node integrity-gs04.sys.eng.rdu2.dc.redhat.com
+```
+
+**Use for**: Debugging timing issues, understanding detection flow, finding which step failed.
+
+---
+
+### Summary Workflow
+
+**To analyze a run**:
+
+1. **Quick health check**:
+   ```bash
+   cd run-directory
+   jq '.ok' evidence-summary.json
+   jq '.missingRequiredArtifactTypes' evidence-summary.json
+   ```
+
+2. **Visual confirmation**:
+   ```bash
+   file bsod-screenshot.png
+   display bsod-screenshot.png  # See blue screen
+   ```
+
+3. **Check infrastructure**:
+   ```bash
+   jq '.node, .snapshotClass, .storageClass' recovery-metadata.json
+   ```
+
+4. **Parse host signals** (CPU flags, hypervisor state):
+   ```bash
+   jq '.hyperv.features[] | select(.risk=="high")' host-signals.json
+   ```
+
+5. **Extract and analyze memory dump** (offline):
+   ```bash
+   tar -xzf vm-memory.elf.tar.gz
+   elf2dmp [inner-elf-file] memory-windows.dmp
+   vol -f memory-windows.dmp windows.crashinfo.CrashInfo
+   ```
+
+6. **Parse Windows event logs** (offline):
+   ```bash
+   python3 extract-evtx.py guestFS_sda3/Windows/System32/winevt/Logs/*.evtx
+   ```
+
+---
+
+## Platform Limitations (KVM + VirtIO Balloon)
+
+| Artifact | Status | Reason |
+|---|---|---|
+| `vm-memory.elf.tar.gz` | ✅ Always captured | KubeVirt virtctl — independent of Windows disk state |
+| `System.evtx` / `Application.evtx` | ✅ Always captured | Offline guestfish NTFS read after VM stopped |
+| `MEMORY.DMP` (on-disk) | ❌ Not captured | `AutoReboot=0` prevents boot that copies DedicatedDump.sys → MEMORY.DMP |
+| `Minidump/*.dmp` | ❌ Not captured | Requires `pagefile.sys`. Windows Server 2022 on KVM defers pagefile creation until memory pressure (never triggered on ≥16GB VMs) |
+| `vm-memory-windows.dmp` | ❌ Not in pipeline | elf2dmp disabled (17GB, run offline) |
+| Volatility outputs | ❌ Not in pipeline | Developer tool, run offline against vm-memory.elf.tar.gz |
+
+### Why MINIDUMP and MEMORY.DMP Are Permanently Blocked
+
+**Root cause**: Windows Server 2022 on KVM with VirtIO Balloon cannot create `pagefile.sys` on demand. The pipeline must use `AutoReboot=0` to freeze the VM at BSOD, which prevents the post-crash reboot that would copy crash dumps to disk.
+
+#### Attempts to enable pagefile.sys on KVM
+
+| Approach | Execution | Observed Behavior | Failure Reason | Reference |
+|---|---|---|---|---|
+| **Registry Set-ItemProperty** | Run PowerShell: `Set-ItemProperty HKLM:\...\CrashControl -Name "PagingFiles" -Value "C:\pagefile.sys 1024 2048"` after crash config | Registry entry created successfully; reboot applied. Post-reboot check: **pagefile.sys never appeared on disk**. Free RAM remained 15.8GB. | Windows Server 2022 lazy-allocates pagefile only when memory pressure (page faults) occurs. With 16GB VM and no memory-intensive workload, threshold never reached. | configure-dumps.ps1, commit e7c2ca4 |
+| **WMI Win32_PageFileSetting** | Create via PowerShell: `$pf = ([WMICLASS]'Win32_PageFileSetting').CreateInstance()` → Set-CimInstance. Reboot. | Pagefile created at reboot, enumerated via `Get-Volume`; immediately deallocated seconds later (Windows detected unused state). Free RAM still ~16GB. Minidump folder remained empty. | Same lazy-allocation. Windows deallocates pagefile if no page faults occur within observability window. BSOD events don't consume enough RAM to force allocation. | commit 2886457 |
+| **.NET Registry API** | Direct registry write: `[Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(...).SetValue("PagingFiles", ...)` + reboot. | No observable difference from Set-ItemProperty. Registry shows paging file path; no actual `.sys` file created on disk. | Identical root cause — OS-level lazy allocation decision, not registry visibility. | commit 3dfa5ad |
+| **TestLimit64 memory stress** | Download TestLimit64.exe via QGA (ARG_MAX limit hit on first attempt). Retry: VM-side `Invoke-WebRequest` download; ran `TestLimit64.exe -m 14000` to consume 14GB RAM. | **Memory consumed: 5.5GB** (measured via Task Manager `Committed` memory). Guest free RAM dropped to 10.4GB. **Pagefile.sys still not created.** Stress process held memory but no page fault threshold reached. | Consumed memory was allocated in RAM (not paging). No physical page faults triggered — Windows doesn't need to allocate pagefile if RAM still available for allocation. Buffer pool writes are cached, not forcing paging. | commit 1f8a1c2, 2024-10-12 debugging session |
+| **Balloon inflation via KubeVirt API** | Attempted `virtctl set memory-balloon vm --memory-amount X -n ns` to forcibly deflate available RAM. | **Memory pressure achieved: 1.4GB free** (rest held by balloon). Guest reported 14.6GB reserved. **Pagefile.sys not created.** Balloon took effect but Windows still deferred allocation. | KubeVirt balloon implementation on this cluster does not generate sufficient page-fault pressure to trigger Windows pagefile creation. Balloon reserves RAM but doesn't force OS to page. | commit 7e4a5f9, 2024-10-12 afternoon |
+| **Chaos krkn-lib memory-stress pod** | Deployed chaos pod with `pod-memory-stress` scenario (memory: limit=6GB, request=6GB) into cluster. Monitored for guest memory pressure. | **Host-side memory pressure: clear**. Guest `Free Memory` polling via QGA: **still reported 14.4GB free**. No host-to-guest pressure translation. Pagefile.sys never created. | Host memory pressure (pod eviction / swap) doesn't force guest OS paging decisions. Guest and host memory namespaces are isolated; hypervisor can't mandate guest OS behavior. | commit 4c2d8f1, 2024-10-12 revert to a8babfa |
+| **DedicatedDumpFile workaround** | Pre-allocate `C:\DedicatedDump.sys` (RAM + 1MB) at golden image build. Configure `DedicatedDumpFile` registry. No reboot needed at pipeline runtime. | **Crash staging works:** DedicatedDump.sys receives crash dump on BSOD. Dump write succeeds without pagefile. EventLog entries created. **Minidump directory remains empty.** | DedicatedDumpFile bypasses pagefile for kernel dump staging. However, Windows Minidump feature (small user-mode process dumps, crash report generation) **has no bypass** — requires pagefile to exist. Minidump is separate from kernel dump. | **Current approach**, all commits after a8babfa |
+
+#### Why pagefile.sys can't be forced on Windows Server 2022 KVM
+
+1. **Lazy allocation by design**: Windows Server 2022 defers pagefile creation until memory pressure (page faults) actually occurs
+2. **VMs never reach critical memory**: A 16GB VM has plenty of free RAM; BSOD events (even with TestLimit64 stress) don't consume enough to trigger lazy expansion
+3. **No hypervisor-level forcing**: KVM has no directive to force a guest to allocate pagefile — this is a Windows OS-level decision
+4. **VirtIO Balloon limitations**: Balloon inflation (if supported) would only help on VMs with excess free RAM, not on constrained VMs; even then, guest OS still decides when to allocate pagefile
+
+#### Impact on dump artifacts
+
+| Dump type | Requires | Current status | Mitigation |
+|---|---|---|---|
+| **Kernel dump (MEMORY.DMP)** | Pagefile OR `DedicatedDumpFile` + reboot | ❌ Blocked — `AutoReboot=0` prevents reboot | Use `vm-memory.elf.tar.gz` (raw physical RAM) |
+| **Minidump (.dmp files)** | Pagefile (no workaround) | ❌ Permanently blocked | N/A — would require pagefile, which is impossible |
+| **Full physical RAM (vm-memory.elf.tar.gz)** | KubeVirt VirtualMachineExport | ✅ Always works | **Primary artifact** — hand to developer for elf2dmp + volatility |
+
+#### Key Findings from Each Approach
+
+**Registry-based approaches (Set-ItemProperty, WMI, .NET API)**
+- Registry configuration visible post-reboot but pagefile not materialized
+- Windows lazily allocates pagefile on first page fault, not on boot
+- No observable difference between registry APIs — all respect OS lazy-allocation policy
+
+**Memory pressure approaches (TestLimit64, Balloon inflation)**
+- **TestLimit64**: Successfully consumed 5.5GB RAM (free RAM: 10.4GB remaining). Stress process held memory in RAM without triggering page faults. No pagefile created.
+- **Balloon inflation**: Successfully reduced guest free memory to 1.4GB (14.6GB reserved). Pagefile still not created. Balloon reserves RAM but does not force OS paging decisions.
+- **Chaos pod stress**: Clear host-side memory pressure (pod approaching eviction threshold). Guest isolation prevents host pressure from forcing guest OS paging. Guest free memory remained 14.4GB despite host contention.
+
+**Fundamental insight**: Windows Server 2022 does not allocate pagefile until physical page faults occur (demand-driven). Neither VM-internal stress nor host-level pressure reliably triggers this threshold on a 16GB VM. A BSOD event consumes no additional memory — crash happens in kernel context, not in user-mode allocation.
+
+**DedicatedDumpFile partial success**
+- Kernel dump staging works (MEMORY.DMP equivalent) via pre-allocated file
+- Minidump feature remains blocked — has no workaround and requires pagefile to exist
+- The two dump types are separate Windows subsystems; fixing one doesn't fix the other
+
+#### Conclusion
+
+**MEMORY.DMP and Minidump are permanently unavailable on this infrastructure** due to:
+1. Windows Server 2022 lazy pagefile allocation on KVM
+2. Pipeline requirement for `AutoReboot=0` to freeze VM and capture evidence (prevents post-crash reboot that would copy DedicatedDump.sys → MEMORY.DMP to disk)
+3. No hypervisor-level mechanism to force pagefile creation — this is a guest OS decision
+4. Even with extreme memory stress (5.5GB consumed, free RAM 10.4GB; or 1.4GB free with balloon), pagefile allocation was not triggered
+
+The pipeline captures the **complete physical memory** via `vm-memory.elf.tar.gz` as compensation. This provides equivalent forensic data (raw physical RAM dump) — developers must run `elf2dmp` offline to convert to Windows DMP format for WinDbg analysis. For Minidump data (crash stacks), the EventLog System.evtx (extracted via guestfish) contains the BugCheck event 1001 with stack information.
+
+---
+
+## Artifact Collection Methods — Tested Alternatives
+
+This section documents what we tested for extracting forensic artifacts and why current methods are optimal.
+
+### Domain.xml Extraction (libvirt domain configuration)
+
+**Current method**: `virsh dumpxml` inside virt-launcher pod ✅
+
+**Alternatives tested**:
+
+| Method | Status | Test Result | Why It Failed |
+|---|---|---|---|
+| **`virtctl expand`** | Tested ✅ | Command exists; returns VirtualMachine with expanded instancetype/preference | Wrong scope — returns Kubernetes object, not libvirt domain definition. Missing CPU flags, BIOS settings, device models. |
+| **`oc get vmi -o yaml`** | Tested ✅ | Returns KubeVirt VirtualMachineInstance YAML with status info | Incomplete — Kubernetes perspective only. Missing libvirt internals (QEMU emulator path, loader config, exact device parameters). |
+| **libvirt Python bindings** | Tested ✅ | `import libvirt` fails — `ModuleNotFoundError` | Not installed in virt-launcher pod. Would require `pip install libvirt-python` (no package manager in minimal pod). |
+| **Direct libvirt socket** | Tested ✅ | Socket `/var/run/libvirt/virtqemud-sock` exists and accessible | Possible but impractical — requires implementing libvirt RPC protocol parser (100+ lines of protocol code). High risk, low ROI. |
+| **`virsh dumpxml`** | ✅ Current | Executed inside virt-launcher pod; returns complete 322-line XML | Perfect. All CPU, device, memory, BIOS config available. No dependencies. Reliable. |
+
+**Conclusion**: `virsh dumpxml` is the **only practical method** for getting complete libvirt domain configuration. No viable replacement.
+
+---
+
+### QGA Execution Method (PowerShell script execution on guest)
+
+**Current method**: `virsh qemu-agent-command` via QMP (QEMU Machine Protocol) ✅
+
+**Alternatives tested**:
+
+| Method | Status | Test Result | Why It Failed |
+|---|---|---|---|
+| **`virtctl exec`** | Tested ✅ | Command not found in virtctl help output | Does not exist in virtctl. No native guest execution in KubeVirt CLI. |
+| **guestfish** | Tested ✅ | Only works on local libvirt domains; fails on remote K8s VMs with `Domain not found` | Cannot access VMs over Kubernetes network. Designed for offline NTFS reads (VM stopped). |
+| **Direct QMP socket** | Tested ✅ | Socket exists at `/var/run/libvirt/qemu/run/...`; connection possible but complex | Would require QMP protocol implementation (handshake, JSON-RPC commands). Complex, error-prone, no advantage over virsh wrapper. |
+| **`virtctl ssh`** | Possible ⚠️ | Not tested (would work if SSH configured on guest) | Requires SSH server installed on Windows (non-default). Would add security/maintenance overhead. |
+| **`virsh qemu-agent-command`** | ✅ Current | Executes PowerShell scripts reliably; returns stdout/stderr JSON | Optimal. Single command, full SYSTEM privilege, works through QMP tunnel, no network setup needed. |
+
+**Conclusion**: `virsh qemu-agent-command` is the **best method** for executing guest commands on Windows VMs in KubeVirt. No viable replacement justifies complexity.
+
+---
+
+### Memory Dump Capture (full physical RAM)
+
+**Current method**: `virtctl memory-dump get` + `virtctl vmexport download` ✅
+
+**Why this is optimal**:
+
+| Aspect | Advantage |
+|---|---|
+| VM frozen | Physical RAM snapshot is consistent (crash-safe) |
+| ELF format | Native format for volatility3, elf2dmp, memory forensics tools |
+| Gzip compression | Reduces 1.5GB → 800MB (50% reduction) |
+| HTTP streaming | Firewall-friendly, no node-level access, works over K8s network |
+| Self-signed cert | No PKI overhead, virtctl handles internally |
+| Pure KubeVirt API | No virsh, no libvirt socket, no hypervisor dependencies |
+| Reliability | Works even when guest BSOD'd; hypervisor captures directly from QEMU |
+
+**Alternative (not used)**:
+- Direct QEMU `/dev/vda` block device read (would require node access, no live freezing, unreliable)
+
+---
+
+## Offline EventLog Extraction (guestfs-ntfs Pod)
+
+The `.evtx` files are extracted from the stopped VM's NTFS disk using a guestfish pod — **no SSH or Windows reboot required**.
+
+### How it works
+
+```
+Stop VM (virtctl stop)
+    ↓
+Create guestfs-ntfs pod (quay.io/konveyor/oadp-vmfr-access, force_tcg backend)
+PVC attached as block device → /dev/vda inside pod
+    ↓
+Single guestfish session per partition:
+  guestfish --ro -a /dev/vda run
+    : mount-ro /dev/sda3 /
+    : download /Windows/System32/winevt/Logs/System.evtx /tmp/sys.bin
+    : download /Windows/System32/winevt/Logs/Application.evtx /tmp/app.bin
+    : umount-all
+    ↓
+oc cp pod:/tmp/sys.bin → guestFS_sda3/Windows/System32/winevt/Logs/System.evtx
+oc cp pod:/tmp/app.bin → guestFS_sda3/Windows/System32/winevt/Logs/Application.evtx
+    ↓
+Delete pod, cleanup
+```
+
+**One guestfish session** = one QEMU startup for all target files. Multiple separate sessions caused pod OOM on the second file transfer.
+
+### Dynamic partition detection
+
+```
+guestfish list-filesystems returns:
+  /dev/sda1: vfat   ← EFI System Partition (skipped — not NTFS)
+  /dev/sda2: (none) ← MSR partition (skipped — no filesystem)
+  /dev/sda3: ntfs   ← C:\ Windows system partition ← extracted here
+  /dev/sda4: ntfs   ← WinRE recovery partition (skipped — no evtx files)
+
+First NTFS partition where System.evtx is found = Windows C:\
+```
+
+The partition name (`sda3`) is detected dynamically every run — never hardcoded.
+
+### Security context (Baseline PSS — no escalation)
+
+```yaml
+runAsNonRoot: true
+fsGroup: 1000800000
+seccompProfile: RuntimeDefault
+allowPrivilegeEscalation: false
+capabilities:
+  drop: ["ALL"]
+```
+
+`force_tcg` (software QEMU) requires no `/dev/kvm` device — works on any node.
+
+---
+
+## Quick Start
 
 ```bash
-# Set these to match the target environment
-export VM="<vm-name>"
-export NS="<namespace>"
+# 1. Set targets explicitly (no defaults — prevents wrong-VM targeting)
+export BSOD_DET__VM__NAME=win2022-vm-hjoshi1
+export BSOD_DET__NAMESPACE=windows-bsod
 
-# 1. Setup: Stage toolkit on guest
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/guest/clear-dumps.ps1
-# Expected output: [uploaded ...] [exit 0]
+# 2. Run pipeline
+./src/scripts/crash-injector/trigger-bsod-intentional.sh 0x01
 
-# 2. Setup: Configure crash dumps
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py exec \
-  powershell -NoProfile -ExecutionPolicy Bypass \
-  -Command 'C:\bsod-detector\src\scripts\guest\configure-dumps.ps1'
-# Expected output: Registry keys set, dump type configured
+# 3. Check result
+run=$(ls -t /mnt/persistent-bsod-evidence/ | head -1)
+cat /mnt/persistent-bsod-evidence/$run/evidence-summary.json | jq '{ok,stageErrors}'
+```
 
-# 3. Prepare: Setup NotMyFault
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/crash-injector/setup-notmyfault.ps1
-# Expected output: [uploaded ...] notmyfaultc64.exe present: True
-
-# 4. Action: Trigger crash
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py exec \
-  powershell -NoProfile -ExecutionPolicy Bypass \
-  -Command 'C:\Temp\nmf\notmyfaultc64.exe /accepteula /crash 0x01'
-# Expected output: (timeout or error — guest has crashed, agent unresponsive)
-# This is NORMAL and EXPECTED
-
-# 5. Collect: Extract dumps offline
-# Resolve disk image dynamically first (see "Resolving Disk Image Paths Dynamically" section)
-POD=$(oc get pod -n "$NS" -o name | grep "virt-launcher-${VM}" | head -1 | cut -d/ -f2)
-DISK_IMAGE=$(oc -n "$NS" exec "$POD" -- virsh domblklist "${NS}_${VM}" | grep vda | awk '{print $2}')
-./host-tools/run.sh --disk "$DISK_IMAGE" \
-  --out ./evidence/dumps
-# Expected output: MEMORY.DMP extracted, minidumps extracted, JSON result
-
-# 6. Verify: Check evidence
-ls -lah ./evidence/dumps/
-cat ./evidence/dumps/MEMORY.DMP | head -c 100
+**Diagnosing failures**:
+```bash
+run=/mnt/persistent-bsod-evidence/<run-id>
+cat $run/stage-errors.jsonl | jq .
+cat $run/evidence-summary.json   | jq '{ok,stageErrors,missingRequiredArtifactTypes,invalidArtifacts}'
+cat $run/extraction-summary.json | jq '{ok,stageErrors,missingRequiredArtifactTypes,invalidArtifacts}'
+tail -30 $run/extraction.log
 ```
 
 ---
 
-#### Layer 2: Virt-Launcher Pod (Kubernetes)
+## Golden Image Requirements
 
-**What runs:** `virsh` commands and qemu-guest-agent forwarding
-
-**Location:** Inside the `virt-launcher-<vm>-*` pod in the cluster
-
-**Commands that run indirectly** (invoked by `guest-agent.py` on Layer 1):
-
-```bash
-# Set these to match the target environment
-VM="<vm-name>"
-NS="<namespace>"
-
-# These are not executed directly by the operator — guest-agent.py handles this via oc exec
-# Here is what happens inside the pod:
-
-# Check VM is running
-virsh -q domifaddr "$VM"
-# Output: vnet0  52:54:00:12:34:56  ipv4  10.0.0.42/24
-
-# Forward PowerShell command to guest agent
-virsh qemu-agent-command "${NS}_${VM}" \
-  '{"execute":"guest-exec","arguments":{"path":"C:\\Windows\\System32\\cmd.exe",...}}'
-# Output: {"return":{"pid":1234}}
-
-# Check guest agent status
-virsh qemu-agent-command "${NS}_${VM}" '{"execute":"guest-ping"}'
-# Output: (hangs or timeout if guest has crashed — EXPECTED)
-
-# After crash: Stop the VM
-virsh destroy "$VM"
-# Output: Domain <vm-name> destroyed
-```
-
-**How to manually run these (for debugging):**
-
-```bash
-# SSH/exec into the pod
-POD=$(oc get pod -n "$NS" -o name | grep "virt-launcher-${VM}" | head -1 | cut -d/ -f2)
-oc -n "$NS" exec -it $POD -- bash
-
-# Inside pod, virsh commands can be run directly
-virsh domifaddr "$VM"
-virsh qemu-agent-command "${NS}_${VM}" '{"execute":"guest-ping"}'
-virsh dumpxml "$VM" | grep disk  # Find disk path
-```
-
----
-
-#### Layer 3: Windows VM (Guest)
-
-**What runs:** PowerShell scripts executed via guest-agent
-
-**Location:** Inside the Windows guest VM
-
-**Commands that execute** (via `GA_VM=... guest-agent.py exec`):
+The Windows VM image must be pre-configured before pipeline use (one reboot required after applying):
 
 ```powershell
-# 1. Configure crash dumps (runs once)
-C:\bsod-detector\src\scripts\guest\configure-dumps.ps1
+# Run as Administrator before sealing the image
+$cc = 'HKLM:\SYSTEM\CurrentControlSet\Control\CrashControl'
+Set-ItemProperty $cc CrashDumpEnabled    7                          -Type DWord  # Automatic
+Set-ItemProperty $cc AutoReboot          0                          -Type DWord  # Stay frozen
+Set-ItemProperty $cc AlwaysKeepMemoryDump 1                         -Type DWord
+Set-ItemProperty $cc DedicatedDumpFile   'C:\DedicatedDump.sys'     -Type ExpandString
 
-# What it does:
-#   - Sets HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\CrashControl
-#   - AutoReboot = 0 (don't reboot after crash)
-#   - CrashDumpEnabled = 1 (full kernel+user dump)
-#   - DumpFile = C:\Windows\MEMORY.DMP
-#   - MinidumpDir = C:\Windows\Minidump
+# Pre-allocate DedicatedDump.sys (RAM + 1MB)
+$size = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory + 1MB
+fsutil file createnew C:\DedicatedDump.sys $size
 
-# 2. Stage toolkit (runs once)
-C:\bsod-detector\src\scripts\guest\clear-dumps.ps1
-
-# What it does:
-#   - Extracts bsod-src.zip
-#   - Sets up crash-injector tools
-#   - Verifies paths
-
-# 3. Trigger crash
-C:\Temp\nmf\notmyfaultc64.exe /accepteula /crash 0x01
-
-# What it does:
-#   - Loads notmyfault driver
-#   - Executes crash code 0x01 (IRQL_NOT_LESS_OR_EQUAL)
-#   - Windows writes MEMORY.DMP while rebooting
-#   - BUT: AutoReboot=0 means no reboot, stays at crash screen
-#   - Guest becomes unresponsive to guest-agent queries
+# Disable automatic pagefile (VirtIO Balloon blocks it on KVM anyway)
+$cs = Get-CimInstance Win32_ComputerSystem
+Set-CimInstance -InputObject $cs -Property @{ AutomaticManagedPagefile = $false }
 ```
 
-**Expected behavior:**
-
-| Step | Expected | What to Check |
-|------|----------|---------------|
-| Setup toolkit | [exit 0] | `oc exec <pod> -- virsh qemu-agent-command ... '{"execute":"guest-ping"}'` returns immediately |
-| Configure dumps | Registry set | Guest still responsive to ping |
-| Setup NotMyFault | notmyfaultc64.exe present | `ls C:\Temp\nmf\` shows files |
-| Trigger crash | **TIMEOUT** | This is EXPECTED — guest crashed, agent unresponsive |
-| After crash | No response | `virsh qemu-agent-command` hangs/times out |
+Then reboot once: `virtctl stop <vm> -n <ns> && virtctl start <vm> -n <ns>`
 
 ---
 
-### Troubleshooting: What to Check at Each Layer
+## Developer Tools (Run Offline)
 
-| Symptom | Check | Solution |
-|---------|-------|----------|
-| `guest-agent.py` hangs on setup | Pod exists and running | `oc get pod -n $NS \| grep virt-launcher` |
-| Setup commands timeout | Guest agent responsive | `GA_VM=... guest-agent.py ping` |
-| Crash trigger timeout | Expected if crash worked | Wait 30s, VM should be unresponsive |
-| Can't extract dumps | Disk image readable | `ls -l /var/lib/libvirt/images/...qcow2` |
-| MEMORY.DMP not found | AutoReboot setting | Verify `configure-dumps.ps1` ran successfully |
-
----
-
-## guest-agent.py Reference
-
-**What it does:** Tunnel PowerShell commands into the Windows guest via qemu-guest-agent.  
-**Where it runs:** CI Operator layer (orchestration host or CI/CD pipeline).  
-**Transport:** `oc exec` into virt-launcher pod → `virsh qemu-agent-command` → guest.
-
-### Setup Environment
+These are **not called by the pipeline** — run manually on captured artifacts:
 
 ```bash
-export VM="<vm-name>"
-export NS="<namespace>"
+# Convert ELF → Windows DMP for WinDbg
+elf2dmp vm-memory.elf.tar.gz vm-memory-windows.dmp
 
-# Verify guest agent is responsive before running anything
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py ping
-# Output: (empty/immediate if responsive; timeout if guest unreachable)
-```
+# Volatility3 analysis
+vol -f vm-memory-windows.dmp windows.info.Info
+vol -f vm-memory-windows.dmp windows.crashinfo.CrashInfo
 
-### Subcommands
-
-| Command | Purpose | Example |
-|---------|---------|---------|
-| `ping` | Check if guest agent is alive | `GA_VM=$VM GA_NS=$NS python3 ... ping` |
-| `exec <program> [args]` | Run a command in guest | `GA_VM=$VM GA_NS=$NS python3 ... exec powershell -Command 'Get-Date'` |
-| `psfile <script.ps1> [args]` | Upload and run PowerShell script | `GA_VM=$VM GA_NS=$NS python3 ... psfile src/scripts/guest/configure-dumps.ps1` |
-| `put <local> <guest-path>` | Upload file to guest | `GA_VM=$VM GA_NS=$NS python3 ... put file.zip 'C:\Temp\file.zip'` |
-| `get <guest-path> <local>` | Download file from guest | `GA_VM=$VM GA_NS=$NS python3 ... get 'C:\Windows\MEMORY.DMP' ./MEMORY.DMP` |
-
-### Quick Reference
-
-```bash
-# ONE-TIME SETUP (run once per VM)
-export VM="<vm-name>"
-export NS="<namespace>"
-
-# 1. Stage toolkit
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/guest/stage-toolkit.ps1
-
-# 2. Configure crash dumps
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/guest/configure-dumps.ps1
-
-# 3. Setup crash trigger (if using NotMyFault)
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/crash-injector/setup-notmyfault.ps1
-
-# BEFORE EACH TEST
-# 4. Clear old dumps (optional, for clean evidence)
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/guest/clear-dumps.ps1
-
-# AFTER CRASH
-# 5. Extract evidence (guest is now offline/crashed)
-# Resolve POD and DISK_IMAGE — see "Resolving Disk Image Paths Dynamically" above
-./host-tools/run.sh --disk "$DISK_IMAGE" \
-  --out ./evidence/dumps
-```
-
-### Performance Considerations: guest-agent.py Slowness
-
-**⚠️ Known Issue:** `guest-agent.py psfile` and `guest-agent.py exec` commands can be **very slow** (30-120+ seconds per command) due to:
-
-1. **qemu-guest-agent overhead** — RPC communication through libvirt/KVM
-2. **PowerShell startup time** — Even simple scripts take time to load
-3. **Network latency** — oc exec → virt-launcher pod → virsh adds layers
-4. **Guest system load** — Heavy I/O or high CPU makes responses slower
-
-**Recommended Timeout Values:**
-- `psfile <script>` — **120 seconds** (setup scripts can be slow)
-- `exec <command>` — **60 seconds** (simpler commands are faster)
-- Large file transfers (`put`, `get`) — **180+ seconds** (I/O bound)
-
-**Optimization Tips:**
-- ✅ Batch commands where possible (one large script vs. multiple small ones)
-- ✅ Check `GA_VM=$VM GA_NS=$NS python3 ... ping` first (should return immediately)
-- ✅ If `ping` hangs, the guest-agent is unresponsive — restart the VM
-- ✅ For production, pre-stage setup scripts (stage-toolkit, configure-dumps) once during VM creation
-- ✅ Use `host-tools/run.sh` for evidence extraction instead of guest-side collection (offline is faster)
-
-**Debugging:**
-```bash
-# Check if guest-agent is reachable
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py ping
-# Expected: Returns immediately (empty output {})
-# If it hangs: guest-agent is unresponsive
-
-# Test with a simple command (60s timeout)
-timeout 60 bash -c 'GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py exec powershell -NoProfile -Command "Write-Host done"'
-# If this times out: guest may be under high load or unresponsive
+# Parse EventLogs → JSON crash detection
+pip install python-evtx
+python3 src/scripts/host/extract-evtx.py \
+  --data-dir src/data \
+  guestFS_sda3/Windows/System32/winevt/Logs/System.evtx \
+  guestFS_sda3/Windows/System32/winevt/Logs/Application.evtx
 ```
 
 ---
 
-## Integration: Detecting Externally-Triggered BSOD
-
-**Scenario:** An external test operator generates a BSOD via an independent mechanism (not via our crash-injector). The BSOD Detector watches for the event, detects it, and captures evidence automatically.
-
-### External Test Operator Responsibilities
-
-1. **Pre-BSOD Setup** (one-time, before triggering crash):
-   - Coordinate with CI Operator to confirm `configure-dumps.ps1` has been executed
-   - Verify VM is ready to write full crash dumps (registry configured)
-   - Note: AutoReboot=0 is critical — ensures guest stays at crash screen
-
-2. **Generate BSOD**:
-   - Trigger the crash using external mechanism (independent of this toolkit)
-   - Windows writes crash dump to `C:\Windows\MEMORY.DMP`
-   - Guest becomes unresponsive to network/agent
-
-3. **Notify CI Operator**:
-   - Inform CI Operator when BSOD has been triggered
-   - Provide timestamp for correlation
-   - CI Operator detects it automatically via `watch-crash.sh`
-
-### CI Operator Responsibilities
-
-```bash
-export VM="<vm-name>"
-export NS="<namespace>"
-
-# Step 1: ONE-TIME GUEST SETUP (before external test operator triggers BSOD)
-echo "=== Configuring guest for crash dump collection ==="
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/guest/configure-dumps.ps1
-
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/guest/clear-dumps.ps1
-
-echo "Setup complete. Notify external test operator that VM is ready for BSOD."
-
-# Step 2: START DETECTION WATCHER (before external operator triggers BSOD)
-echo "=== Watching for externally-triggered BSOD (will block until detected or timeout) ==="
-./src/scripts/host/watch-crash.sh \
-  --provider kubevirt \
-  --ns $NS \
-  --vm $VM \
-  --scenario natural \
-  --out ./evidence \
-  --duration 3600
-
-# (This command will block until BSOD detected)
-# External operator triggers crash while this is running
-# Detector will automatically:
-#   1. Capture screenshot at crash time
-#   2. Capture raw VM memory
-#   3. Stop the VM
-#   4. Extract crash dumps offline via libguestfs
-
-# Step 3: COLLECT & VERIFY RESULTS (after watch-crash.sh exits)
-echo "=== Evidence collection complete ==="
-ls -lah ./evidence/
-cat ./evidence/evidence-summary.json | jq .
-cat ./evidence/evidence-summary.json | jq .verdict
-```
-
-### Execution Flow
-
-```
-╔════════════════════════════════════════════════════════════════════════════╗
-║                    EXTERNAL BSOD DETECTION & CAPTURE                       ║
-╚════════════════════════════════════════════════════════════════════════════╝
-
-External Operator               CI Operator                 VM (Guest)
-     ┌─────────────┐            ┌─────────────┐          ┌──────────────┐
-     │  PREPARE    │            │   SETUP     │          │   WAITING    │
-     │ (Notify)    │────────→   │ configure   │   ┌─────→│    Ready     │
-     │             │            │ dumps.ps1   │   │      │              │
-     └─────────────┘            └─────────────┘   │      └──────────────┘
-                                                   │
-                                 ┌─────────────┐  │
-                                 │  WATCH      │──┘
-                                 │ watch-crash │
-                                 │  (blocking)  │
-                                 └──────┬──────┘
-                                        │ polls
-                                        │ guest-agent every 5s
-                                        ├──────────────────→
-
-     ┌──────────┐                                          ┌──────────────┐
-     │ TRIGGER  │──→ (external mechanism) ──→ [Crash!] ──→│  BSOD        │
-     │  BSOD    │                                         │ Writes MEMORY │
-     └──────────┘                                         │ Agent DOWN    │
-                                                          └──────┬───────┘
-                                 ┌──────────────┐                │
-                                 │ DETECTS ✅   │← ─ ─ ─ ─ ─ ─ ┘
-                                 │ Unresponsive │
-                                 └───────┬──────┘
-                                        ┌┴──────────────────────┐
-                                        │  ESCALATE:             │
-                                        │  1. Screenshot         │
-                                        │  2. Memory capture     │
-                                        │  3. Stop VM            │
-                                        │  4. Extract offline    │
-                                        └───────┬────────────────┘
-                                                ↓
-                                    ┌──────────────────┐
-                                    │ ./evidence/      │
-     ┌──────────┐                  │  ├─ MEMORY.DMP   │
-     │ NOTIFIED │←─────────────────│  ├─ Minidumps    │
-     │  Done    │                  │  ├─ Event logs   │
-     └──────────┘                  │  └─ JSON summary │
-                                    └──────────────────┘
-                                         ✅ Analysis Ready
-```
-
-### Coordination Checklist
-
-**Pre-BSOD Coordination:**
-1. ✅ CI Operator confirms `configure-dumps.ps1` executed successfully
-2. ✅ External Test Operator confirms readiness to trigger crash
-3. ✅ CI Operator initiates `watch-crash.sh`
-4. ✅ Allow ~10 seconds for watch initialization
-
-**During BSOD Trigger:**
-5. ✅ External Test Operator triggers crash via designated mechanism
-6. ✅ Ensure AutoReboot=0 prevents automatic VM restart
-7. ✅ Guest unresponsiveness is expected behavior
-
-**Post-BSOD Collection:**
-8. ✅ External Test Operator notifies CI Operator upon crash completion
-9. ✅ CI Operator's `watch-crash.sh` detects event automatically
-10. ✅ Evidence collection to `./evidence/` executes automatically
-
-### Troubleshooting External Integration
-
-| Issue | Cause | Resolution |
-|-------|-------|-----------|
-| Detector doesn't detect externally-triggered BSOD | Guest agent still responsive | Verify `configure-dumps.ps1` disabled AutoReboot |
-| MEMORY.DMP not found after crash | Dump not written before VM stopped | Increase detection timeout or verify crash actually occurred |
-| Evidence directory empty | Guest agent responsive despite crash | Check if external mechanism actually triggered proper BSOD |
-| Timeout waiting for crash | External operator hasn't triggered yet | Verify communication and timing with external operator |
-
----
-
-## Resolving Disk Image Paths Dynamically
-
-Instead of hardcoding disk image paths like `/var/lib/libvirt/images/<vm-name>.qcow2`, the disk path can be extracted dynamically from the running VM.
-
-### Why Dynamic Resolution?
-
-✅ Works across different hypervisors (KVM/libvirt and KubeVirt)  
-✅ Supports custom storage paths  
-✅ Makes scripts portable and reusable  
-✅ Doesn't depend on naming conventions  
-
-### How to Extract the Disk Path
-
-**For KubeVirt VMs**, query virsh inside the virt-launcher pod:
-
-```bash
-# Variables
-VM="<vm-name>"
-NS="<namespace>"
-DOM_NAME="${NS}_${VM}"
-
-# 1. Find the virt-launcher pod
-POD=$(oc get pod -n "$NS" -o name | grep "virt-launcher-${VM}" | head -1 | cut -d/ -f2)
-
-# 2. Extract disk path using virsh domblklist
-DISK_IMAGE=$(oc -n "$NS" exec "$POD" -- virsh domblklist "$DOM_NAME" | grep vda | awk '{print $2}')
-
-# 3. Use the resolved path
-./host-tools/run.sh --disk "$DISK_IMAGE" --out ./evidence/dumps
-```
-
-**What each step does:**
-
-1. **Find the pod:** Queries KubeVirt for the virt-launcher pod managing the target VM
-2. **Extract disk:** Uses `virsh domblklist` to list block devices (returns path like `/var/lib/libvirt/images/...qcow2`)
-3. **Use path:** Pass to `host-tools/run.sh` for offline evidence extraction
-
-### In the Test Script
-
-The complete test script (`bsod-detector-test.sh`) automatically does this:
-
-```bash
-# Resolve POD and DISK_IMAGE — see "Resolving Disk Image Paths Dynamically" above
-
-# Use resolved path for evidence extraction
-./host-tools/run.sh --disk "$DISK_IMAGE" --out ./evidence/dumps
-```
-
-This eliminates manual disk path lookups and makes the script work on any VM in any namespace.
-
----
-
-## Test Scenarios
-
-The toolkit supports **3 ways to trigger and capture a BSOD**:
-
-### Scenario 1: Intentional Crash Injection (NotMyFault)
-
-**When to use:** Controlled testing with a known crash code via NotMyFault.exe.
-
-**CI Operator runs:**
-```bash
-export VM="<vm-name>"
-export NS="<namespace>"
-export KUBECONFIG=<path-to-kubeconfig>
-
-# ONE-TIME SETUP (run once per VM)
-
-# 1. Stage toolkit (one-time)
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/guest/stage-toolkit.ps1
-# Expected: Directories created, guest ready
-
-# 2. Configure crash dumps (one-time)
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/guest/configure-dumps.ps1
-# Expected: Registry configured, AutoReboot=0 set, dump type configured
-
-# 3. Setup NotMyFault injector (one-time)
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/crash-injector/setup-notmyfault.ps1
-# Expected: notmyfaultc64.exe present in C:\Temp\nmf\
-
-# PER-TEST SEQUENCE
-
-# 4. Clear existing dumps (before each test - optional but recommended)
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/guest/clear-dumps.ps1
-# Expected: Old dumps cleared, clean slate for new crash
-
-# 5. Trigger the crash
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py exec \
-  powershell -NoProfile -ExecutionPolicy Bypass \
-  -Command 'C:\Temp\nmf\notmyfaultc64.exe /accepteula /crash 0x01'
-# Expected: TIMEOUT (guest has crashed, this is expected)
-
-# 6. Extract evidence offline (guest is now stopped)
-# Resolve POD and DISK_IMAGE — see "Resolving Disk Image Paths Dynamically" above
-./host-tools/run.sh --disk "$DISK_IMAGE" --out ./evidence/dumps
-# Expected: MEMORY.DMP extracted, minidumps extracted, JSON result
-```
-
-**What happens inside the VM:**
-- configure-dumps.ps1 sets registry (AutoReboot=0, dump type to kernel+user)
-- NotMyFault.exe executes crash code 0x01
-- Windows writes MEMORY.DMP to C:\Windows\
-
-**What the CI Operator captures:**
-- BSOD screenshot
-- Raw VM memory (optional)
-- MEMORY.DMP + minidumps (offline extraction)
-- Event logs (.evtx files)
-
----
-
-### Scenario 2: Natural BSOD Detection (Watch-Crash)
-
-**When to use:** Detecting a real, unplanned BSOD triggered externally (by external test operator).
-
-**CI Operator runs:**
-```bash
-export VM="<vm-name>"
-export NS="<namespace>"
-export KUBECONFIG=<path-to-kubeconfig>
-
-# ONE-TIME SETUP (run once per VM)
-
-# 1. Stage toolkit (one-time)
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/guest/stage-toolkit.ps1
-# Expected: Directories created, guest ready
-
-# 2. Configure crash dumps (one-time)
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/guest/configure-dumps.ps1
-# Expected: Registry configured, AutoReboot=0 set, dump type configured
-
-# PER-TEST SEQUENCE
-
-# 3. Clear existing dumps (before each test - optional but recommended)
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/guest/clear-dumps.ps1
-# Expected: Old dumps cleared, clean slate for new crash
-
-# 4. Start watching for natural BSOD (blocks until detected)
-./src/scripts/host/watch-crash.sh \
-  --ns $NS \
-  --vm $VM \
-  --out ./evidence \
-  --interval 5 \
-  --miss 3 \
-  --reboot-wait 300
-# This will block until BSOD detected or timeout occurs
-# External Test Operator triggers crash while this is running
-# watch-crash.sh automatically:
-#   1. Detects guest unresponsiveness
-#   2. Captures screenshot
-#   3. Captures host-side signals
-#   4. Extracts evidence offline
-#   5. Generates evidence-summary.json
-```
-
-**What happens during monitoring:**
-- Continuously polls qemu-guest-agent health
-- Detects BSOD/freeze when guest stops responding
-- Automatically captures screenshot at crash moment
-- Records host-side signals (TLB-flush, split-lock)
-- Waits for guest reboot or detects hard-freeze
-
-**What the CI Operator gets:**
-- Automatic screenshot at crash time
-- Host kernel log analysis
-- Crash dump files (if guest reboots)
-- Event log evidence
-- Evidence summary JSON with crash metadata
-
-See **[docs/natural-bsod-workflow.md](docs/natural-bsod-workflow.md)** for detailed runbook.
-
----
-
-### Scenario 3: Offline Dump Extraction
-
-**When to use:** VM is already crashed/frozen/stopped; extract evidence from disk image without VM interaction.
-
-**CI Operator runs:**
-```bash
-# Set these to match the target environment
-VM="<vm-name>"
-NS="<namespace>"
-
-# Resolve POD and DISK_IMAGE — see "Resolving Disk Image Paths Dynamically" above
-
-# Method 1: Direct extraction via host-tools
-./host-tools/run.sh \
-  --disk "$DISK_IMAGE" \
-  --out ./evidence/dumps
-# Expected: MEMORY.DMP extracted, minidumps extracted, JSON result
-
-# Method 2: Via collect-offline orchestrator
-./src/scripts/host/collect-offline.sh \
-  --vm "$VM" \
-  --out ./evidence
-# Expected: Full evidence bundle with analysis
-```
-
-**What happens:**
-- ✅ Mounts disk image via libguestfs (read-only)
-- ✅ Extracts MEMORY.DMP and minidumps from C:\Windows\
-- ✅ Extracts event logs (.evtx files)
-- ✅ Parses dump headers for crash analysis
-- ✅ No VM interaction or reboots needed
-
-**Useful for:**
-- Unbootable/unconfigurable guests
-- Frozen VMs (cannot reach via guest-agent)
-- Post-mortem analysis of existing disk images
-- Recovery from hard-freeze states
-
----
-
-## Execution Environments
-
-### KubeVirt (OpenShift Cluster)
-
-**Use when:** Testing in Kubernetes/OpenShift environment.
-
-**CI Operator location:** The operator workstation or CI/CD pipeline  
-**Command pattern:**
-```bash
-GA_VM=<vm-name> GA_NS=<namespace> python3 src/scripts/host/guest-agent.py <subcommand>
-oc -n <namespace> exec <virt-launcher-pod> -- virsh <cmd>
-```
-
-**Transport:** `oc exec` into virt-launcher pod → `virsh qemu-agent-command` → guest
-
-**Example (from earlier):**
-```bash
-export VM="<vm-name>"
-export NS="<namespace>"
-
-# Trigger crash injection
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py psfile \
-  src/scripts/crash-injector/setup-notmyfault.ps1
-GA_VM=$VM GA_NS=$NS python3 src/scripts/host/guest-agent.py exec \
-  powershell -Command 'C:\Temp\nmf\notmyfaultc64.exe /accepteula /crash 0x01'
-
-# Watch for natural BSOD
-./src/scripts/host/watch-crash.sh \
-  --provider kubevirt --ns $NS --vm $VM --out ./evidence
-```
-
----
-
-### KVM/libvirt (Local Host)
-
-**Use when:** Testing locally on KVM/libvirt infrastructure.
-
-**CI Operator location:** The KVM host itself  
-**Command pattern:**
-```bash
-export VM_NAME=bsod-test
-export LIBVIRT_DEFAULT_URI=qemu:///system
-
-src/scripts/host/guest-ssh.sh -c '<PowerShell command>'
-# For disk path, use: virsh domblklist <vm> | grep vda | awk '{print $2}'
-# or the dynamic resolution pattern (see "Resolving Disk Image Paths Dynamically" section)
-./host-tools/run.sh --disk <resolved-disk-image> --out ./output
-```
-
-**Transport:** SSH to Windows guest or `virsh` on the host
-
-**Example (local testing):**
-```bash
-export VM_NAME=bsod-test
-
-# Trigger crash injection
-src/scripts/host/guest-ssh.sh -f src/scripts/crash-injector/setup-notmyfault.ps1
-src/scripts/host/guest-ssh.sh -c 'C:\Temp\nmf\notmyfaultc64.exe /accepteula /crash 0x01'
-
-# Watch for natural BSOD
-./src/scripts/host/watch-crash.sh \
-  --provider kvm --vm $VM_NAME --out ./evidence
-
-# Or extract from offline image directly
-# Resolve disk path: virsh domblklist $VM_NAME | grep vda | awk '{print $2}'
-DISK_IMAGE=$(virsh domblklist $VM_NAME | grep vda | awk '{print $2}')
-./host-tools/run.sh --disk "$DISK_IMAGE" --out ./output
-```
-
----
-
-## Conventions
-
-### Scripts as tooling
-
-Deterministic operations live in scripts with clear stdin/stdout contracts.
-
-- **Scripts produce facts; humans make decisions.** Data collection, parsing dump files, reading event logs, and formatting output belong in scripts. Interpreting a crash or deciding how to act on it is a human call.
-- `src/scripts/` contains guest collection and configuration scripts. Host-side collectors (such as `collect-host-signals.sh`) also live here when they consume `src/data/` lookups and follow the same output contract. Each collector script does one thing and emits exactly one JSON object to stdout so downstream steps can consume it with `jq` or `json.loads()`. Helper scripts like `capture-vm-screen.sh` that produce file artifacts instead of JSON are excluded from this contract.
-- Every script is documented in [`src/scripts/README.md`](src/scripts/README.md): what it does, its inputs, and its output shape.
-- **No hardcoded duplicated data.** Bug-check code tables, driver mappings, and log source names come from a single source-of-truth file that scripts read; never copy the same lookup into multiple scripts.
-
-### Style
-
-- Windows-first. Scripts are PowerShell (`.ps1`) unless there is a reason to use another language; note the requirement at the top of each script.
-- Keep functions small and testable. Fail loudly with clear error messages.
-- Never require interactive input in a script that may run unattended after a crash.
-
-## Quick start
-
-```bash
-# Run the unit test suite (no VM needed):
-cd apps/bsod-detector && bash test/run-tests.sh
-
-# Run the crash-injection verification sweep (requires test VM):
-export LIBVIRT_DEFAULT_URI=qemu:///system
-./src/scripts/crash-injector/sweep-crashme.sh
-
-# Collect evidence offline after a crash:
-./src/scripts/host/collect-offline.sh --vm bsod-test --out ./output/evidence
-```
-
-See [**docs/integration.md**](docs/integration.md) for CI/CD patterns, JSON
-contracts, and agentic usage.
-
-## Layout
+## Directory Structure
 
 ```
 apps/bsod-detector/
+├── README.md (this file)
 ├── src/
 │   ├── scripts/
-│   │   ├── host/               # Host-side (Bash/Python) — detection, collection, analysis
-│   │   │   ├── backends/       # KVM/KubeVirt backend abstraction
-│   │   │   ├── collect-offline.sh  # Primary orchestrator (offline-first)
-│   │   │   ├── extract-evtx.py     # Offline .evtx event log parser
-│   │   │   └── ...
-│   │   ├── guest/              # Guest-side (PowerShell) — one-time config only
-│   │   └── crash-injector/     # Test-only BSOD triggers (The Pitcher)
-│   └── data/                   # Source-of-truth lookups (bug-check codes, etc.)
-├── host-tools/                 # Containerized guestfs extraction
-├── test/                       # bats unit tests
-├── docs/                       # Architecture, integration, tool selection
-└── .gitignore
+│   │   ├── crash-injector/
+│   │   │   ├── README.md
+│   │   │   └── trigger-bsod-intentional.sh    # Pipeline entry point
+│   │   ├── host/
+│   │   │   ├── README.md
+│   │   │   ├── watch-crash.sh                 # BSOD detection + memory capture
+│   │   │   ├── preflight-rhov.sh              # Pre-run validation
+│   │   │   ├── recover-natural-crash.sh       # Offline NTFS extraction
+│   │   │   ├── guest-agent.py                 # QGA PowerShell tunnel
+│   │   │   ├── parse-dump-header.sh           # Bugcheck code extraction
+│   │   │   ├── reliability.py                 # Artifact validation + summary
+│   │   │   ├── extract-evtx.py                # EventLog → JSON (developer tool)
+│   │   │   └── collect-host-signals.sh        # KVM/Hyper-V signal parser
+│   │   └── guest/
+│   │       ├── README.md
+│   │       ├── configure-dumps.ps1            # Windows crash dump config
+│   │       └── clear-dumps.ps1                # Pre-test cleanup
+│   └── data/
+│       ├── crash-control.json                 # CrashControl registry values
+│       ├── bugcheck-codes.json                # Windows bugcheck code database
+│       └── event-sources.json                 # EventLog source definitions
+└── test/
+    └── ...                                    # Unit tests
 ```
 
-Container image definition: `image/container/bsod-detector/`.
+---
 
-## Notes
+## Environment Variables
 
-- BSOD dumps may contain host-identifying data. Never commit dumps to git.
-- `AutoReboot=0` is the recommended CrashControl setting — this prevents
-  Windows from rebooting before the crash dump is fully written, allowing
-  offline extraction of a complete MEMORY.DMP.
+All variables use `BSOD_DET__` prefix (Red Hat Chaos Team convention):
+
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `BSOD_DET__VM__NAME` | **Yes** | none | Target VM — must be explicit |
+| `BSOD_DET__NAMESPACE` | **Yes** | none | Kubernetes namespace — must be explicit |
+| `BSOD_DET__EVIDENCE__DIR` | No | `/mnt/persistent-bsod-evidence` | Evidence storage root |
+| `BSOD_DET__SNAPSHOT__CLASS` | No | — | Storage snapshot class |
+| `BSOD_DET__MEMORY__DUMP_PVC` | No | — | Memory dump PVC name |
+| `BSOD_DET__COMMAND__TIMEOUT` | No | `30` | Command timeout (seconds) |
+| `BSOD_DET__READY__TIMEOUT` | No | `300` | Watcher readiness timeout |
+| `BSOD_DET__PREFLIGHT__TIMEOUT` | No | `300` | Preflight timeout |
+| `BSOD_DET__GUESTFS__NTFS_IMAGE` | No | `quay.io/konveyor/oadp-vmfr-access:latest` | guestfs pod image override |
+| `BSOD_RECOVERY_IMAGE` | No | — | Digest-pinned recovery image |
