@@ -12,12 +12,14 @@ Designed for **deliberate, controlled crash testing** — not production use.
 
 **Usage**:
 ```bash
-BSOD_DET__VM__NAME="win2022-vm-hjoshi1" BSOD_DET__NAMESPACE="windows-bsod" \
+BSOD_DET__VM__NAME="win2022-vm-hjoshi1" \
+BSOD_DET__NAMESPACE="windows-bsod" \
+BSOD_DET__CONFIRM_TARGET="win2022-vm-hjoshi1" \
   ./trigger-bsod-intentional.sh 0x01
 ```
 
 **Arguments**:
-- `crash_type` — NotMyFault bugcheck code (default: `0x01`)
+- `crash_type` — NotMyFault bugcheck code (explicit, no default)
   - `0x01` EXCEPTION_ACCESS_VIOLATION
   - `0x02` INVALID_KERNEL_HANDLE
   - `0x03` SYSTEM_SERVICE_EXCEPTION
@@ -30,6 +32,7 @@ BSOD_DET__VM__NAME="win2022-vm-hjoshi1" BSOD_DET__NAMESPACE="windows-bsod" \
 |---|---|---|
 | `BSOD_DET__VM__NAME` | **Yes — no default** | Target Windows VM name |
 | `BSOD_DET__NAMESPACE` | **Yes — no default** | Kubernetes namespace |
+| `BSOD_DET__CONFIRM_TARGET` | **Yes — no default** | **Authorization token.** Must equal `BSOD_DET__VM__NAME` to prevent accidental BSOD injection on wrong VM. Prevents typos/mistakes. |
 | `BSOD_DET__EVIDENCE__DIR` | No | Evidence root (default: `/mnt/persistent-bsod-evidence`) |
 | `BSOD_DET__SNAPSHOT__CLASS` | No | Storage snapshot class |
 | `BSOD_DET__MEMORY__DUMP_PVC` | No | Memory dump PVC name |
