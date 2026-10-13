@@ -49,9 +49,8 @@ func envStr(key, def string) string {
 	return def
 }
 
-// defaultPrompt is the built-in analysis prompt template used when neither the
-// --prompt flag nor the PROMPT_TEMPLATE env var is set. "{job_url}" is replaced
-// with the Prow job URL at analysis time.
+// defaultPrompt is the fallback for --prompt / PROW_AN__PROMPT__TEMPLATE.
+// The analyzer substitutes the Prow URL for "{job_url}".
 const defaultPrompt = "Analyze this Prow CI failure in detail. Provide: (1) Root cause, (2) Related Jira issues, (3) Recurring pattern analysis, (4) Recommended actions. URL: {job_url}"
 
 func main() {
@@ -72,7 +71,6 @@ func main() {
 
 	flag.Parse()
 
-	// Validate required flags
 	if *slackToken == "" {
 		slog.Error("--slack-token is required (or set PROW_AN__SLACK__BOT_TOKEN)")
 		os.Exit(1)
@@ -123,7 +121,6 @@ func main() {
 		slog.Info("Analyzing Prow URLs from allow-listed bots", "botIDs", allowedBotIDs)
 	}
 
-	// Create Slack client with debug logging
 	slackClient := slack.New(
 		*slackToken,
 		slack.OptionAppLevelToken(*appToken),
@@ -143,24 +140,20 @@ func main() {
 		handlerOpts = append(handlerOpts, handler.WithSelfBotID(authResp.BotID))
 	}
 
-	// Create analyzer
 	a := analyzer.NewAnalyzer(*mcpURL, *mcpToken, *prompt,
 		analyzer.WithInsecureSkipVerify(*tlsInsecure),
 		analyzer.WithDebug(*mcpDebug),
 		analyzer.WithTimeout(time.Duration(*mcpTimeout)*time.Second),
 	)
 
-	// Create handler
 	h := handler.New(slackClient, a, monitoredChannels, handlerOpts...)
 
-	// Create socket mode client with debug logging
 	socketClient := socketmode.New(
 		slackClient,
 		socketmode.OptionDebug(*slackDebug),
 		socketmode.OptionLog(log.New(os.Stdout, "socketmode: ", log.Lshortfile|log.LstdFlags)),
 	)
 
-	// Handle events
 	go func() {
 		for evt := range socketClient.Events {
 			slog.Info("Received socket mode event", "type", evt.Type)

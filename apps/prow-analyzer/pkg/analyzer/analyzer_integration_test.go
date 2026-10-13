@@ -17,11 +17,7 @@ import (
 	"time"
 )
 
-// These tests exercise AnalyzeFailure against real net/http/httptest servers,
-// verifying the full MCP round-trip (initialize + tools/call, headers, SSE
-// streaming) over an actual socket. They run under -race with no coverage
-// threshold; the equivalent branch coverage is provided by the in-memory unit
-// tests in analyzer_unit_test.go.
+// Real HTTP test servers exercise MCP session setup, headers, and SSE responses.
 
 func TestAnalyzeFailure_InitializeSession(t *testing.T) {
 	sessionID := "test-session-123"
@@ -264,10 +260,7 @@ func TestAnalyzeFailure_Errors(t *testing.T) {
 	})
 }
 
-// TestNextID_ConcurrentUniqueness verifies the per-request JSON-RPC id counter
-// hands out unique ids under heavy concurrency. A fixed or racily-incremented id
-// would let the shared MCP session cross-correlate concurrent requests, so this
-// guards the atomic counter directly (runs under -race).
+// Distinct IDs let the shared backend session distinguish concurrent requests.
 func TestNextID_ConcurrentUniqueness(t *testing.T) {
 	a := NewAnalyzer("url", "token", "template")
 
@@ -299,19 +292,8 @@ func TestNextID_ConcurrentUniqueness(t *testing.T) {
 	}
 }
 
-// TestAnalyzeFailure_ConcurrentCallerMarkerCorrelation runs many concurrent
-// analyses over the shared MCP session and verifies end-to-end request/response
-// correlation using a CALLER-CONTROLLED marker, independent of the JSON-RPC id
-// mechanism. Each caller passes a distinct job URL; the analyzer carries it into
-// the prompt the server receives, the server echoes that marker back in its
-// response content, and each caller asserts the response it got carries its OWN
-// marker. Because the marker is chosen by the caller (not derived from the
-// server-assigned id), a correct result proves no cross-delivery, duplication, or
-// loss without assuming anything about how ids are allocated.
-//
-// The id-uniqueness property is checked separately, as its own invariant: every
-// tools/call id the server observed must be distinct and number one per caller.
-// Runs under -race.
+// Caller-chosen job URLs verify response delivery independently of request-ID
+// allocation. Request-ID uniqueness remains a separate shared-session invariant.
 func TestAnalyzeFailure_ConcurrentCallerMarkerCorrelation(t *testing.T) {
 	const callers = 32
 
@@ -401,13 +383,8 @@ func TestAnalyzeFailure_ConcurrentCallerMarkerCorrelation(t *testing.T) {
 	}
 }
 
-// TestAnalyzeFailure_MismatchedResponseID documents the client's correlation
-// contract: it pairs a response to its request by the HTTP round-trip, NOT by
-// matching the JSON-RPC response id to the request id. A response whose id
-// deliberately differs from the request's is still accepted and its content
-// returned. (Uniqueness of the request-side ids still matters so a shared backend
-// session cannot cross-deliver — that is covered by the tests above. If the
-// client is ever changed to validate response ids, update this test with it.)
+// The client associates responses by HTTP round-trip, not by validating their
+// JSON-RPC IDs. Keep this contract explicit alongside request-ID uniqueness.
 func TestAnalyzeFailure_MismatchedResponseID(t *testing.T) {
 	const wrongID = 999999
 
@@ -447,13 +424,8 @@ func TestAnalyzeFailure_MismatchedResponseID(t *testing.T) {
 	}
 }
 
-// TestAnalyzeFailure_ErrorsArePayloadFree plants sentinel content in the HTTP
-// response body and the MCP error message, drives the failing analysis paths, and
-// captures BOTH the returned error and everything the analyzer writes to stdout
-// (its operational logging, e.g. logTimings). It then asserts the sentinels never
-// surface. This guards the boundary RedactError alone does not cover: the raw
-// error that reaches the operational logs must itself be payload-free. It is a
-// source-level path exercise, not a live leak reproduction.
+// Sentinels in backend errors must reach neither returned diagnostics nor
+// operational stdout; audit categorization alone does not protect that boundary.
 func TestAnalyzeFailure_ErrorsArePayloadFree(t *testing.T) {
 	const httpSentinel = "SENSITIVE-HTTP-BODY-a1b2c3d4"
 	const mcpSentinel = "SENSITIVE-MCP-MESSAGE-e5f6a7b8"

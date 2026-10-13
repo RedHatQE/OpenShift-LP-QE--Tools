@@ -4,10 +4,7 @@ package main
 
 import "testing"
 
-// TestEnvBool exercises the bot's boolean environment consumer across unset,
-// empty, valid, and invalid inputs. An unset variable reads the same as an
-// empty one (os.Getenv returns "" for both), so an empty value covers the
-// "unset" branch.
+// os.Getenv maps unset and empty variables to the same fallback path.
 func TestEnvBool(t *testing.T) {
 	const key = "PROW_AN__TEST__BOOL"
 	cases := []struct {
@@ -35,8 +32,6 @@ func TestEnvBool(t *testing.T) {
 	}
 }
 
-// TestEnvInt exercises the bot's integer environment consumer, including the
-// invalid and negative inputs that must fall back to the default.
 func TestEnvInt(t *testing.T) {
 	const key = "PROW_AN__TEST__INT"
 	cases := []struct {
@@ -62,8 +57,6 @@ func TestEnvInt(t *testing.T) {
 	}
 }
 
-// TestEnvStr exercises the bot's string environment consumer: a set, non-empty
-// value wins; an unset or empty value yields the default.
 func TestEnvStr(t *testing.T) {
 	const key = "PROW_AN__TEST__STR"
 	cases := []struct {

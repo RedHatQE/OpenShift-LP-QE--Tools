@@ -12,10 +12,8 @@ import (
 	"testing"
 )
 
-// captureAudit redirects the package audit logger to a buffer for the duration of
-// fn and returns everything it wrote. Being an in-package test lets us swap the
-// unexported logger without changing the production API, so assertions can run
-// against the real emitted JSON.
+// captureAudit captures real audit JSON without changing the production API.
+// It swaps the package logger and must not be used concurrently.
 func captureAudit(fn func()) string {
 	var buf bytes.Buffer
 	saved := logger
@@ -26,8 +24,6 @@ func captureAudit(fn func()) string {
 	return buf.String()
 }
 
-// TestWithInteractionID verifies WithInteractionID stores the ID and that
-// InteractionID reads it back (present branch).
 func TestWithInteractionID(t *testing.T) {
 	ctx := WithInteractionID(context.Background(), "C123/456.789")
 	if got := InteractionID(ctx); got != "C123/456.789" {
@@ -35,14 +31,12 @@ func TestWithInteractionID(t *testing.T) {
 	}
 }
 
-// TestInteractionID_Absent covers the missing-value branch of InteractionID.
 func TestInteractionID_Absent(t *testing.T) {
 	if got := InteractionID(context.Background()); got != "" {
 		t.Errorf("InteractionID on empty ctx = %q, want empty", got)
 	}
 }
 
-// TestHash covers Hash: determinism, distinctness and fixed length.
 func TestHash(t *testing.T) {
 	a := Hash("some analysis text")
 	b := Hash("some analysis text")
@@ -58,8 +52,6 @@ func TestHash(t *testing.T) {
 	}
 }
 
-// TestRedactError covers every category branch of RedactError, ensuring raw
-// error content is mapped to a coarse, payload-free label (and nil -> "").
 func TestRedactError(t *testing.T) {
 	tests := []struct {
 		name string
@@ -86,10 +78,8 @@ func TestRedactError(t *testing.T) {
 	}
 }
 
-// TestReceived asserts the pseudonymization schema on the real emitted audit
-// line: the raw actor value and the raw "actor" key are both absent, and
-// actor_sha256 equals the intended fingerprint. This makes the minimization
-// requirement a regression test, not coverage-only execution.
+// Verify the emitted schema, not just the hash helper: raw actor identity must
+// be absent while its fingerprint and interaction correlation remain available.
 func TestReceived(t *testing.T) {
 	// A distinctive raw value that cannot collide with a hex digest or any other
 	// field, so a Contains check reliably detects a leak.
@@ -157,15 +147,11 @@ func TestReceived_EmptyActor(t *testing.T) {
 	}
 }
 
-// TestToolQuery covers the ToolQuery emitter (lifecycle event 2/3), including the
-// variadic attrs append.
 func TestToolQuery(t *testing.T) {
 	ctx := WithInteractionID(context.Background(), "test-id")
 	ToolQuery(ctx, "ship-help-mcp", "tools/call", "tool", "ask_persona", "persona", "ship_public")
 }
 
-// TestOutcome covers the Outcome emitter (lifecycle event 3/3), including the
-// variadic attrs append.
 func TestOutcome(t *testing.T) {
 	ctx := WithInteractionID(context.Background(), "test-id")
 	Outcome(ctx, "success", "duration_ms", int64(1234), "response_chars", 42)

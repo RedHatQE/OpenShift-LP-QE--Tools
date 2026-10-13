@@ -27,8 +27,7 @@ jobs:
       with:
         go-version: '1.22'
     
-    # CI invokes the same Make targets developers run locally, so the two cannot
-    # diverge. The test--unit target embeds the 100% coverage gate.
+    # Use the shared local/CI build and test entry points.
     - name: Build binaries
       working-directory: ./apps/prow-analyzer
       run: make build

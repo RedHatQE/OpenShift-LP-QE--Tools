@@ -96,13 +96,9 @@ func Outcome(ctx context.Context, status string, attrs ...any) {
 	logger.Log(ctx, slog.LevelInfo, "interaction_outcome", args...)
 }
 
-// RedactError maps an error to a coarse, payload-free category safe to persist in
-// the immutable audit trail. It is defense-in-depth: the analyzer already
-// constructs its errors payload-free (HTTP response bodies and MCP error messages
-// are elided to metadata — status/code and byte counts — at the source in
-// pkg/analyzer), so the operational logs that receive the full error are payload-
-// free too. This function coarsens those errors further to a small, stable set of
-// categories for the immutable trail. It returns "" for a nil error.
+// RedactError maps diagnostics to stable audit categories ("" for nil).
+// This complements the analyzer's HTTP-body/MCP-message elision without putting
+// operational diagnostic strings into the audit trail.
 func RedactError(err error) string {
 	if err == nil {
 		return ""

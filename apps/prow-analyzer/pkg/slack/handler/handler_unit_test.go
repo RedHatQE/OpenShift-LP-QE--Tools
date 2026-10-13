@@ -19,7 +19,7 @@ import (
 	"github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/analyzer"
 )
 
-// --- in-memory test doubles (no real HTTP servers, no goroutines) ---
+// In-memory test doubles avoid external services.
 
 // doerFunc adapts a function to analyzer.HTTPDoer so tests can drive the
 // analyzer's HTTP responses without a network.
@@ -201,11 +201,8 @@ func TestNew_DedupTTLFromTimeout(t *testing.T) {
 }
 
 func TestNew_DedupTTLFollowsWithTimeoutOverride(t *testing.T) {
-	// Regression: the bot drives the analyzer timeout via WithTimeout
-	// (--mcp-timeout / PROW_AN__MCP__TIMEOUT_SEC) while the unprefixed
-	// MCP_TIMEOUT_SECONDS env var is unset. The dedup window must track the
-	// effective override, not the env/default, so a repeated URL cannot start a
-	// second concurrent run while the first (longer) analysis is still in flight.
+	// The suppression window follows WithTimeout rather than the shared env
+	// default; this asserts its sizing formula, not total analysis duration.
 	t.Setenv("MCP_TIMEOUT_SECONDS", "") // bare env would otherwise be DefaultMCPTimeout
 	override := 3600 * time.Second
 	a := analyzer.NewAnalyzer("", "", "", analyzer.WithTimeout(override))
@@ -450,10 +447,8 @@ func TestHandle_QueueFull(t *testing.T) {
 	}
 }
 
-// TestHandle_SpawnsAnalysis covers the success branch of Handle — acquiring a
-// semaphore slot and dispatching the async analysis. All dependencies are
-// in-memory mocks, and the unit run has no -race, so the dispatched work is
-// harmless; analyzeAndRespond's own branches are covered directly below.
+// Exercise async dispatch with in-memory transports; response branches are
+// tested directly below.
 func TestHandle_SpawnsAnalysis(t *testing.T) {
 	client, _ := newMockSlack(true)
 	h := New(client, successAnalyzer(), []string{"C123"})

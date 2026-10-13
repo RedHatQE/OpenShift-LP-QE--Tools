@@ -58,7 +58,7 @@ export SHIP_HELP_MCP_TOKEN="eyJhbGc..."
 ### Slack Bot
 
 ```bash
-# The bot reads all of its environment variables under the PROW_AN__ prefix
+# Bot-specific settings use the PROW_AN__ prefix; TLS configuration is shared.
 export PROW_AN__MCP__URL__SHIP_HELP="https://<ship-help-mcp-host>/personas/<persona>/mcp"
 export PROW_AN__MCP__TOKEN__SHIP_HELP="<your-token>"
 export PROW_AN__SLACK__BOT_TOKEN="xoxb-..."
