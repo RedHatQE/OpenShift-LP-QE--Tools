@@ -13,11 +13,11 @@ build: build--cli build--bot
 
 # Build CLI
 build--cli:
-	"$(GO)" build -o prow-analyzer--cli ./cmd/prow-analyzer--cli
+	'$(GO)' build -o prow-analyzer--cli ./cmd/prow-analyzer--cli
 
 # Build Bot
 build--bot:
-	"$(GO)" build -o prow-analyzer--bot ./cmd/prow-analyzer--bot
+	'$(GO)' build -o prow-analyzer--bot ./cmd/prow-analyzer--bot
 
 # Run the full suite: unit (with coverage gate) then integration (mirrors CI ordering)
 test: test--unit test--integration
