@@ -208,6 +208,36 @@ guest-agent.py <cmd>
 
 ---
 
+### `collect-host-signals.sh`
+
+**Purpose**: Parse host-side KVM/Hyper-V crash-correlation signals from pre-captured files.
+
+**Called by**: `watch-crash.sh` → `CaptureHostSignals()` with `--log-file launcher-compute.log --domain-xml domain.xml`
+
+**Responsibilities**:
+- Scan `launcher-compute.log` for Intel split-lock `#AC` trap patterns defined in `host-signals.json`
+- Extract Hyper-V enlightenment feature states from `domain.xml` (tlbflush, ipi, vapic, spinlocks, synictimer)
+- Detect if split-lock mitigation is applied (tlbflush + ipi both off)
+- Generate crash-correlation assessment
+
+**Operates fully offline** — reads pre-captured files, never connects to the node or pod directly (important for OpenShift/KubeVirt where kernel log and domain live in different pods).
+
+**Output** (`host-signals.json`):
+```json
+{
+  "ok": true,
+  "vm": "windows-bsod_win2022-vm-hjoshi1",
+  "kernelSignals": [{"id": "split-lock-trap", "count": 0, "relatedBugCheck": "0x00020001", "matches": []}],
+  "splitLockDetected": false,
+  "hyperv": {"features": [{"name": "tlbflush", "state": "absent", "risk": "high", "present": false}, ...], "mitigationApplied": false},
+  "assessment": ["No split-lock #AC traps found in the examined kernel-log window."]
+}
+```
+
+**Data source**: `src/data/host-signals.json` — defines signal patterns and Hyper-V feature list.
+
+---
+
 ### `parse-dump-header.sh`
 
 **Purpose**: Extract Windows bugcheck code from a `.dmp` file header.
