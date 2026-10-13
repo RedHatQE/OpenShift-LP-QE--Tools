@@ -597,7 +597,7 @@ image/container/prow-analyzer/
 ### Development environment
 
 > **Linux is required for the `make` targets.** The Makefile recipes
-> use strict Bash conventions — notably `shopt -s inherit_errexit`,
+> and suite scripts use strict Bash conventions — notably `shopt -s inherit_errexit`,
 > which needs **GNU Bash 4.4+**. macOS ships Bash 3.2, so `make build`,
 > `make test`, and `make test--unit` will **not** run natively on macOS.
 >
@@ -605,8 +605,8 @@ image/container/prow-analyzer/
 > VM or container** (for example `podman run --rm -it -v "$PWD":/src -w /src
 > registry.access.redhat.com/ubi9/go-toolset:1.22 bash`). As a fallback for
 > ad-hoc checks, `go` commands can be run directly without the Makefile (e.g.
-> `go test -tags unit ./pkg/...`), but the coverage gate and test guards only run
-> through the `make` targets on Linux. CI runs these targets on Linux.
+> `go test -tags unit ./pkg/...`), but direct Go commands bypass the coverage gate
+> and test guards in the suite scripts. CI calls these scripts through Make on Linux.
 
 ### Building
 
@@ -626,11 +626,18 @@ make clean
 
 ### Testing
 
+Make delegates to `scripts/test--unit.sh` and `scripts/test--integration.sh`.
+Both source `scripts/check--test-selection.sh` for shared configuration and selection
+checks. Each suite defines its tag once and uses the same immutable package array
+for its guard and test command. `make check-tags` calls each suite with `--check-only`;
+it lists selected tests without running the suites. The guard counts selected
+test/benchmark/fuzz/example names; it does not prove every test file has a tag.
+
 ```bash
 # Run unit tests with coverage, then integration tests with the race detector
 make test
 
-# Run unit tests with the embedded 100% coverage gate
+# Run unit tests with the script's 100% package coverage gate
 make test--unit
 
 # Use a specific Go executable and package selection for both suites.
