@@ -85,6 +85,46 @@ End          → stage-errors.jsonl, evidence-summary.json, watcher.log
 | `vm-memory-windows.dmp` | ❌ Not in pipeline | elf2dmp disabled (17GB, run offline) |
 | Volatility outputs | ❌ Not in pipeline | Developer tool, run offline against vm-memory.elf.tar.gz |
 
+### Why MINIDUMP and MEMORY.DMP Are Permanently Blocked
+
+**Root cause**: Windows Server 2022 on KVM with VirtIO Balloon cannot create `pagefile.sys` on demand. The pipeline must use `AutoReboot=0` to freeze the VM at BSOD, which prevents the post-crash reboot that would copy crash dumps to disk.
+
+#### Attempts to enable pagefile.sys on KVM
+
+| Approach | How it worked | Why it failed | Reference |
+|---|---|---|---|
+| **Registry Set-ItemProperty** | Run PowerShell: `Set-ItemProperty HKLM:\...\CrashControl -Name "PagingFiles" -Value "C:\pagefile.sys 1024 2048"` | Windows Server 2022 lazy-allocates pagefile. With ≥16GB RAM, memory pressure rarely occurs on a VM. No pagefile created after reboot. | configure-dumps.ps1, commit e7c2ca4 |
+| **WMI Win32_PageFileSetting** | Create pagefile via `[WMICLASS]` and `Set-CimInstance`. Triggers on reboot. | Same lazy-allocation issue. Pagefile created at reboot but immediately deallocated (unused). BSOD events occur without consuming memory heavily enough to trigger pagefile use. | commit 2886457 |
+| **.NET Registry API** | Use `RegistryKey.SetValue()` to directly set paging file registry entries (e.g., `PagingFiles` MULTI_SZ). | No functional difference from Set-ItemProperty. Windows still defers pagefile creation. | commit 3dfa5ad |
+| **TestLimit64 memory stress** | Downloaded TestLimit64.exe on guest, ran `TestLimit64.exe -m 14000` to consume RAM and trigger pagefile creation. | ARG_MAX command-line limit (128KB) exceeded when uploading binary through QGA. Switched to VM-side `Invoke-WebRequest` download, but pagefile still never created — writes were buffered, not hitting physical page faults. | commit 1f8a1c2, debugging attempts |
+| **Balloon inflation via KubeVirt API** | Attempted to use `virtctl set memory-balloon` to forcibly pressure the VM and trigger pagefile creation. | KubeVirt balloon API not supported on this cluster; hypervisor returned: "WARN: balloon inflation not supported on this VMI — skipping". | commit 7e4a5f9 |
+| **Chaos krkn-lib memory stress pod** | Injected memory-stress scenario (pod-memory-stress) into cluster via chaos toolkit, hoping to force guest memory pressure indirectly. | Memory pressure on host doesn't reliably translate to guest pressure. Guest still had 14.4GB free RAM, no pagefile created. | commit 4c2d8f1, revert to a8babfa |
+| **DedicatedDumpFile workaround** | Pre-allocate `C:\DedicatedDump.sys` at golden image build time. Windows uses this file for crash dump staging **instead of pagefile**. Eliminates pagefile requirement for dump staging. | Works for crash staging but does NOT create Minidump files (which still require pagefile). Only solves half the problem. Minidump creation remains blocked. | **Current approach**, all commits after a8babfa |
+
+#### Why pagefile.sys can't be forced on Windows Server 2022 KVM
+
+1. **Lazy allocation by design**: Windows Server 2022 defers pagefile creation until memory pressure (page faults) actually occurs
+2. **VMs never reach critical memory**: A 16GB VM has plenty of free RAM; BSOD events (even with TestLimit64 stress) don't consume enough to trigger lazy expansion
+3. **No hypervisor-level forcing**: KVM has no directive to force a guest to allocate pagefile — this is a Windows OS-level decision
+4. **VirtIO Balloon limitations**: Balloon inflation (if supported) would only help on VMs with excess free RAM, not on constrained VMs; even then, guest OS still decides when to allocate pagefile
+
+#### Impact on dump artifacts
+
+| Dump type | Requires | Current status | Mitigation |
+|---|---|---|---|
+| **Kernel dump (MEMORY.DMP)** | Pagefile OR `DedicatedDumpFile` + reboot | ❌ Blocked — `AutoReboot=0` prevents reboot | Use `vm-memory.elf.tar.gz` (raw physical RAM) |
+| **Minidump (.dmp files)** | Pagefile (no workaround) | ❌ Permanently blocked | N/A — would require pagefile, which is impossible |
+| **Full physical RAM (vm-memory.elf.tar.gz)** | KubeVirt VirtualMachineExport | ✅ Always works | **Primary artifact** — hand to developer for elf2dmp + volatility |
+
+#### Conclusion
+
+**MEMORY.DMP and Minidump are permanently unavailable on this infrastructure** due to:
+1. Windows Server 2022 lazy pagefile allocation on KVM
+2. Pipeline requirement for `AutoReboot=0` to freeze VM and capture evidence
+3. No hypervisor-level mechanism to force pagefile creation
+
+The pipeline captures the **complete physical memory** via `vm-memory.elf.tar.gz` as compensation. This provides equivalent forensic data (raw RAM dump) — developers must run `elf2dmp` offline to convert to Windows DMP format for WinDbg analysis.
+
 ---
 
 ## Offline EventLog Extraction (guestfs-ntfs Pod)
