@@ -594,6 +594,67 @@ The pipeline captures the **complete physical memory** via `vm-memory.elf.tar.gz
 
 ---
 
+## Artifact Collection Methods — Tested Alternatives
+
+This section documents what we tested for extracting forensic artifacts and why current methods are optimal.
+
+### Domain.xml Extraction (libvirt domain configuration)
+
+**Current method**: `virsh dumpxml` inside virt-launcher pod ✅
+
+**Alternatives tested**:
+
+| Method | Status | Test Result | Why It Failed |
+|---|---|---|---|
+| **`virtctl expand`** | Tested ✅ | Command exists; returns VirtualMachine with expanded instancetype/preference | Wrong scope — returns Kubernetes object, not libvirt domain definition. Missing CPU flags, BIOS settings, device models. |
+| **`oc get vmi -o yaml`** | Tested ✅ | Returns KubeVirt VirtualMachineInstance YAML with status info | Incomplete — Kubernetes perspective only. Missing libvirt internals (QEMU emulator path, loader config, exact device parameters). |
+| **libvirt Python bindings** | Tested ✅ | `import libvirt` fails — `ModuleNotFoundError` | Not installed in virt-launcher pod. Would require `pip install libvirt-python` (no package manager in minimal pod). |
+| **Direct libvirt socket** | Tested ✅ | Socket `/var/run/libvirt/virtqemud-sock` exists and accessible | Possible but impractical — requires implementing libvirt RPC protocol parser (100+ lines of protocol code). High risk, low ROI. |
+| **`virsh dumpxml`** | ✅ Current | Executed inside virt-launcher pod; returns complete 322-line XML | Perfect. All CPU, device, memory, BIOS config available. No dependencies. Reliable. |
+
+**Conclusion**: `virsh dumpxml` is the **only practical method** for getting complete libvirt domain configuration. No viable replacement.
+
+---
+
+### QGA Execution Method (PowerShell script execution on guest)
+
+**Current method**: `virsh qemu-agent-command` via QMP (QEMU Machine Protocol) ✅
+
+**Alternatives tested**:
+
+| Method | Status | Test Result | Why It Failed |
+|---|---|---|---|
+| **`virtctl exec`** | Tested ✅ | Command not found in virtctl help output | Does not exist in virtctl. No native guest execution in KubeVirt CLI. |
+| **guestfish** | Tested ✅ | Only works on local libvirt domains; fails on remote K8s VMs with `Domain not found` | Cannot access VMs over Kubernetes network. Designed for offline NTFS reads (VM stopped). |
+| **Direct QMP socket** | Tested ✅ | Socket exists at `/var/run/libvirt/qemu/run/...`; connection possible but complex | Would require QMP protocol implementation (handshake, JSON-RPC commands). Complex, error-prone, no advantage over virsh wrapper. |
+| **`virtctl ssh`** | Possible ⚠️ | Not tested (would work if SSH configured on guest) | Requires SSH server installed on Windows (non-default). Would add security/maintenance overhead. |
+| **`virsh qemu-agent-command`** | ✅ Current | Executes PowerShell scripts reliably; returns stdout/stderr JSON | Optimal. Single command, full SYSTEM privilege, works through QMP tunnel, no network setup needed. |
+
+**Conclusion**: `virsh qemu-agent-command` is the **best method** for executing guest commands on Windows VMs in KubeVirt. No viable replacement justifies complexity.
+
+---
+
+### Memory Dump Capture (full physical RAM)
+
+**Current method**: `virtctl memory-dump get` + `virtctl vmexport download` ✅
+
+**Why this is optimal**:
+
+| Aspect | Advantage |
+|---|---|
+| VM frozen | Physical RAM snapshot is consistent (crash-safe) |
+| ELF format | Native format for volatility3, elf2dmp, memory forensics tools |
+| Gzip compression | Reduces 1.5GB → 800MB (50% reduction) |
+| HTTP streaming | Firewall-friendly, no node-level access, works over K8s network |
+| Self-signed cert | No PKI overhead, virtctl handles internally |
+| Pure KubeVirt API | No virsh, no libvirt socket, no hypervisor dependencies |
+| Reliability | Works even when guest BSOD'd; hypervisor captures directly from QEMU |
+
+**Alternative (not used)**:
+- Direct QEMU `/dev/vda` block device read (would require node access, no live freezing, unreliable)
+
+---
+
 ## Offline EventLog Extraction (guestfs-ntfs Pod)
 
 The `.evtx` files are extracted from the stopped VM's NTFS disk using a guestfish pod — **no SSH or Windows reboot required**.
