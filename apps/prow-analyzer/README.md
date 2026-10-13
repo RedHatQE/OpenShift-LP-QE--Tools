@@ -6,6 +6,7 @@ Automated Prow CI failure analysis using Red Hat's ship-help MCP (AI helpdesk).
 > prior to use — outputs are for internal use only.** New users should start with
 > the **[User Guide](doc/user-guide.md)**.
 
+
 ## Documentation
 
 - **[User Guide](doc/user-guide.md)** — start here: purpose, quick start,
@@ -18,6 +19,7 @@ Automated Prow CI failure analysis using Red Hat's ship-help MCP (AI helpdesk).
 - [Developer & Operator Reference](doc/reference.md) — components, MCP protocol
   flow, configuration, and deployment internals.
 - [Deployment quick start](doc/deployment.md).
+
 
 ## Features
 
@@ -33,6 +35,7 @@ Automated Prow CI failure analysis using Red Hat's ship-help MCP (AI helpdesk).
   - Internal documentation
   - Historical failure patterns
 
+
 ## Quick Start
 
 ### CLI Usage
@@ -44,16 +47,15 @@ export SHIP_HELP_MCP_URL="https://<your-mcp-endpoint>"
 export SHIP_HELP_MCP_TOKEN="<your-token>"
 ./prow-analyzer--cli analyze <prow-url>
 ```
-
 **Note:** Analysis takes 2-4 minutes as ship-help searches across 9+ data sources (Jira, GitHub, an internal triage system, build logs, etc.).
 
 Example:
-
 ```bash
 export SHIP_HELP_MCP_URL="https://<ship-help-mcp-host>/personas/<persona>/mcp"
 export SHIP_HELP_MCP_TOKEN="eyJhbGc..."
 ./prow-analyzer--cli analyze https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-stolostron-policy-collection-main-ocp4.22-interop-opp-aws/2066255424226594816
 ```
+
 
 ### Slack Bot
 
@@ -75,6 +77,8 @@ The bot monitors configured Slack channels and automatically analyzes any Prow U
 - Related Jira issues
 - Recurring pattern detection
 - Recommended actions
+
+
 
 ## Installation
 
@@ -99,12 +103,15 @@ export SHIP_HELP_MCP_TOKEN="your-token-here"
 go build ./cmd/prow-analyzer--bot
 ```
 
+
 ### OpenShift Deployment
 
 See the **[Deployment quick start](doc/deployment.md)** for the full procedure
 (build and push the image, create the namespace and Secret, edit the manifest
 placeholders, and `oc apply`). The deployment manifest lives at
 `deploy/openshift/deployment.yaml`.
+
+
 
 ## Configuration
 
@@ -127,6 +134,7 @@ including the bot's optional vars (`PROW_AN__ALLOWED_BOT_IDS`,
 `PROW_AN__MCP__SHIP_HELP__DEBUG`, `PROW_AN__MCP__TIMEOUT_SEC`) and `TLS_INSECURE_SKIP_VERIFY`
 (read unprefixed by both the bot and the CLI).
 
+
 ### Getting Tokens
 
 **Ship-help MCP Token:**
@@ -139,6 +147,8 @@ including the bot's optional vars (`PROW_AN__ALLOWED_BOT_IDS`,
 - Required bot scopes: `channels:history`, `chat:write`, `app_mentions:read`
 - Install to workspace and get tokens from OAuth & Permissions
 
+
+
 ## Architecture
 
 ### Components
@@ -148,22 +158,20 @@ including the bot's optional vars (`PROW_AN__ALLOWED_BOT_IDS`,
    - MCP protocol handling (JSON-RPC over SSE)
    - Prow URL extraction and validation
    - Response formatting
-
 2. **cmd/prow-analyzer--cli** - CLI tool
    - Single job analysis
    - Standalone operation
    - Human-readable output
-
 3. **cmd/prow-analyzer--bot** - Slack bot
    - Real-time channel monitoring
    - Automatic URL detection
    - Threaded responses
    - Socket mode for reliable event delivery
-
 4. **pkg/slack/handler** - Event processing
    - Message filtering
    - Channel authorization
    - Async analysis execution
+
 
 ### MCP Protocol Flow
 
@@ -174,10 +182,12 @@ including the bot's optional vars (`PROW_AN__ALLOWED_BOT_IDS`,
 4. Extract analysis from JSON-RPC result
 ```
 
+
+
 ## Example Output
 
 ```text
-🔍 Prow Analyzer Analysis
+:mag: Prow Analyzer Analysis
 
 **Root Cause:**
 Test failure in openshift-tests due to timeout waiting for operator rollout.
@@ -198,11 +208,13 @@ the same test suite.
 Analysis completed in 78.6s • Powered by ship-help MCP
 ```
 
+
 ## Development
 
 Based on the working implementation from:
 - openshift/ci-tools PR #5251 (analyzer code)
 - openshift/release PR #80559 (configuration)
+
 
 ## License
 
