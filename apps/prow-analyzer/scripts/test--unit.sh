@@ -16,7 +16,8 @@ typeset suiteTag='unit'
 typeset goCmd="${GO-go}"
 typeset -a suitePkgArr="(${PKGS-./pkg/...})"
 
-typeset coverageThreshold='100.0' coverageFile='coverage.out' coverageHTML='coverage.html'
+typeset covMin='100.0' covFile='coverage.out' covHTML='coverage.html'
+typeset totCov=''
 typeset -a botPkgArr=('./cmd/prow-analyzer--bot')
 
 : 'Guarding that the unit build tag actually selects tests...'
@@ -27,40 +28,37 @@ GO="${goCmd}" \
     1
 
 [ -z "${chkOnly}" ] || exit 0
-: 'Running unit tests with coverage...'
-"${goCmd}" test -v -tags "${suiteTag}" -covermode=set -coverprofile="${coverageFile}" "${suitePkgArr[@]}"
-: 'Generating coverage report...'
-"${goCmd}" tool cover -html="${coverageFile}" -o "${coverageHTML}"
-: 'Calculating coverage percentage...'
-typeset coverageOutput='' totalCoverage=''
-coverageOutput="$(
-    "${goCmd}" tool cover -func="${coverageFile}"
-)"
-: "${coverageOutput}"
-totalCoverage="$(
-    printf '%s\n' "${coverageOutput}" |
+: 'Running Unit Test with Code Coverage...'
+"${goCmd}" test -v -tags "${suiteTag}" \
+    -covermode=set -coverprofile="${covFile}" \
+    "${suitePkgArr[@]}"
+
+: 'Generating Code Coverage report...'
+"${goCmd}" tool cover -html="${covFile}" -o "${covHTML}"
+: 'Calculating Code Coverage percentage...'
+totCov="$(
+    printf '%s\n' "$("${goCmd}" tool cover -func="${covFile}")" |
+    sed -nE 's/^total:\D+([.0-9]+)%/\1/p;tq;b;:q q'
     grep 'total:' | awk '{print $3}' | sed 's/%//'
 )"
-: "Total coverage: ${totalCoverage}%"
-: "Required coverage: ${coverageThreshold}%"
-typeset -i isBelowThreshold=0
-isBelowThreshold="$(
-    printf '%s\n' "${totalCoverage} < ${coverageThreshold}" | bc -l
-)"
-if ((isBelowThreshold)); then
-    : "❌ FAIL: Coverage ${totalCoverage}% is below threshold ${coverageThreshold}%"
-    : "Coverage report: ${coverageHTML}"
+: "Total Code Coverage: ${totCov}%"
+: "Required Code Coverage: ${covMin}%"
+if ((totCov} < covMin)); then
+    : "❌ FAIL: Code Coverage ${totCov}% is below threshold ${covMin}%."
+    : "Code Coverage report: ${covHTML}"
     false
 else
-    : "✅ PASS: Coverage ${totalCoverage}% meets threshold ${coverageThreshold}%"
-    : "Coverage report: ${coverageHTML}"
+    : "✅ PASS: Code Coverage ${totCov}% meets threshold ${covMin}%"
+    : "Code Coverage report: ${covHTML}"
 fi
+
 : 'Guarding that the unit build tag selects bot tests...'
 GO="${goCmd}" \
     "${scrDir}/check--test-selection.sh" \
     "${suiteTag}" \
     "${botPkgArr[*]@Q}" \
     1
-: 'Running bot env-consumer unit tests (outside the coverage gate)...'
+: 'Running bot env-consumer Unit Test (outside the Code Coverage gate)...'
 "${goCmd}" test -v -tags "${suiteTag}" "${botPkgArr[@]}"
+
 true
