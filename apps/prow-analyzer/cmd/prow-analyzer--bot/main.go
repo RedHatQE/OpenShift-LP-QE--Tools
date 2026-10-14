@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"os"
@@ -62,7 +63,11 @@ var (
 	newSocketClient = socketmode.New
 	runSocket       = (*socketmode.Client).Run
 	ackSocket       = (*socketmode.Client).Ack
+	dispatchEvent   = handleSocketEvent
+	launchWorker    = func(worker func()) { go worker() }
 )
+
+var stdout io.Writer = os.Stdout
 
 func main() {
 	var (
@@ -136,7 +141,7 @@ func main() {
 		*slackToken,
 		slack.OptionAppLevelToken(*appToken),
 		slack.OptionDebug(*slackDebug),
-		slack.OptionLog(log.New(os.Stdout, "slack: ", log.Lshortfile|log.LstdFlags)),
+		slack.OptionLog(log.New(stdout, "slack: ", log.Lshortfile|log.LstdFlags)),
 	)
 
 	// Determine this bot's own bot ID so its own messages are never analyzed
@@ -162,16 +167,16 @@ func main() {
 	socketClient := newSocketClient(
 		slackClient,
 		socketmode.OptionDebug(*slackDebug),
-		socketmode.OptionLog(log.New(os.Stdout, "socketmode: ", log.Lshortfile|log.LstdFlags)),
+		socketmode.OptionLog(log.New(stdout, "socketmode: ", log.Lshortfile|log.LstdFlags)),
 	)
 
-	go func() {
+	launchWorker(func() {
 		for evt := range socketClient.Events {
-			handleSocketEvent(evt, h, socketClient)
+			dispatchEvent(evt, h, socketClient)
 		}
-	}()
+	})
 
-	fmt.Println("Prow analyzer bot is running...")
+	fmt.Fprintln(stdout, "Prow analyzer bot is running...")
 	if err := runSocket(socketClient); err != nil {
 		slog.Error("Socket mode error", "error", err)
 		exit(1)

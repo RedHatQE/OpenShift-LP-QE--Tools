@@ -3,16 +3,17 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"flag"
-	"io"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/analyzer"
+	"github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/audit"
 )
 
 type stubAnalyzer struct {
@@ -60,25 +61,41 @@ func TestMain(t *testing.T) {
 			t.Setenv("USER", "unit-user")
 			oldFlags, oldUsage, oldArgs := flag.CommandLine, flag.Usage, os.Args
 			oldFactory, oldExit := newAnalyzer, exit
-			oldStdout, oldStderr := os.Stdout, os.Stderr
+			oldStdout, oldStderr := stdout, stderr
+			oldReceived, oldOutcome := received, outcome
 			t.Cleanup(func() {
 				flag.CommandLine, flag.Usage, os.Args = oldFlags, oldUsage, oldArgs
 				newAnalyzer, exit = oldFactory, oldExit
-				os.Stdout, os.Stderr = oldStdout, oldStderr
+				stdout, stderr = oldStdout, oldStderr
+				received, outcome = oldReceived, oldOutcome
 			})
 			flag.CommandLine = flag.NewFlagSet("cli", flag.ContinueOnError)
 			flag.Usage = func() { flag.CommandLine.PrintDefaults() }
 			os.Args = append([]string{"cli"}, testCase.args...)
-			stdoutRead, stdoutWrite, err := os.Pipe()
-			if err != nil {
-				t.Fatal(err)
+			var output, errorOutput bytes.Buffer
+			stdout, stderr = &output, &errorOutput
+			auditCalls := []string{}
+			received = func(ctx context.Context, source, actor, channel, trigger string) {
+				if audit.InteractionID(ctx) != "cli:job" || source != "cli" || actor != "unit-user" || channel != "" || trigger != "job" {
+					t.Error("received audit contract changed")
+				}
+				auditCalls = append(auditCalls, "received")
 			}
-			stderrRead, stderrWrite, err := os.Pipe()
-			if err != nil {
-				t.Fatal(err)
+			outcome = func(ctx context.Context, status string, attrs ...any) {
+				if audit.InteractionID(ctx) != "cli:job" {
+					t.Error("outcome correlation changed")
+				}
+				auditCalls = append(auditCalls, status)
+				if status == "failed" && (len(attrs) != 2 || attrs[0] != "error" || attrs[1] != audit.RedactError(testCase.err)) {
+					t.Errorf("error privacy=%v", attrs)
+				}
+				if status == "success" && (len(attrs) != 6 || attrs[1] != int64(1500) || attrs[3] != len("test analysis") || attrs[5] != audit.Hash("test analysis")) {
+					t.Errorf("outcome metadata=%v", attrs)
+				}
+				if status == "skipped" && (len(attrs) != 2 || attrs[1] != "job_passing") {
+					t.Errorf("skip reason=%v", attrs)
+				}
 			}
-			t.Cleanup(func() { stdoutRead.Close(); stdoutWrite.Close(); stderrRead.Close(); stderrWrite.Close() })
-			os.Stdout, os.Stderr = stdoutWrite, stderrWrite
 			stub := &stubAnalyzer{outcome: testCase.outcome, err: testCase.err, result: &analyzer.AnalysisResult{Analysis: "test analysis", Duration: 1500 * time.Millisecond}}
 			factoryCalls := 0
 			newAnalyzer = func(url, token, prompt string) failureAnalyzer {
@@ -109,21 +126,11 @@ func TestMain(t *testing.T) {
 				}()
 				main()
 			}()
-			stdoutWrite.Close()
-			stderrWrite.Close()
-			stdout, err := io.ReadAll(stdoutRead)
-			if err != nil {
-				t.Fatal(err)
-			}
-			stderr, err := io.ReadAll(stderrRead)
-			if err != nil {
-				t.Fatal(err)
-			}
 			if status != testCase.status {
 				t.Errorf("status = %d, want %d", status, testCase.status)
 			}
-			if !strings.Contains(string(stdout), testCase.stdout) || !strings.Contains(string(stderr), testCase.stderr) {
-				t.Errorf("stdout=%q stderr=%q", stdout, stderr)
+			if !strings.Contains(output.String(), testCase.stdout) || !strings.Contains(errorOutput.String(), testCase.stderr) {
+				t.Errorf("stdout=%q stderr=%q", output.String(), errorOutput.String())
 			}
 			if len(stub.calls) != testCase.calls {
 				t.Errorf("boundary calls = %v", stub.calls)
@@ -131,17 +138,20 @@ func TestMain(t *testing.T) {
 			if testCase.calls == 0 && factoryCalls != 0 {
 				t.Error("constructed analyzer before validation")
 			}
+			if (testCase.calls == 0 && len(auditCalls) != 0) || (testCase.calls > 0 && (len(auditCalls) != 2 || auditCalls[0] != "received")) {
+				t.Errorf("audit calls=%v", auditCalls)
+			}
 			if testCase.calls > 0 {
 				if factoryCalls != 1 || stub.calls[0] != "outcome:job" {
 					t.Errorf("factory=%d calls=%v", factoryCalls, stub.calls)
 				}
 				for _, notice := range []string{analyzer.Disclaimer, analyzer.ReviewNotice, "URL: job"} {
-					if !strings.Contains(string(stdout), notice) {
+					if !strings.Contains(output.String(), notice) {
 						t.Errorf("missing output notice %q", notice)
 					}
 				}
 			}
-			if testCase.calls == 2 && testCase.err == nil && strings.Count(string(stdout), analyzer.AILabel) != 2 {
+			if testCase.calls == 2 && testCase.err == nil && strings.Count(output.String(), analyzer.AILabel) != 2 {
 				t.Error("AI output labels missing")
 			}
 		})
@@ -149,8 +159,17 @@ func TestMain(t *testing.T) {
 }
 
 func TestNewAnalyzer(t *testing.T) {
+	oldConstructor := constructAnalyzer
+	t.Cleanup(func() { constructAnalyzer = oldConstructor })
+	want := &analyzer.Analyzer{}
+	constructAnalyzer = func(url, token, prompt string, opts ...analyzer.AnalyzerOption) *analyzer.Analyzer {
+		if url != "https://example.invalid/mcp" || token != "token" || prompt != "prompt" || len(opts) != 0 {
+			t.Error("constructor adapter arguments changed")
+		}
+		return want
+	}
 	client := newAnalyzer("https://example.invalid/mcp", "token", "prompt")
-	if _, ok := client.(*analyzer.Analyzer); !ok {
+	if client != want {
 		t.Fatalf("constructor result %T", client)
 	}
 }

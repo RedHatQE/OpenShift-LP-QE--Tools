@@ -113,7 +113,9 @@ type botExit int
 func prepareBotMain(t *testing.T, args []string) {
 	t.Helper()
 	oldFlags, oldArgs, oldExit := flag.CommandLine, os.Args, exit
-	t.Cleanup(func() { flag.CommandLine, os.Args, exit = oldFlags, oldArgs, oldExit })
+	oldStdout := stdout
+	stdout = &bytes.Buffer{}
+	t.Cleanup(func() { flag.CommandLine, os.Args, exit = oldFlags, oldArgs, oldExit; stdout = oldStdout })
 	flag.CommandLine = flag.NewFlagSet("bot", flag.ContinueOnError)
 	os.Args = append([]string{"bot"}, args...)
 	exit = func(status int) { panic(botExit(status)) }
@@ -208,9 +210,11 @@ func TestMainRuntime(t *testing.T) {
 			t.Cleanup(func() { slog.SetDefault(oldLogger) })
 			oldSlack, oldAuth, oldAnalyzer, oldHandler := newSlackClient, authTest, newAnalyzer, newHandler
 			oldSocket, oldRun, oldAck := newSocketClient, runSocket, ackSocket
+			oldDispatch, oldLaunch := dispatchEvent, launchWorker
 			t.Cleanup(func() {
 				newSlackClient, authTest, newAnalyzer, newHandler = oldSlack, oldAuth, oldAnalyzer, oldHandler
 				newSocketClient, runSocket, ackSocket = oldSocket, oldRun, oldAck
+				dispatchEvent, launchWorker = oldDispatch, oldLaunch
 			})
 			client := &slack.Client{}
 			calls := []string{}
@@ -234,15 +238,17 @@ func TestMainRuntime(t *testing.T) {
 				if url != "url" || token != "mcp-token" || prompt != "prompt" || len(opts) != 3 {
 					t.Errorf("analyzer arguments=%q/%q/%q/%d", url, token, prompt, len(opts))
 				}
-				analysis = analyzer.NewAnalyzer(url, token, prompt, opts...)
+				analysis = &analyzer.Analyzer{}
+				for _, option := range opts {
+					option(analysis)
+				}
 				if analysis.Timeout() != 42*time.Second {
 					t.Errorf("timeout=%s", analysis.Timeout())
 				}
 				return analysis
 			}
-			done := make(chan struct{})
 			eventHandler := &stubHandler{handle: func(event *slackevents.EventsAPIEvent, logger *slog.Logger) (bool, error) {
-				close(done)
+				t.Error("main unit invoked real event handling instead of mocked dispatch")
 				return false, nil
 			}}
 			newHandler = func(actual *slack.Client, actualAnalysis *analyzer.Analyzer, channels []string, opts ...handler.Option) handler.PartialHandler {
@@ -256,7 +262,7 @@ func TestMainRuntime(t *testing.T) {
 				}
 				return eventHandler
 			}
-			socket := &socketmode.Client{Events: make(chan socketmode.Event)}
+			socket := &socketmode.Client{Events: make(chan socketmode.Event, 2)}
 			newSocketClient = func(actual *slack.Client, opts ...socketmode.Option) *socketmode.Client {
 				calls = append(calls, "socket")
 				if actual != client || len(opts) != 2 {
@@ -264,21 +270,32 @@ func TestMainRuntime(t *testing.T) {
 				}
 				return socket
 			}
-			acks := 0
 			ackSocket = func(actual *socketmode.Client, request socketmode.Request, payload ...interface{}) {
-				if actual != socket {
-					t.Error("ack client mismatch")
-				}
-				acks++
+				t.Error("main unit invoked external ack")
 			}
+			dispatches := 0
+			dispatchEvent = func(event socketmode.Event, actual handler.PartialHandler, actualSocket *socketmode.Client) {
+				dispatches++
+				if actual != eventHandler || actualSocket != socket || event.Type != socketmode.EventTypeConnected {
+					t.Error("dispatch arguments changed")
+				}
+			}
+			var worker func()
+			launchWorker = func(actual func()) { worker = actual }
+			workerCompleted := false
 			runSocket = func(actual *socketmode.Client) error {
 				calls = append(calls, "run")
 				if actual != socket {
 					t.Error("run client mismatch")
 				}
-				actual.Events <- socketmode.Event{Type: socketmode.EventTypeEventsAPI, Data: slackevents.EventsAPIEvent{}, Request: &socketmode.Request{}}
-				<-done
+				actual.Events <- socketmode.Event{Type: socketmode.EventTypeConnected}
+				actual.Events <- socketmode.Event{Type: socketmode.EventTypeConnected}
 				close(actual.Events)
+				if worker == nil {
+					t.Fatal("worker not launched before Run")
+				}
+				worker()
+				workerCompleted = true
 				return testCase.runErr
 			}
 			wantStatus := 0
@@ -288,8 +305,8 @@ func TestMainRuntime(t *testing.T) {
 			if status := callBotMain(t); status != wantStatus {
 				t.Errorf("status=%d want=%d", status, wantStatus)
 			}
-			if !reflect.DeepEqual(calls, []string{"slack", "auth", "analyzer", "handler", "socket", "run"}) || acks != 1 {
-				t.Errorf("calls=%v acks=%d", calls, acks)
+			if !reflect.DeepEqual(calls, []string{"slack", "auth", "analyzer", "handler", "socket", "run"}) || dispatches != 2 || !workerCompleted {
+				t.Errorf("calls=%v dispatches=%d workerCompleted=%v", calls, dispatches, workerCompleted)
 			}
 			if !strings.Contains(logs.String(), testCase.message) {
 				t.Errorf("logs=%q", logs.String())
@@ -299,6 +316,12 @@ func TestMainRuntime(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLaunchWorker(t *testing.T) {
+	completed := make(chan struct{})
+	launchWorker(func() { close(completed) })
+	<-completed
 }
 
 func TestHandleSocketEvent(t *testing.T) {
