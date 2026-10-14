@@ -7,8 +7,9 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"os"
-	"strings"
+	"reflect"
 	"testing"
 	"time"
 
@@ -17,19 +18,22 @@ import (
 )
 
 type stubAnalyzer struct {
-	outcome analyzer.JobOutcome
-	result  *analyzer.AnalysisResult
-	err     error
-	calls   []string
+	outcome  analyzer.JobOutcome
+	result   *analyzer.AnalysisResult
+	err      error
+	calls    []string
+	contexts []context.Context
 }
 
 func (stub *stubAnalyzer) JobOutcomeFor(ctx context.Context, jobURL string) analyzer.JobOutcome {
 	stub.calls = append(stub.calls, "outcome:"+jobURL)
+	stub.contexts = append(stub.contexts, ctx)
 	return stub.outcome
 }
 
 func (stub *stubAnalyzer) AnalyzeFailure(ctx context.Context, jobURL string) (*analyzer.AnalysisResult, error) {
 	stub.calls = append(stub.calls, "analysis:"+jobURL)
+	stub.contexts = append(stub.contexts, ctx)
 	return stub.result, stub.err
 }
 
@@ -45,15 +49,16 @@ func TestMain(t *testing.T) {
 		status         int
 		stdout, stderr string
 		calls          int
+		auditStatus    string
 	}{
-		{name: "usage", stderr: "Environment variables:", status: 1},
-		{name: "unknown command", args: []string{"unknown", "job"}, stderr: "Unknown command: unknown", status: 1},
-		{name: "missing URL", args: []string{"analyze", "job"}, token: "token", stderr: "Both --mcp-url and --token", status: 1},
-		{name: "missing token", args: []string{"analyze", "job"}, url: "url", stderr: "Both --mcp-url and --token", status: 1},
-		{name: "passing job", args: []string{"analyze", "job"}, url: "url", token: "token", outcome: analyzer.OutcomePassed, stdout: "This Prow job passed", calls: 1},
-		{name: "analysis error", args: []string{"analyze", "job"}, url: "url", token: "token", err: errors.New("redacted backend failure"), stderr: "Error: redacted backend failure", status: 1, calls: 2},
-		{name: "analysis success", args: []string{"analyze", "job"}, url: "url", token: "token", stdout: "Analysis completed in 1.5s", calls: 2},
-		{name: "flags override env", args: []string{"-mcp-url", "url", "-token", "token", "-prompt", "custom {job_url}", "analyze", "job"}, url: "env-url", token: "env-token", stdout: "test analysis", calls: 2},
+		{name: "usage", stderr: "  -mcp-url string\n    \tShip-help MCP URL\n  -prompt string\n    \tAnalysis prompt template (default \"Analyze this Prow CI failure: {job_url}\")\n  -token string\n    \tShip-help MCP token\n\n\nEnvironment variables:\n  SHIP_HELP_MCP_URL    Ship-help MCP endpoint\n  SHIP_HELP_MCP_TOKEN  Authentication token\n", status: 1},
+		{name: "unknown command", args: []string{"unknown", "job"}, stderr: "Unknown command: unknown\n", status: 1},
+		{name: "missing URL", args: []string{"analyze", "job"}, token: "token", stderr: "Error: Both --mcp-url and --token are required (or set SHIP_HELP_MCP_URL and SHIP_HELP_MCP_TOKEN)\n", status: 1},
+		{name: "missing token", args: []string{"analyze", "job"}, url: "url", stderr: "Error: Both --mcp-url and --token are required (or set SHIP_HELP_MCP_URL and SHIP_HELP_MCP_TOKEN)\n", status: 1},
+		{name: "passing job", args: []string{"analyze", "job"}, url: "url", token: "token", outcome: analyzer.OutcomePassed, stdout: "✅ This Prow job passed — no failure analysis needed.\n", calls: 1, auditStatus: "skipped"},
+		{name: "analysis error", args: []string{"analyze", "job"}, url: "url", token: "token", err: errors.New("redacted backend failure"), stderr: "Error: redacted backend failure\n", status: 1, calls: 2, auditStatus: "failed"},
+		{name: "analysis success", args: []string{"analyze", "job"}, url: "url", token: "token", calls: 2, auditStatus: "success"},
+		{name: "flags override env", args: []string{"-mcp-url", "url", "-token", "token", "-prompt", "custom {job_url}", "analyze", "job"}, url: "env-url", token: "env-token", calls: 2, auditStatus: "success"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Setenv("SHIP_HELP_MCP_URL", testCase.url)
@@ -75,25 +80,30 @@ func TestMain(t *testing.T) {
 			var output, errorOutput bytes.Buffer
 			stdout, stderr = &output, &errorOutput
 			auditCalls := []string{}
+			var interactionContext context.Context
 			received = func(ctx context.Context, source, actor, channel, trigger string) {
+				interactionContext = ctx
 				if audit.InteractionID(ctx) != "cli:job" || source != "cli" || actor != "unit-user" || channel != "" || trigger != "job" {
 					t.Error("received audit contract changed")
 				}
 				auditCalls = append(auditCalls, "received")
 			}
 			outcome = func(ctx context.Context, status string, attrs ...any) {
-				if audit.InteractionID(ctx) != "cli:job" {
+				if ctx != interactionContext || audit.InteractionID(ctx) != "cli:job" {
 					t.Error("outcome correlation changed")
 				}
 				auditCalls = append(auditCalls, status)
-				if status == "failed" && (len(attrs) != 2 || attrs[0] != "error" || attrs[1] != audit.RedactError(testCase.err)) {
-					t.Errorf("error privacy=%v", attrs)
+				var wantAttrs []any
+				switch testCase.auditStatus {
+				case "failed":
+					wantAttrs = []any{"error", audit.RedactError(testCase.err)}
+				case "success":
+					wantAttrs = []any{"duration_ms", int64(1500), "response_chars", len("test analysis"), "response_sha256", audit.Hash("test analysis")}
+				case "skipped":
+					wantAttrs = []any{"reason", "job_passing"}
 				}
-				if status == "success" && (len(attrs) != 6 || attrs[1] != int64(1500) || attrs[3] != len("test analysis") || attrs[5] != audit.Hash("test analysis")) {
-					t.Errorf("outcome metadata=%v", attrs)
-				}
-				if status == "skipped" && (len(attrs) != 2 || attrs[1] != "job_passing") {
-					t.Errorf("skip reason=%v", attrs)
+				if status != testCase.auditStatus || !reflect.DeepEqual(attrs, wantAttrs) {
+					t.Errorf("outcome = %q %v, want %q %v", status, attrs, testCase.auditStatus, wantAttrs)
 				}
 			}
 			stub := &stubAnalyzer{outcome: testCase.outcome, err: testCase.err, result: &analyzer.AnalysisResult{Analysis: "test analysis", Duration: 1500 * time.Millisecond}}
@@ -129,8 +139,15 @@ func TestMain(t *testing.T) {
 			if status != testCase.status {
 				t.Errorf("status = %d, want %d", status, testCase.status)
 			}
-			if !strings.Contains(output.String(), testCase.stdout) || !strings.Contains(errorOutput.String(), testCase.stderr) {
-				t.Errorf("stdout=%q stderr=%q", output.String(), errorOutput.String())
+			wantOutput := testCase.stdout
+			if testCase.calls > 0 {
+				wantOutput = fmt.Sprintf("%s\n%s\n\n🔍 Analyzing Prow failure...\nURL: job\n\n", analyzer.Disclaimer, analyzer.ReviewNotice) + wantOutput
+			}
+			if testCase.auditStatus == "success" {
+				wantOutput += fmt.Sprintf("%s — the following analysis is AI-generated:\n\ntest analysis\n\n---\n%s • Analysis completed in 1.5s\n\n%s\n%s\n", analyzer.AILabel, analyzer.AILabel, analyzer.ReviewNotice, analyzer.Disclaimer)
+			}
+			if output.String() != wantOutput || errorOutput.String() != testCase.stderr {
+				t.Errorf("stdout=%q stderr=%q, want stdout=%q stderr=%q", output.String(), errorOutput.String(), wantOutput, testCase.stderr)
 			}
 			if len(stub.calls) != testCase.calls {
 				t.Errorf("boundary calls = %v", stub.calls)
@@ -138,21 +155,32 @@ func TestMain(t *testing.T) {
 			if testCase.calls == 0 && factoryCalls != 0 {
 				t.Error("constructed analyzer before validation")
 			}
-			if (testCase.calls == 0 && len(auditCalls) != 0) || (testCase.calls > 0 && (len(auditCalls) != 2 || auditCalls[0] != "received")) {
+			wantAuditCalls := []string{}
+			if testCase.calls > 0 {
+				wantAuditCalls = []string{"received", testCase.auditStatus}
+			}
+			if !reflect.DeepEqual(auditCalls, wantAuditCalls) {
 				t.Errorf("audit calls=%v", auditCalls)
 			}
 			if testCase.calls > 0 {
 				if factoryCalls != 1 || stub.calls[0] != "outcome:job" {
 					t.Errorf("factory=%d calls=%v", factoryCalls, stub.calls)
 				}
-				for _, notice := range []string{analyzer.Disclaimer, analyzer.ReviewNotice, "URL: job"} {
-					if !strings.Contains(output.String(), notice) {
-						t.Errorf("missing output notice %q", notice)
-					}
-				}
 			}
-			if testCase.calls == 2 && testCase.err == nil && strings.Count(output.String(), analyzer.AILabel) != 2 {
-				t.Error("AI output labels missing")
+			var wantCalls []string
+			if testCase.calls > 0 {
+				wantCalls = append(wantCalls, "outcome:job")
+			}
+			if testCase.calls == 2 {
+				wantCalls = append(wantCalls, "analysis:job")
+			}
+			if !reflect.DeepEqual(stub.calls, wantCalls) {
+				t.Errorf("operations = %v, want %v", stub.calls, wantCalls)
+			}
+			for _, ctx := range stub.contexts {
+				if ctx != interactionContext || audit.InteractionID(ctx) != "cli:job" {
+					t.Error("analyzer operation context changed")
+				}
 			}
 		})
 	}

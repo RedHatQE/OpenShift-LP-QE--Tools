@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -144,6 +145,18 @@ func callBotMain(t *testing.T) (status int) {
 	return 0
 }
 
+func assertBotLogger(t *testing.T, prefix string, debugf func(string, ...any)) {
+	t.Helper()
+	output := stdout.(*bytes.Buffer)
+	output.Reset()
+	debugf("logger probe")
+	want := "^" + regexp.QuoteMeta(prefix) + `[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} main_unit_test\.go:[0-9]+: logger probe\n$`
+	if !regexp.MustCompile(want).MatchString(output.String()) {
+		t.Errorf("logger output = %q, want pattern %q", output.String(), want)
+	}
+	output.Reset()
+}
+
 type stubHandler struct {
 	handler.PartialHandler
 	handle func(*slackevents.EventsAPIEvent, *slog.Logger) (bool, error)
@@ -195,11 +208,11 @@ func TestMainRuntime(t *testing.T) {
 		authErr, runErr error
 		message         string
 	}{
-		{name: "fail closed", message: "fail-closed"},
+		{name: "fail closed", args: []string{"-mcp-debug=false", "-slack-debug=false", "-tls-insecure=false"}, message: "fail-closed"},
 		{name: "monitor all", args: []string{"-monitor-all"}, message: "monitoring EVERY channel"},
-		{name: "allowlists", args: []string{"-channels", " C123, ,C456, ", "-allowed-bots", " B123, ,B456, "}, channels: []string{"C123", "C456"}, allowedBots: true, message: "Analyzing Prow URLs from allow-listed bots"},
-		{name: "auth failure", authErr: errors.New("auth unavailable"), message: "self bot ID unknown"},
-		{name: "socket failure", runErr: errors.New("socket stopped"), message: "Socket mode error"},
+		{name: "allowlists", args: []string{"-channels", " C123, ,C456, ", "-allowed-bots", " B123, ,B456, ", "-mcp-debug=false"}, channels: []string{"C123", "C456"}, allowedBots: true, message: "Analyzing Prow URLs from allow-listed bots"},
+		{name: "auth failure", args: []string{"-slack-debug=false"}, authErr: errors.New("auth unavailable"), message: "self bot ID unknown"},
+		{name: "socket failure", args: []string{"-tls-insecure=false"}, runErr: errors.New("socket stopped"), message: "Socket mode error"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			args := append([]string{"-slack-token", "bot-token", "-app-token", "app-token", "-mcp-url", "url", "-mcp-token", "mcp-token", "-prompt", "prompt", "-mcp-timeout", "42", "-mcp-debug", "-slack-debug", "-tls-insecure"}, testCase.args...)
@@ -217,12 +230,22 @@ func TestMainRuntime(t *testing.T) {
 				dispatchEvent, launchWorker = oldDispatch, oldLaunch
 			})
 			client := &slack.Client{}
+			wantDebug := testCase.name != "fail closed" && testCase.name != "auth failure"
 			calls := []string{}
 			newSlackClient = func(token string, opts ...slack.Option) *slack.Client {
 				calls = append(calls, "slack")
 				if token != "bot-token" || len(opts) != 3 {
 					t.Errorf("Slack constructor token/options=%q/%d", token, len(opts))
 				}
+				for _, option := range opts {
+					option(client)
+				}
+				if reflect.ValueOf(client).Elem().FieldByName("appLevelToken").String() != "app-token" || client.Debug() != wantDebug {
+					t.Error("Slack app token or debug options changed")
+				}
+				slack.OptionDebug(true)(client)
+				assertBotLogger(t, "slack: ", client.Debugf)
+				slack.OptionDebug(wantDebug)(client)
 				return client
 			}
 			authTest = func(actual *slack.Client) (*slack.AuthTestResponse, error) {
@@ -245,6 +268,13 @@ func TestMainRuntime(t *testing.T) {
 				if analysis.Timeout() != 42*time.Second {
 					t.Errorf("timeout=%s", analysis.Timeout())
 				}
+				wantAnalysis := &analyzer.Analyzer{}
+				analyzer.WithInsecureSkipVerify(testCase.name != "fail closed" && testCase.name != "socket failure")(wantAnalysis)
+				analyzer.WithDebug(testCase.name != "fail closed" && testCase.name != "allowlists")(wantAnalysis)
+				analyzer.WithTimeout(42 * time.Second)(wantAnalysis)
+				if !reflect.DeepEqual(analysis, wantAnalysis) {
+					t.Error("analyzer TLS, debug or timeout options changed")
+				}
 				return analysis
 			}
 			eventHandler := &stubHandler{handle: func(event *slackevents.EventsAPIEvent, logger *slog.Logger) (bool, error) {
@@ -260,6 +290,32 @@ func TestMainRuntime(t *testing.T) {
 				if actual != client || actualAnalysis != analysis || !reflect.DeepEqual(channels, testCase.channels) || len(opts) != wantOpts {
 					t.Errorf("handler inputs channels=%v options=%d", channels, len(opts))
 				}
+				settings := reflect.ValueOf(handler.New(actual, actualAnalysis, channels, opts...)).Elem()
+				wantSelfID := "SELF"
+				if testCase.authErr != nil {
+					wantSelfID = ""
+				}
+				if settings.FieldByName("selfBotID").String() != wantSelfID || settings.FieldByName("monitorAll").Bool() != (testCase.name == "monitor all") {
+					t.Error("handler self ID or monitor-all options changed")
+				}
+				wantBots := map[string]bool{}
+				if testCase.allowedBots {
+					wantBots = map[string]bool{"B123": true, "B456": true}
+				}
+				wantChannels := map[string]bool{}
+				for _, channel := range testCase.channels {
+					wantChannels[channel] = true
+				}
+				for field, want := range map[string]map[string]bool{"allowedBotIDs": wantBots, "monitoredChannels": wantChannels} {
+					actualMap := map[string]bool{}
+					values := settings.FieldByName(field)
+					for _, key := range values.MapKeys() {
+						actualMap[key.String()] = values.MapIndex(key).Bool()
+					}
+					if !reflect.DeepEqual(actualMap, want) {
+						t.Errorf("handler %s = %v, want %v", field, actualMap, want)
+					}
+				}
 				return eventHandler
 			}
 			socket := &socketmode.Client{Events: make(chan socketmode.Event, 2)}
@@ -268,6 +324,15 @@ func TestMainRuntime(t *testing.T) {
 				if actual != client || len(opts) != 2 {
 					t.Error("socket constructor mismatch")
 				}
+				settings := &socketmode.Client{}
+				for _, option := range opts {
+					option(settings)
+				}
+				if reflect.ValueOf(settings).Elem().FieldByName("debug").Bool() != wantDebug {
+					t.Error("socket debug option changed")
+				}
+				socketmode.OptionDebug(true)(settings)
+				assertBotLogger(t, "socketmode: ", settings.Debugf)
 				return socket
 			}
 			ackSocket = func(actual *socketmode.Client, request socketmode.Request, payload ...interface{}) {
