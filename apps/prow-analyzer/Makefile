@@ -40,8 +40,7 @@ clean:
 	{ set -euxo pipefail; shopt -s inherit_errexit;\
 	    rm -f prow-analyzer--cli prow-analyzer--bot;\
 	    rm -f coverage.out coverage.html;\
-	    true;\
-	}
+	true; }
 
 # Help
 help:

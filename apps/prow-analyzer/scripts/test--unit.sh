@@ -1,34 +1,42 @@
 #!/bin/bash
-set -euxo pipefail; shopt -s inherit_errexit
+set -euxo pipefail; shopt -s inherit_errexit extglob
 
-typeset suiteTag='unit' scriptDir=''
-typeset goCommand="${GO-go}" packageText="${PKGS-./pkg/...}"
-scriptDir="$(
-    dirname -- "${BASH_SOURCE[0]}"
-)"
-packageText="${packageText//$'\n'/ }"
-typeset -a suitePackagesArr=(); read -r -a suitePackagesArr 0<<<"${packageText}"$'\n'
-case "${#}:${1-}" in
-    '0:'|'1:--check-only') ;;
-    *) printf 'Expected no arguments or --check-only\n' >&2; exit 2 ;;
+typeset -i chkOnly="${1:-}"; (($#)) && shift
+
+case "${#}:${chkOnly}" in
+  (0:?(--check-only))   ;;
+  (*)
+    echo 'Expected no arguments or `--check-only`.'
+    exit 2
+    ;;
 esac
 
+typeset scrDir="$(
+    dirname -- "${BASH_SOURCE[0]}"
+)"
+typeset suiteTag='unit'
+typeset goCmd="${GO-go}"
+typeset -a suitePkgArr=(${PKGS-./pkg/...})
+
 typeset coverageThreshold='100.0' coverageFile='coverage.out' coverageHTML='coverage.html'
-typeset -a botPackagesArr=('./cmd/prow-analyzer--bot')
+typeset -a botPkgArr=('./cmd/prow-analyzer--bot')
 
 : 'Guarding that the unit build tag actually selects tests...'
-GO="${goCommand}" "${scriptDir}/check--test-selection.sh" "${suiteTag}" "${suitePackagesArr[*]}" 1
-if [[ "${1-}" == '--check-only' ]]; then
-    exit 0
-fi
+GO="${goCmd}" \
+    "${scrDir}/check--test-selection.sh" \
+    "${suiteTag}" \
+    "${suitePkgArr[*]@Q}" \
+    1
+
+[ -z "${chkOnly}" ] || exit 0
 : 'Running unit tests with coverage...'
-"${goCommand}" test -v -tags "${suiteTag}" -covermode=set -coverprofile="${coverageFile}" "${suitePackagesArr[@]}"
+"${goCmd}" test -v -tags "${suiteTag}" -covermode=set -coverprofile="${coverageFile}" "${suitePkgArr[@]}"
 : 'Generating coverage report...'
-"${goCommand}" tool cover -html="${coverageFile}" -o "${coverageHTML}"
+"${goCmd}" tool cover -html="${coverageFile}" -o "${coverageHTML}"
 : 'Calculating coverage percentage...'
 typeset coverageOutput='' totalCoverage=''
 coverageOutput="$(
-    "${goCommand}" tool cover -func="${coverageFile}"
+    "${goCmd}" tool cover -func="${coverageFile}"
 )"
 : "${coverageOutput}"
 totalCoverage="$(
@@ -50,7 +58,11 @@ else
     : "Coverage report: ${coverageHTML}"
 fi
 : 'Guarding that the unit build tag selects bot tests...'
-GO="${goCommand}" "${scriptDir}/check--test-selection.sh" "${suiteTag}" "${botPackagesArr[*]}" 1
+GO="${goCmd}" \
+    "${scrDir}/check--test-selection.sh" \
+    "${suiteTag}" \
+    "${botPkgArr[*]@Q}" \
+    1
 : 'Running bot env-consumer unit tests (outside the coverage gate)...'
-"${goCommand}" test -v -tags "${suiteTag}" "${botPackagesArr[@]}"
+"${goCmd}" test -v -tags "${suiteTag}" "${botPkgArr[@]}"
 true
