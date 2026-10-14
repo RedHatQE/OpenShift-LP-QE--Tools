@@ -7,7 +7,7 @@ typeset buildTag="${1:?usage: check--test-selection.sh <buildTag> [packages] [mi
 typeset pkgsTest="${1:-./pkg/...}"; (($#)) && shift
 typeset -i minCnt="${1:-1}"; (($#)) && shift
 
-typeset goCmd="${GO-go}"
+typeset goCmd="${GO-go}" pkgLst=''
 typeset -i funcCnt=0
 typeset -a pkgArr=(${pkgsTest})
 
@@ -15,10 +15,9 @@ typeset -a pkgArr=(${pkgsTest})
 # The `go test -list` compiles the (tagged) test binaries and prints one
 #   function name per line, plus a per-package summary line. Cnt only the
 #   function names.
+pkgLst="$("${goCmd}" test -tags "${buildTag}" -list '.*' "${pkgArr[@]}")"
 funcCnt="$(
-    printf '%s\n' "$(
-        "${goCmd}" test -tags "${buildTag}" -list '.*' "${pkgArr[@]}"
-    )" |
+    printf '%s\n' "${pkgLst}" |
     awk '/^(Test|Benchmark|Fuzz|Example)/ {Cnt++} END {print (Cnt+0)}'
 )"
 

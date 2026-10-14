@@ -11,9 +11,7 @@ case "${#}:${chkOnly}" in
     ;;
 esac
 
-typeset scrDir="$(
-    dirname -- "${BASH_SOURCE[0]}"
-)"
+typeset scrDir="${BASH_SOURCE[0]%/*}"
 typeset suiteTag='integration'
 typeset goCmd="${GO-go}"
 typeset -a suitePkgArr=(${PKGS-./pkg/...})
