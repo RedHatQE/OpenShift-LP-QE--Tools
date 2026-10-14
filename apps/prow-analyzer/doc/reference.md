@@ -564,8 +564,10 @@ apps/prow-analyzer/
     prow-analyzer--bot/
       main.go                          Bot entrypoint (Slack socket mode)
       main_test.go                     Environment helper tests
-      main_unit_test.go                Flag and environment contract tests
-    prow-analyzer--cli/main.go         CLI entrypoint (single URL analysis)
+      main_unit_test.go                Direct entrypoint, configuration and event tests
+    prow-analyzer--cli/
+      main.go                          CLI entrypoint (single URL analysis)
+      main_unit_test.go                Direct entrypoint and output/audit contract tests
   pkg/
     analyzer/
       analyzer.go                      Core MCP client and analysis logic
@@ -596,8 +598,8 @@ image/container/prow-analyzer/
 
 ### Development environment
 
-> **Linux is required for the `make` targets.** The build/test scripts under
-> `scripts/` use strict Bash conventions — notably `shopt -s inherit_errexit`,
+> **Linux is required for the `make` targets.** The Makefile recipes
+> and suite scripts use strict Bash conventions — notably `shopt -s inherit_errexit`,
 > which needs **GNU Bash 4.4+**. macOS ships Bash 3.2, so `make build`,
 > `make test`, and `make test--unit` will **not** run natively on macOS.
 >
@@ -605,8 +607,8 @@ image/container/prow-analyzer/
 > VM or container** (for example `podman run --rm -it -v "$PWD":/src -w /src
 > registry.access.redhat.com/ubi9/go-toolset:1.22 bash`). As a fallback for
 > ad-hoc checks, `go` commands can be run directly without the Makefile (e.g.
-> `go test -tags unit ./pkg/...`), but the coverage gate and test guards only run
-> through the `make` targets on Linux. CI runs these targets on Linux.
+> `go test -tags unit ./pkg/... ./cmd/...`), but direct Go commands bypass the coverage gate
+> and test guards in the suite scripts. CI calls these scripts through Make on Linux.
 
 ### Building
 
@@ -626,12 +628,24 @@ make clean
 
 ### Testing
 
+Make delegates to `scripts/test--unit.sh` and `scripts/test--integration.sh`.
+Each wrapper owns its configuration and calls the standalone
+`scripts/check--test-selection.sh <tag> [packages] [minCount]` guard. Each suite
+defines its tag once and passes the same package selection to its guard and test
+command. `make check-tags` calls each suite with `--check-only`;
+it lists selected tests without running the suites. The guard counts selected
+test/benchmark/fuzz/example names; it does not prove every test file has a tag.
+
 ```bash
 # Run unit tests with coverage, then integration tests with the race detector
 make test
 
-# Run unit tests with the embedded 100% coverage gate
+# Run package and command unit tests together in the 100% coverage gate
 make test--unit
+
+# Use a specific Go executable and package selection for both suites.
+# Include every package and command to retain the full default coverage scope.
+make test GO=/path/to/go PKGS='./pkg/... ./cmd/...'
 
 # Run specific tests — the suites are tagged, so a build tag is required or the
 # run selects zero tests. Unit suite is tagged `unit`:
@@ -645,6 +659,12 @@ go test -tags integration -race -v -run TestHandle ./pkg/slack/handler/
 ```
 
 Test coverage areas:
+
+- **Commands:** Direct CLI and bot entrypoint tests mock external construction,
+  network/socket calls, output and audit writers. Bot event dispatch is tested
+  directly; entrypoint fixtures complete their injected event loop before
+  restoring dependencies. Flag/environment contracts and environment helpers
+  run inside the same package-and-command unit coverage gate.
 
 - **Analyzer (21 tests):** MCP session initialization and reuse, stale session recovery (404 retry), HTTP error handling (401, 403, 404, 500), SSE stream parsing (pings, data lines, empty streams, invalid JSON), context cancellation, dependency injection error paths (marshal, request builder, reader, client.Do), initialization failure retryability, Prow URL extraction (plain, Slack-formatted, trailing punctuation, deck-internal), response formatting (valid and nil results).
 
