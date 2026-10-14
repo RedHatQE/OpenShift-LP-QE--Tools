@@ -17,7 +17,7 @@ typeset goCmd="${GO-go}"
 typeset -a suitePkgArr="(${PKGS-./pkg/...})"
 
 typeset covMin='100.0' covFile='coverage.out' covHTML='coverage.html'
-typeset totCov=''
+typeset covOut='' totCov=''
 typeset -a botPkgArr=('./cmd/prow-analyzer--bot')
 
 : 'Guarding that the unit build tag actually selects tests...'
@@ -36,14 +36,14 @@ GO="${goCmd}" \
 : 'Generating Code Coverage report...'
 "${goCmd}" tool cover -html="${covFile}" -o "${covHTML}"
 : 'Calculating Code Coverage percentage...'
+covOut="$("${goCmd}" tool cover -func="${covFile}")"
 totCov="$(
-    printf '%s\n' "$("${goCmd}" tool cover -func="${covFile}")" |
-    sed -nE 's/^total:\D+([.0-9]+)%/\1/p;tq;b;:q q'
-    grep 'total:' | awk '{print $3}' | sed 's/%//'
+    echo "${covOut}" |
+    sed -nE 's/^total:[^.0-9]+([.0-9]+)%/\1/p;tq;b;:q q'
 )"
 : "Total Code Coverage: ${totCov}%"
 : "Required Code Coverage: ${covMin}%"
-if ((totCov} < covMin)); then
+if ((totCov < covMin)); then
     : "❌ FAIL: Code Coverage ${totCov}% is below threshold ${covMin}%."
     : "Code Coverage report: ${covHTML}"
     false
