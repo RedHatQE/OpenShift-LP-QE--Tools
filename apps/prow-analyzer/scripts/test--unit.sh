@@ -14,11 +14,10 @@ esac
 typeset scrDir="${BASH_SOURCE[0]%/*}"
 typeset suiteTag='unit'
 typeset goCmd="${GO-go}"
-typeset -a suitePkgArr="(${PKGS-./pkg/...})"
+typeset -a suitePkgArr="(${PKGS-./pkg/... ./cmd/...})"
 
 typeset covMin='100.0' covFile='coverage.out' covHTML='coverage.html'
 typeset covOut='' totCov=''
-typeset -a botPkgArr=('./cmd/prow-analyzer--bot')
 
 : 'Guarding that the unit build tag actually selects tests...'
 GO="${goCmd}" \
@@ -56,14 +55,5 @@ else
     : "Code Coverage report: ${covHTML}"
     false
 fi
-
-: 'Guarding that the unit build tag selects bot tests...'
-GO="${goCmd}" \
-    "${scrDir}/check--test-selection.sh" \
-    "${suiteTag}" \
-    "${botPkgArr[*]@Q}" \
-    1
-: 'Running bot env-consumer Unit Test (outside the Code Coverage gate)...'
-"${goCmd}" test -v -tags "${suiteTag}" "${botPkgArr[@]}"
 
 true

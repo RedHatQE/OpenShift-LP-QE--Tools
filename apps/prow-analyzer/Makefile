@@ -4,7 +4,7 @@
 
 SHELL   := /bin/bash
 GO      ?= go
-PKGS    ?= ./pkg/...
+PKGS    ?= ./pkg/... ./cmd/...
 
 SCRIPTS := ./scripts
 
@@ -22,7 +22,7 @@ build--bot:
 # Run the full suite: unit (with coverage gate) then integration (mirrors CI ordering)
 test: test--unit test--integration
 
-# Gate ./pkg/... at 100% coverage and run bot command tests separately.
+# Gate all package and command unit tests together at 100% coverage.
 test--unit:
 	GO='$(GO)' PKGS='$(strip $(PKGS))' '$(SCRIPTS)/test--unit.sh'
 

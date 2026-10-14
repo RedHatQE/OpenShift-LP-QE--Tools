@@ -3,28 +3,26 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
-	"os/exec"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/slack-go/slack"
+	"github.com/slack-go/slack/slackevents"
+	"github.com/slack-go/slack/socketmode"
+
+	"github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/analyzer"
+	"github.com/RedHatQE/OpenShift-LP-QE--Tools/apps/prow-analyzer/pkg/slack/handler"
 )
 
 func TestBotEnvironmentFlagDefaults(t *testing.T) {
-	if os.Getenv("PROW_ANALYZER_TEST_HELPER") == "true" {
-		flag.CommandLine = flag.NewFlagSet("prow-analyzer--bot", flag.ExitOnError)
-		flag.CommandLine.Usage = func() {
-			for _, name := range []string{"mcp-url", "mcp-token", "mcp-debug", "channels", "allowed-bots", "mcp-timeout"} {
-				fmt.Printf("%s=%s\n", name, flag.Lookup(name).Value.String())
-			}
-			os.Exit(0)
-		}
-		os.Args = append([]string{"prow-analyzer--bot"}, strings.Fields(os.Getenv("PROW_ANALYZER_TEST_ARGS"))...)
-		main()
-		return
-	}
-
 	for _, key := range []string{
 		"PROW_AN__MCP__URL__SHIP_HELP", "PROW_AN__MCP__TOKEN__SHIP_HELP", "PROW_AN__MCP__SHIP_HELP__DEBUG",
 		"PROW_AN__MONITORED_CHANNELS", "PROW_AN__ALLOWED_BOT_IDS", "PROW_AN__MCP__TIMEOUT_SEC",
@@ -89,17 +87,261 @@ func TestBotEnvironmentFlagDefaults(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
+			prepareBotMain(t, strings.Fields(testCase.args))
 			for key, value := range testCase.env {
 				t.Setenv(key, value)
 			}
-			command := exec.Command(os.Args[0], "-test.run=^TestBotEnvironmentFlagDefaults$")
-			command.Env = append(os.Environ(), "PROW_ANALYZER_TEST_HELPER=true", "PROW_ANALYZER_TEST_ARGS="+testCase.args)
-			output, err := command.CombinedOutput()
-			if err != nil {
-				t.Fatalf("bot flag parsing failed: %v\n%s", err, output)
+			var output bytes.Buffer
+			flag.CommandLine.Usage = func() {
+				for _, name := range []string{"mcp-url", "mcp-token", "mcp-debug", "channels", "allowed-bots", "mcp-timeout"} {
+					fmt.Fprintf(&output, "%s=%s\n", name, flag.Lookup(name).Value.String())
+				}
+				panic(botExit(0))
 			}
-			if string(output) != testCase.want {
-				t.Errorf("bot flags = %q, want %q", output, testCase.want)
+			if status := callBotMain(t); status != 0 {
+				t.Fatalf("help status = %d", status)
+			}
+			if output.String() != testCase.want {
+				t.Errorf("bot flags = %q, want %q", output.String(), testCase.want)
+			}
+		})
+	}
+}
+
+type botExit int
+
+func prepareBotMain(t *testing.T, args []string) {
+	t.Helper()
+	oldFlags, oldArgs, oldExit := flag.CommandLine, os.Args, exit
+	t.Cleanup(func() { flag.CommandLine, os.Args, exit = oldFlags, oldArgs, oldExit })
+	flag.CommandLine = flag.NewFlagSet("bot", flag.ContinueOnError)
+	os.Args = append([]string{"bot"}, args...)
+	exit = func(status int) { panic(botExit(status)) }
+	for _, key := range []string{
+		"PROW_AN__SLACK__BOT_TOKEN", "PROW_AN__SLACK__APP_TOKEN", "PROW_AN__MCP__URL__SHIP_HELP",
+		"PROW_AN__MCP__TOKEN__SHIP_HELP", "PROW_AN__MONITORED_CHANNELS", "PROW_AN__ALLOWED_BOT_IDS",
+		"PROW_AN__PROMPT__TEMPLATE", "PROW_AN__MONITOR__ALL", "PROW_AN__SLACK__DEBUG",
+		"PROW_AN__MCP__SHIP_HELP__DEBUG", "PROW_AN__MCP__TIMEOUT_SEC", "TLS_INSECURE_SKIP_VERIFY",
+	} {
+		t.Setenv(key, "")
+	}
+}
+
+func callBotMain(t *testing.T) (status int) {
+	t.Helper()
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			value, ok := recovered.(botExit)
+			if !ok {
+				panic(recovered)
+			}
+			status = int(value)
+		}
+	}()
+	main()
+	return 0
+}
+
+type stubHandler struct {
+	handler.PartialHandler
+	handle func(*slackevents.EventsAPIEvent, *slog.Logger) (bool, error)
+}
+
+func (stub *stubHandler) Handle(event *slackevents.EventsAPIEvent, logger *slog.Logger) (bool, error) {
+	return stub.handle(event, logger)
+}
+
+func TestMainValidation(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		args    []string
+		message string
+	}{
+		{"missing slack token", nil, "--slack-token is required"},
+		{"missing app token", []string{"-slack-token", "bot"}, "--app-token is required"},
+		{"missing MCP URL", []string{"-slack-token", "bot", "-app-token", "app", "-mcp-token", "token"}, "Both --mcp-url and --mcp-token"},
+		{"missing MCP token", []string{"-slack-token", "bot", "-app-token", "app", "-mcp-url", "url"}, "Both --mcp-url and --mcp-token"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			prepareBotMain(t, testCase.args)
+			var logs bytes.Buffer
+			oldLogger := slog.Default()
+			slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+			t.Cleanup(func() { slog.SetDefault(oldLogger) })
+			oldSlack := newSlackClient
+			newSlackClient = func(string, ...slack.Option) *slack.Client {
+				t.Fatal("external construction before validation")
+				return nil
+			}
+			t.Cleanup(func() { newSlackClient = oldSlack })
+			if status := callBotMain(t); status != 1 {
+				t.Errorf("status=%d", status)
+			}
+			if !strings.Contains(logs.String(), testCase.message) {
+				t.Errorf("logs=%q", logs.String())
+			}
+		})
+	}
+}
+
+func TestMainRuntime(t *testing.T) {
+	for _, testCase := range []struct {
+		name            string
+		args            []string
+		channels        []string
+		allowedBots     bool
+		authErr, runErr error
+		message         string
+	}{
+		{name: "fail closed", message: "fail-closed"},
+		{name: "monitor all", args: []string{"-monitor-all"}, message: "monitoring EVERY channel"},
+		{name: "allowlists", args: []string{"-channels", " C123, ,C456, ", "-allowed-bots", " B123, ,B456, "}, channels: []string{"C123", "C456"}, allowedBots: true, message: "Analyzing Prow URLs from allow-listed bots"},
+		{name: "auth failure", authErr: errors.New("auth unavailable"), message: "self bot ID unknown"},
+		{name: "socket failure", runErr: errors.New("socket stopped"), message: "Socket mode error"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			args := append([]string{"-slack-token", "bot-token", "-app-token", "app-token", "-mcp-url", "url", "-mcp-token", "mcp-token", "-prompt", "prompt", "-mcp-timeout", "42", "-mcp-debug", "-slack-debug", "-tls-insecure"}, testCase.args...)
+			prepareBotMain(t, args)
+			var logs bytes.Buffer
+			oldLogger := slog.Default()
+			slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+			t.Cleanup(func() { slog.SetDefault(oldLogger) })
+			oldSlack, oldAuth, oldAnalyzer, oldHandler := newSlackClient, authTest, newAnalyzer, newHandler
+			oldSocket, oldRun, oldAck := newSocketClient, runSocket, ackSocket
+			t.Cleanup(func() {
+				newSlackClient, authTest, newAnalyzer, newHandler = oldSlack, oldAuth, oldAnalyzer, oldHandler
+				newSocketClient, runSocket, ackSocket = oldSocket, oldRun, oldAck
+			})
+			client := &slack.Client{}
+			calls := []string{}
+			newSlackClient = func(token string, opts ...slack.Option) *slack.Client {
+				calls = append(calls, "slack")
+				if token != "bot-token" || len(opts) != 3 {
+					t.Errorf("Slack constructor token/options=%q/%d", token, len(opts))
+				}
+				return client
+			}
+			authTest = func(actual *slack.Client) (*slack.AuthTestResponse, error) {
+				calls = append(calls, "auth")
+				if actual != client {
+					t.Error("auth client mismatch")
+				}
+				return &slack.AuthTestResponse{BotID: "SELF"}, testCase.authErr
+			}
+			var analysis *analyzer.Analyzer
+			newAnalyzer = func(url, token, prompt string, opts ...analyzer.AnalyzerOption) *analyzer.Analyzer {
+				calls = append(calls, "analyzer")
+				if url != "url" || token != "mcp-token" || prompt != "prompt" || len(opts) != 3 {
+					t.Errorf("analyzer arguments=%q/%q/%q/%d", url, token, prompt, len(opts))
+				}
+				analysis = analyzer.NewAnalyzer(url, token, prompt, opts...)
+				if analysis.Timeout() != 42*time.Second {
+					t.Errorf("timeout=%s", analysis.Timeout())
+				}
+				return analysis
+			}
+			done := make(chan struct{})
+			eventHandler := &stubHandler{handle: func(event *slackevents.EventsAPIEvent, logger *slog.Logger) (bool, error) {
+				close(done)
+				return false, nil
+			}}
+			newHandler = func(actual *slack.Client, actualAnalysis *analyzer.Analyzer, channels []string, opts ...handler.Option) handler.PartialHandler {
+				calls = append(calls, "handler")
+				wantOpts := 3
+				if testCase.authErr != nil {
+					wantOpts = 2
+				}
+				if actual != client || actualAnalysis != analysis || !reflect.DeepEqual(channels, testCase.channels) || len(opts) != wantOpts {
+					t.Errorf("handler inputs channels=%v options=%d", channels, len(opts))
+				}
+				return eventHandler
+			}
+			socket := &socketmode.Client{Events: make(chan socketmode.Event)}
+			newSocketClient = func(actual *slack.Client, opts ...socketmode.Option) *socketmode.Client {
+				calls = append(calls, "socket")
+				if actual != client || len(opts) != 2 {
+					t.Error("socket constructor mismatch")
+				}
+				return socket
+			}
+			acks := 0
+			ackSocket = func(actual *socketmode.Client, request socketmode.Request, payload ...interface{}) {
+				if actual != socket {
+					t.Error("ack client mismatch")
+				}
+				acks++
+			}
+			runSocket = func(actual *socketmode.Client) error {
+				calls = append(calls, "run")
+				if actual != socket {
+					t.Error("run client mismatch")
+				}
+				actual.Events <- socketmode.Event{Type: socketmode.EventTypeEventsAPI, Data: slackevents.EventsAPIEvent{}, Request: &socketmode.Request{}}
+				<-done
+				close(actual.Events)
+				return testCase.runErr
+			}
+			wantStatus := 0
+			if testCase.runErr != nil {
+				wantStatus = 1
+			}
+			if status := callBotMain(t); status != wantStatus {
+				t.Errorf("status=%d want=%d", status, wantStatus)
+			}
+			if !reflect.DeepEqual(calls, []string{"slack", "auth", "analyzer", "handler", "socket", "run"}) || acks != 1 {
+				t.Errorf("calls=%v acks=%d", calls, acks)
+			}
+			if !strings.Contains(logs.String(), testCase.message) {
+				t.Errorf("logs=%q", logs.String())
+			}
+			if strings.Contains(logs.String(), "bot-token") || strings.Contains(logs.String(), "mcp-token") {
+				t.Error("credentials leaked")
+			}
+		})
+	}
+}
+
+func TestHandleSocketEvent(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		event   socketmode.Event
+		handled bool
+		err     error
+		calls   int
+		message string
+	}{
+		{"connecting", socketmode.Event{Type: socketmode.EventTypeConnecting}, false, nil, 0, "Connecting to Slack"},
+		{"connected", socketmode.Event{Type: socketmode.EventTypeConnected}, false, nil, 0, "Connected to Slack"},
+		{"connection error", socketmode.Event{Type: socketmode.EventTypeConnectionError, Data: "disconnected"}, false, nil, 0, "Connection error"},
+		{"invalid event", socketmode.Event{Type: socketmode.EventTypeEventsAPI, Data: "invalid"}, false, nil, 0, "Ignored event"},
+		{"handler error", socketmode.Event{Type: socketmode.EventTypeEventsAPI, Data: slackevents.EventsAPIEvent{Type: "callback"}, Request: &socketmode.Request{}}, false, errors.New("handle failed"), 1, "Failed to handle event"},
+		{"handled", socketmode.Event{Type: socketmode.EventTypeEventsAPI, Data: slackevents.EventsAPIEvent{Type: "callback"}, Request: &socketmode.Request{}}, true, nil, 1, "Event handled"},
+		{"not handled", socketmode.Event{Type: socketmode.EventTypeEventsAPI, Data: slackevents.EventsAPIEvent{Type: "callback"}, Request: &socketmode.Request{}}, false, nil, 1, "Received socket mode event"},
+		{"unknown", socketmode.Event{Type: socketmode.EventType("unknown")}, false, nil, 0, "Unhandled event type"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			var logs bytes.Buffer
+			oldLogger, oldAck := slog.Default(), ackSocket
+			slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+			t.Cleanup(func() { slog.SetDefault(oldLogger); ackSocket = oldAck })
+			acks, handles := 0, 0
+			socket := &socketmode.Client{}
+			ackSocket = func(actual *socketmode.Client, request socketmode.Request, payload ...interface{}) {
+				if actual != socket {
+					t.Error("ack socket mismatch")
+				}
+				acks++
+			}
+			eventHandler := &stubHandler{handle: func(event *slackevents.EventsAPIEvent, logger *slog.Logger) (bool, error) {
+				handles++
+				if event.Type != "callback" || acks != 1 {
+					t.Error("callback changed or handled before ack")
+				}
+				return testCase.handled, testCase.err
+			}}
+			handleSocketEvent(testCase.event, eventHandler, socket)
+			if acks != testCase.calls || handles != testCase.calls || !strings.Contains(logs.String(), testCase.message) {
+				t.Errorf("acks=%d handles=%d logs=%q", acks, handles, logs.String())
 			}
 		})
 	}

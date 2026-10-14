@@ -53,6 +53,17 @@ func envStr(key, def string) string {
 // The analyzer substitutes the Prow URL for "{job_url}".
 const defaultPrompt = "Analyze this Prow CI failure in detail. Provide: (1) Root cause, (2) Related Jira issues, (3) Recurring pattern analysis, (4) Recommended actions. URL: {job_url}"
 
+var (
+	exit            = os.Exit
+	newSlackClient  = slack.New
+	authTest        = (*slack.Client).AuthTest
+	newAnalyzer     = analyzer.NewAnalyzer
+	newHandler      = handler.New
+	newSocketClient = socketmode.New
+	runSocket       = (*socketmode.Client).Run
+	ackSocket       = (*socketmode.Client).Ack
+)
+
 func main() {
 	var (
 		slackToken  = flag.String("slack-token", os.Getenv("PROW_AN__SLACK__BOT_TOKEN"), "Slack bot token (defaults to env. var. PROW_AN__SLACK__BOT_TOKEN, if set).")
@@ -73,15 +84,15 @@ func main() {
 
 	if *slackToken == "" {
 		slog.Error("--slack-token is required (or set PROW_AN__SLACK__BOT_TOKEN)")
-		os.Exit(1)
+		exit(1)
 	}
 	if *appToken == "" {
 		slog.Error("--app-token is required (or set PROW_AN__SLACK__APP_TOKEN)")
-		os.Exit(1)
+		exit(1)
 	}
 	if *mcpURL == "" || *mcpToken == "" {
 		slog.Error("Both --mcp-url and --mcp-token are required (or set PROW_AN__MCP__URL__SHIP_HELP and PROW_AN__MCP__TOKEN__SHIP_HELP)")
-		os.Exit(1)
+		exit(1)
 	}
 
 	// Parse monitored channels. Fail-closed: when empty and --monitor-all is not
@@ -121,7 +132,7 @@ func main() {
 		slog.Info("Analyzing Prow URLs from allow-listed bots", "botIDs", allowedBotIDs)
 	}
 
-	slackClient := slack.New(
+	slackClient := newSlackClient(
 		*slackToken,
 		slack.OptionAppLevelToken(*appToken),
 		slack.OptionDebug(*slackDebug),
@@ -134,21 +145,21 @@ func main() {
 		handler.WithAllowedBotIDs(allowedBotIDs),
 		handler.WithMonitorAll(*monitorAll),
 	}
-	if authResp, err := slackClient.AuthTest(); err != nil {
+	if authResp, err := authTest(slackClient); err != nil {
 		slog.Warn("AuthTest failed; self bot ID unknown (own messages still ignored via allow-list)", "error", err)
 	} else {
 		handlerOpts = append(handlerOpts, handler.WithSelfBotID(authResp.BotID))
 	}
 
-	a := analyzer.NewAnalyzer(*mcpURL, *mcpToken, *prompt,
+	a := newAnalyzer(*mcpURL, *mcpToken, *prompt,
 		analyzer.WithInsecureSkipVerify(*tlsInsecure),
 		analyzer.WithDebug(*mcpDebug),
 		analyzer.WithTimeout(time.Duration(*mcpTimeout)*time.Second),
 	)
 
-	h := handler.New(slackClient, a, monitoredChannels, handlerOpts...)
+	h := newHandler(slackClient, a, monitoredChannels, handlerOpts...)
 
-	socketClient := socketmode.New(
+	socketClient := newSocketClient(
 		slackClient,
 		socketmode.OptionDebug(*slackDebug),
 		socketmode.OptionLog(log.New(os.Stdout, "socketmode: ", log.Lshortfile|log.LstdFlags)),
@@ -156,39 +167,43 @@ func main() {
 
 	go func() {
 		for evt := range socketClient.Events {
-			slog.Info("Received socket mode event", "type", evt.Type)
-			switch evt.Type {
-			case socketmode.EventTypeConnecting:
-				slog.Info("Connecting to Slack...")
-			case socketmode.EventTypeConnected:
-				slog.Info("Connected to Slack")
-			case socketmode.EventTypeConnectionError:
-				slog.Error("Connection error", "data", evt.Data)
-			case socketmode.EventTypeEventsAPI:
-				eventsAPIEvent, ok := evt.Data.(slackevents.EventsAPIEvent)
-				if !ok {
-					slog.Warn("Ignored event", "event", evt)
-					continue
-				}
-
-				socketClient.Ack(*evt.Request)
-
-				logger := slog.With("type", eventsAPIEvent.Type)
-				handled, err := h.Handle(&eventsAPIEvent, logger)
-				if err != nil {
-					logger.Error("Failed to handle event", "error", err)
-				} else if handled {
-					logger.Info("Event handled")
-				}
-			default:
-				slog.Info("Unhandled event type", "type", evt.Type)
-			}
+			handleSocketEvent(evt, h, socketClient)
 		}
 	}()
 
 	fmt.Println("Prow analyzer bot is running...")
-	if err := socketClient.Run(); err != nil {
+	if err := runSocket(socketClient); err != nil {
 		slog.Error("Socket mode error", "error", err)
-		os.Exit(1)
+		exit(1)
+	}
+}
+
+func handleSocketEvent(evt socketmode.Event, h handler.PartialHandler, socketClient *socketmode.Client) {
+	slog.Info("Received socket mode event", "type", evt.Type)
+	switch evt.Type {
+	case socketmode.EventTypeConnecting:
+		slog.Info("Connecting to Slack...")
+	case socketmode.EventTypeConnected:
+		slog.Info("Connected to Slack")
+	case socketmode.EventTypeConnectionError:
+		slog.Error("Connection error", "data", evt.Data)
+	case socketmode.EventTypeEventsAPI:
+		eventsAPIEvent, ok := evt.Data.(slackevents.EventsAPIEvent)
+		if !ok {
+			slog.Warn("Ignored event", "event", evt)
+			return
+		}
+
+		ackSocket(socketClient, *evt.Request)
+
+		logger := slog.With("type", eventsAPIEvent.Type)
+		handled, err := h.Handle(&eventsAPIEvent, logger)
+		if err != nil {
+			logger.Error("Failed to handle event", "error", err)
+		} else if handled {
+			logger.Info("Event handled")
+		}
+	default:
+		slog.Info("Unhandled event type", "type", evt.Type)
 	}
 }
