@@ -43,13 +43,18 @@ totCov="$(
 )"
 : "Total Code Coverage: ${totCov}%"
 : "Required Code Coverage: ${covMin}%"
-if ((totCov < covMin)); then
+if awk -v tot="${totCov}" -v min="${covMin}" '
+    BEGIN {
+        if (tot !~ /^[0-9]+([.][0-9]+)?$/) exit 2
+        exit !((tot+0) >= (min+0))
+    }
+'; then
+    : "✅ PASS: Code Coverage ${totCov}% meets threshold ${covMin}%"
+    : "Code Coverage report: ${covHTML}"
+else
     : "❌ FAIL: Code Coverage ${totCov}% is below threshold ${covMin}%."
     : "Code Coverage report: ${covHTML}"
     false
-else
-    : "✅ PASS: Code Coverage ${totCov}% meets threshold ${covMin}%"
-    : "Code Coverage report: ${covHTML}"
 fi
 
 : 'Guarding that the unit build tag selects bot tests...'
