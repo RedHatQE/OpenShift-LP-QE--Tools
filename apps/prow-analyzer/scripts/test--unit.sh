@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit extglob
 
-typeset -i chkOnly="${1:-}"; (($#)) && shift
+typeset chkOnly="${1:-}"; (($#)) && shift
 
 case "${#}:${chkOnly}" in
   (0:?(--check-only))   ;;
@@ -11,12 +11,10 @@ case "${#}:${chkOnly}" in
     ;;
 esac
 
-typeset scrDir="$(
-    dirname -- "${BASH_SOURCE[0]}"
-)"
+typeset scrDir="${BASH_SOURCE[0]%/*}"
 typeset suiteTag='unit'
 typeset goCmd="${GO-go}"
-typeset -a suitePkgArr=(${PKGS-./pkg/...})
+typeset -a suitePkgArr="(${PKGS-./pkg/...})"
 
 typeset coverageThreshold='100.0' coverageFile='coverage.out' coverageHTML='coverage.html'
 typeset -a botPkgArr=('./cmd/prow-analyzer--bot')

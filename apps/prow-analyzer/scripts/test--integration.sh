@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit extglob
 
-typeset -i chkOnly="${1:-}"; (($#)) && shift
+typeset chkOnly="${1:-}"; (($#)) && shift
 
 case "${#}:${chkOnly}" in
   (0:?(--check-only))   ;;
@@ -14,7 +14,7 @@ esac
 typeset scrDir="${BASH_SOURCE[0]%/*}"
 typeset suiteTag='integration'
 typeset goCmd="${GO-go}"
-typeset -a suitePkgArr=(${PKGS-./pkg/...})
+typeset -a suitePkgArr="(${PKGS-./pkg/...})"
 
 GO="${goCmd}" \
     "${scrDir}/check--test-selection.sh" \

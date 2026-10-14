@@ -9,7 +9,7 @@ typeset -i minCnt="${1:-1}"; (($#)) && shift
 
 typeset goCmd="${GO-go}" pkgLst=''
 typeset -i funcCnt=0
-typeset -a pkgArr=(${pkgsTest})
+typeset -a pkgArr="(${pkgsTest})"
 
 : "Checking that \`-tags ${buildTag}\` selects at least ${minCnt} test(s) in \`${pkgsTest}\`..."
 # The `go test -list` compiles the (tagged) test binaries and prints one
