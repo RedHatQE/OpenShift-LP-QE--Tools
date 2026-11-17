@@ -21,7 +21,7 @@ Out of scope here, because existing tests exercise it:
 
 * direct execution of the extractor (presence, executable mode, interpreter
   line, ``--help``): ``test_recovery.py`` executes the extractor by path, for
-  example in ``test_cli_statuses``;
+  example in ``TestCliStatuses``;
 * the watcher's call into the extractor: ``test_recovery.py`` and
   ``test_recursive_mapping.py`` run ``watch-crash.sh``'s ``Recover`` function
   against the real extractor.
@@ -95,7 +95,7 @@ class PreflightExtractorHelperTests(unittest.TestCase):
     def StubCalls(self):
         return self.stubLog.read_text(encoding='utf-8').splitlines() if self.stubLog.exists() else []
 
-    def test_missing_extractor_fails_before_running_required_tools(self):
+    def TestMissingExtractorFailsBeforeRunningRequiredTools(self):
         self.MirrorHostScripts(omit=(extractorName,))
         result = self.RunPreflight()
         lines = result.stderr.splitlines()
@@ -111,7 +111,7 @@ class PreflightExtractorHelperTests(unittest.TestCase):
             self.assertEqual(self.StubCalls(), [],
                              'preflight ran a required tool before rejecting the missing extractor')
 
-    def test_present_extractor_passes_helper_check(self):
+    def TestPresentExtractorPassesHelperCheck(self):
         self.MirrorHostScripts()
         result = self.RunPreflight()
         lines = result.stderr.splitlines()
@@ -126,6 +126,25 @@ class PreflightExtractorHelperTests(unittest.TestCase):
                           f'preflight stopped somewhere other than the next check; stderr:\n{result.stderr}')
         with self.subTest(check='no stubbed tool ran'):
             self.assertEqual(self.StubCalls(), [], 'preflight ran a required tool before its guest configuration check')
+
+
+def load_tests(loader, standardTests, pattern):
+    # unittest load_tests protocol hook: the function name and its positional parameters are framework-required.
+    # Test methods follow the team PascalCase convention (Test...), which the default 'test' method prefix does not
+    # match, so collect them with a module-local loader. The shared loader passed in is left unchanged; its -k name
+    # patterns, method ordering and suite class are copied so filtering keeps working. Naming a whole class
+    # (module.Class) bypasses this hook and selects nothing; select module.Class.TestName or use -k '.Class.'.
+    pascalLoader = unittest.TestLoader()
+    pascalLoader.testMethodPrefix = 'Test'
+    pascalLoader.suiteClass = loader.suiteClass
+    pascalLoader.testNamePatterns = loader.testNamePatterns
+    pascalLoader.sortTestMethodsUsing = loader.sortTestMethodsUsing
+    suite = loader.suiteClass(standardTests)
+    for name in sorted(globals()):
+        value = globals()[name]
+        if isinstance(value, type) and issubclass(value, unittest.TestCase):
+            suite.addTests(pascalLoader.loadTestsFromTestCase(value))
+    return suite
 
 
 if __name__ == '__main__':
