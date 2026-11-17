@@ -1,0 +1,16 @@
+<p>Red Hat OpenShift Virtualization Layered Product.</p><ac:structured-macro ac:name="panel" ac:schema-version="1" ac:macro-id="45d93f63-2780-48ad-afd4-01048ce96f8e"><ac:parameter ac:name="borderWidth">0</ac:parameter><ac:parameter ac:name="borderStyle">none</ac:parameter><ac:rich-text-body><p><ac:structured-macro ac:name="toc" ac:schema-version="1" ac:macro-id="67e107a6-e747-4181-b931-e299202c302b"><ac:parameter ac:name="outline">true</ac:parameter></ac:structured-macro><ac:structured-macro ac:name="multiexcerpt-include" ac:schema-version="1" ac:macro-id="7c6da25c-b7f8-4b60-9944-81984c186f61"><ac:parameter ac:name="MultiExcerptName">Include--Global</ac:parameter><ac:parameter ac:name="DisableCaching">true</ac:parameter><ac:parameter ac:name="PageWithExcerpt"><ac:link><ri:page ri:content-title="MPEX Integrity Engineering" /></ac:link></ac:parameter><ac:parameter ac:name="shouldDisplayInlineCommentsInIncludes">false</ac:parameter></ac:structured-macro></p></ac:rich-text-body></ac:structured-macro><h1>OCP Installation Customization</h1><h2>Requirement for Scheduling Virtual Machine Instance (VMI)</h2><ac:structured-macro ac:name="panel" ac:schema-version="1" ac:macro-id="3b63695d-a4be-41f3-9575-739d1d22a917"><ac:parameter ac:name="borderStyle">solid</ac:parameter><ac:parameter ac:name="title">Setting `*.metal` Instance Type for Worker Nodes</ac:parameter><ac:rich-text-body><ac:structured-macro ac:name="html" ac:schema-version="1" ac:macro-id="fe25b3d3-a683-4b40-afe9-cffbeb3ab98a"><ac:plain-text-body><![CDATA[<div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+{
+    _OCP__INSTLR_FLG__CUSTOM="$((_OCP__INSTLR_FLG__CUSTOM | 0x00000008))"
+    _OCP__INSTLR_DAY0="${_OCP__INSTLR_DAY0:+${_OCP__INSTLR_DAY0}$'\n'}"$'(\n'"$(cat - 0&lt;&lt;'scrEOF'
+: 'Day-0 Customization for RH OV: Worker Nodes need to be `*.metal` Instance Type.'
+yq -i '.compute[0].platform.aws.type = "m6i.metal"' "${_OCP__CLUSTER_DIR}/install-config.yaml"
+true
+scrEOF
+    )"$'\n)'
+}
+
+</pre>
+    </div>
+</div>]]></ac:plain-text-body></ac:structured-macro></ac:rich-text-body></ac:structured-macro><p><br /></p>

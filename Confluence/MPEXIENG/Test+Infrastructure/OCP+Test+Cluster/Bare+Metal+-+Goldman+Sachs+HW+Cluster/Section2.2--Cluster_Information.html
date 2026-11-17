@@ -1,0 +1,81 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cluster Information</title>
+    <base href="{{site.url}}{{site.baseurl}}{{page.url}}" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../../Scripts/js/global.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<div style="font-family:monospace;font-size:large;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+( set -euo pipefail; shopt -s inherit_errexit
+    typeset bwNoteName='note.HWcluster--GoldmanSachs'
+    typeset bwData=
+    typeset -i i=0 j=0 t=0
+    export BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}"
+    export BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)"
+    {
+        [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+            echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+            exit 1
+        }
+        bwData="$(bw get item "${bwNoteName}")" || {
+            echo "You may NOT have access to BitWarden Note \`${bwNoteName}\`." 1&gt;&amp;2
+            exit 1
+        }
+    }
+    trap 'tput cnorm; tput rmcup' EXIT
+    tput smcup; tput civis
+    i=5 t=10
+    while ((i--)); do
+        clear
+        case $i in
+          (4)
+            echo 'General Information.'
+            echo "${bwData}" | jq -cr '.notes'
+            ;;
+          (3)
+            echo 'Web Console `kubeadmin` password.'
+            echo "${bwData}" | jq -cr '.fields[]? | select(.name == "cred.OCP").value | fromjson | .pwd'
+            ;;
+          (2)
+            echo 'Accessing Nodes.'
+            echo "${bwData}" | jq -cr '.fields[]? | select(.name == "NodeAccess").value'
+            ;;
+          (1)
+            echo 'Accessing BMCs.'
+            echo "${bwData}" | jq -cr '.fields[]? | select(.name == "BMC").value'
+            ;;
+          (0)
+            echo 'Serial Console Credential.'
+            echo "${bwData}" | jq -cr '.fields[]? | select(.name == "SerialConsole").value'
+            ;;
+        esac
+        REPLY=' ' j=t
+        while ((j)); do
+            tput cr; tput el
+            printf '%s %s %s' \
+                'Press [SPACE] key to stay on this page' \
+                "(timeout in $((j--)) sec.)" \
+                'or any OTHER key to continue now...'
+            read -srn 1 -t 1 || continue
+            [ "${REPLY}" = ' ' ] &amp;&amp; j=t || break
+        done
+    done
+true )
+</pre>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,321 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS SES - Email Verification</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../js/global.js"></script>
+    <script type="module" src="../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="aws-ses--verify-email">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__DNS_BASE_DOM\": \"...dnsBaseDomain1...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID1...\", \"vEV--_AWS__SES__SNDR_DOM\": \"...senderDomain1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__DNS_BASE_DOM\": \"...dnsBaseDomain2...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID2...\", \"vEV--_AWS__SES__SNDR_DOM\": \"...senderDomain2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_AWS__DNS_BASE_DOM": "...dnsBaseDomain...",
+                "vEV--_AWS__ROLE_NAME_SFX": "...roleNameSfx...",
+                "vEV--AWS_REGION": "...awsRegion...",
+                "vEV--AWS_ACCOUNT_ID": [
+                    ["Please select an AWS Account."],
+                    {
+                        "val": "...awsAccID1...",
+                        "txt": "...awsAccName1..."
+                    },
+                    {
+                        "val": "...awsAccID2...",
+                        "txt": "...awsAccName2..."
+                    }
+                ],
+                "vEV--_AWS__SES__SNDR_DOM": "...senderDomain...",
+                "vEV--_AWS__SES__RCPT_EMAIL": "user@redhat.com"
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_AWS__DNS_BASE_DOM</span>   <input type="text"          data-var="vEV--_AWS__DNS_BASE_DOM" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__RESET_PROFILE</span>  <select class="cw-cls--opt" data-var="vEV--_AWS__RESET_PROFILE">
+            <option value="0"   selected="">0: Keep existing Profile.</option>
+            <option value="1"              >1: Reset Profile.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__ROLE_NAME_SFX</span>  <input type="text"          data-var="vEV--_AWS__ROLE_NAME_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_REGION</span>           <input type="text"          data-var="vEV--AWS_REGION" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_ACCOUNT_ID</span>       <select class="cw-cls--opt" data-var="vEV--AWS_ACCOUNT_ID"></select></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">Sender eMail Domain</p>
+        <label><span class="cw-cls--label-text">_AWS__SES__SNDR_DOM</span>  <input type="text"          data-var="vEV--_AWS__SES__SNDR_DOM" value="" /></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">Recipient eMail Address</p>
+        <label><span class="cw-cls--label-text">_AWS__SES__RCPT_EMAIL</span><input type="text"          data-var="vEV--_AWS__SES__RCPT_EMAIL" value="" /></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Verifying Sender eMail Domain
+__SHELL=0 \
+    _AWS__SES__SNDR_DOM='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__SES__SNDR_DOM"></span>' \
+    _AWS__DNS_BASE_DOM='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__DNS_BASE_DOM"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this \`DEBUG\` session!!!
+
+        typeset e=
+        typeset -i wInt=0 wMax=0
+        typeset -a dkimTkns=()
+
+        # Get DKIM tokens for DNS verification.
+        read -ra dkimTkns &lt; &lt;(
+            aws sesv2 get-email-identity \
+                --email-identity "${_AWS__SES__SNDR_DOM}" \
+                --output text \
+                --query 'DkimAttributes.Tokens[]' \
+                2&gt; /dev/null ||
+            aws sesv2 create-email-identity \
+                --email-identity "${_AWS__SES__SNDR_DOM}" \
+                --output text \
+                --query 'DkimAttributes.Tokens[]'
+        )
+
+        cat - 0&lt;&lt;txtEOF
+--------------------------------------------------------------------------------
+Add the following DNS Records to Route 53 to verify domain:
+--------------------------------------------------------------------------------
+DKIM CNAME Records (for eMail signing):
+$(
+    for e in "${dkimTkns[@]}"; do
+        cat - 0&lt;&lt;loopEOF
+    Name:  ${e}._domainkey.${_AWS__SES__SNDR_DOM}
+    Type:  CNAME
+    Value: ${e}.dkim.amazonses.com
+
+loopEOF
+    done
+)
+--------------------------------------------------------------------------------
+txtEOF
+
+        # Get Route 53 Hosted Zone ID.
+        typeset r53ZoneID="$(
+            aws route53 list-hosted-zones-by-name \
+                --dns-name "${_AWS__DNS_BASE_DOM}" \
+                --output text \
+                --query "HostedZones[?
+                    (Name == \`\"${_AWS__DNS_BASE_DOM}.\"\`)
+                ].Id" | \
+                cut -d/ -f3
+        )"; [ -n "${r53ZoneID}" ]
+
+        # Create DNS Records.
+        aws route53 wait resource-record-sets-changed --id "$(
+            aws route53 change-resource-record-sets \
+                --hosted-zone-id "${r53ZoneID}" \
+                --change-batch "$(
+                    jq -cn \
+                        --arg domain "${_AWS__SES__SNDR_DOM}" \
+                        --argjson tokens "$(
+                            printf '%s\n' "${dkimTkns[@]}" |
+                            jq -cRs 'split("\n")[:-1]'
+                        )" \
+                        '{
+                            Changes: (
+                                $tokens |
+                                map({
+                                    Action: "UPSERT",
+                                    ResourceRecordSet: {
+                                        Name: (. + "._domainkey." + $domain),
+                                        Type: "CNAME",
+                                        TTL: 300,
+                                        ResourceRecords: [{
+                                            Value: (. + ".dkim.amazonses.com")
+                                        }]
+                                    }
+                                })
+                            )
+                        }'
+                )" \
+                --output text \
+                --query 'ChangeInfo.Id'
+        )"
+
+        # Monitor SES Sender Domain verification.
+        (   # Isolate \`SECONDS\` reset.
+            # SES Sender Domain verification.
+            SECONDS=0 wInt=15 wMax=1800     # 30 min. Max.
+            while ((SECONDS &lt; wMax)); do
+                typeset dkimStatus="$(
+                    aws sesv2 get-email-identity \
+                        --email-identity "${_AWS__SES__SNDR_DOM}" \
+                        --output text \
+                        --query 'DkimAttributes.Status'
+                )"
+                [[ "${dkimStatus}" == SUCCESS ]] &amp;&amp; break
+                echo "Waited ${SECONDS}/${wMax} sec.: "'Verifying SES Sender Domain...' 1&gt;&amp;2
+                sleep ${wInt}
+            done
+            ((SECONDS &gt;= wMax)) &amp;&amp; {
+                cat - 0&lt;&lt;errEOF 1&gt;&amp;2
+Timed out waiting for SES Sender Domain verification.
+Note:
+    Script timeout after 30 minutes (SSO session time limit).
+    DNS propagation may still be in progress and can take up to 72 hours.
+    Re-run this script later to check verification status OR execute:
+        watch -wn 60 "\$(cat - 0&lt;&lt;monEOF
+            \$(
+                [ -v BASH_ALIASES[aws] ] &amp;&amp;
+                echo "\${BASH_ALIASES[aws]}" ||
+                echo aws
+            ) sesv2 get-email-identity \\\\
+                --region "\${AWS_REGION}" \\\\
+                --email-identity chaos.lp.devcluster.openshift.com \\\\
+                --query '{
+                    Verified: VerifiedForSendingStatus,
+                    DKIM: DkimAttributes.Status
+                }'
+monEOF
+        )"
+errEOF
+                exit 2
+            }
+            # Final status.
+            aws sesv2 get-email-identity \
+                --email-identity "${_AWS__SES__SNDR_DOM}" \
+                --output table \
+                --no-cli-pager
+        )
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Recipient eMail Address (Sandbox Mode)
+# In sandbox mode, you can only send eMails to verified email addresses. Verify recipient addresses before testing:
+__SHELL=0 \
+    _AWS__SES__RCPT_EMAIL='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__SES__RCPT_EMAIL"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this \`DEBUG\` session!!!
+
+        # Create eMail Identity for Recipient eMail verification.
+        aws sesv2 get-email-identity \
+            --email-identity "${_AWS__SES__RCPT_EMAIL}" \
+            --output text \
+            --query 'VerifiedForSendingStatus' \
+            2&gt; /dev/null ||
+        aws sesv2 create-email-identity \
+            --email-identity "${_AWS__SES__RCPT_EMAIL}" \
+            --output table \
+            --no-cli-pager
+
+        cat - 0&lt;&lt;txtEOF
+--------------------------------------------------------------------------------
+E-Mail Verification Requested
+--------------------------------------------------------------------------------
+Recipient: ${_AWS__SES__RCPT_EMAIL}
+
+A verification eMail has been sent to this address.
+The recipient must click the verification link in the eMail.
+
+Verification typically completes within a few minutes.
+
+You can check verification status with:
+    aws sesv2 get-email-identity \\
+        --email-identity ${_AWS__SES__RCPT_EMAIL@Q} \\
+        --query 'VerifiedForSendingStatus' \\
+        --no-cli-pager
+--------------------------------------------------------------------------------
+txtEOF
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,213 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS EC2 SSM Agent Installation</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../../js/global.js"></script>
+    <script type="module" src="../../../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="OCP--aws-ec2-ssmAgent--install">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_BW__NOTE_NAME\": \"...bwNoteName1...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_BW__NOTE_NAME\": \"...bwNoteName2...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_BW__NOTE_NAME": "...bwNoteName...",
+                "vEV--AWS_REGION": "...awsRegion...",
+                "vEV--AWS_ACCOUNT_ID": [
+                    ["Please select an AWS Account."],
+                    {
+                        "val": "...awsAccID1...",
+                        "txt": "...awsAccName1..."
+                    },
+                    {
+                        "val": "...awsAccID2...",
+                        "txt": "...awsAccName2..."
+                    }
+                ]
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_BW__NOTE_NAME</span>   <input type="text"          data-var="vEV--_BW__NOTE_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_REGION</span>       <input type="text"          data-var="vEV--AWS_REGION" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_ACCOUNT_ID</span>   <select class="cw-cls--opt" data-var="vEV--AWS_ACCOUNT_ID"></select></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+__SHELL=0 \
+    _BW__NOTE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME"></span>' \
+    KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/config}" \
+    BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}" \
+    BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)" \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+                echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+                exit 1
+            }
+            eval "$(
+                bw get notes "${_BW__NOTE_NAME}" || {
+                    echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                    echo false
+                }
+            )"
+            eval "${__shOpt}"; unset __shOpt
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        }
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset e= iamIP= iamRNs=
+
+        # Adding IAM Permission Policy `AmazonSSMManagedInstanceCore` to the EC2 Instance IAM Role to allow connecting to the VM via SSM.
+        iamRNs="$(
+            for e in $(
+                oc get Nodes -o jsonpath='{range .items[*]}{.spec.providerID}{"\n"}{end}'
+            ); do
+                iamIP="$(
+                    aws ec2 describe-instances \
+                        --instance-ids "${e##*/}" \
+                        --output text \
+                        --query 'Reservations[0].Instances[0].IamInstanceProfile.Arn'
+                )"
+                aws iam get-instance-profile \
+                    --instance-profile-name "${iamIP##*/}" \
+                    --output text \
+                    --query 'InstanceProfile.Roles[0].RoleName'
+            done | sort -u
+        )"
+        for e in ${iamRNs}; do
+            {   # Attached Policy.
+                aws iam list-attached-role-policies \
+                    --role-name "${e}" \
+                    --output text \
+                    --query 'AttachedPolicies[].PolicyName' |
+                grep -qE '^AmazonSSMManagedInstanceCore$'
+            } || aws iam attach-role-policy \
+                --role-name "${e}" \
+                --policy-arn 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
+        done
+
+        # Applying MachineConfig to OCP Nodes.
+        for e in {master,worker}; do
+            oc apply -f - 0&lt;&lt;ocEOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  name: 99999-00--${e}--ssm-agent-install
+  labels:
+    machineconfiguration.openshift.io/role: ${e}
+spec:
+  config:
+    ignition:
+      version: $(oc get MachineConfigs -o jsonpath='{range .items[*]}{.spec.config.ignition.version}{"\n"}{end}' | grep -vE '^\$' | head -n 1)
+    storage: {} # Required empty object
+    systemd:
+      units:
+        - name: aws-ec2--ssm-agent--install.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Install AWS EC2 SSM Agent
+            After=network-online.target
+            Wants=network-online.target
+
+            [Service]
+            Type=oneshot
+            RemainAfterExit=yes
+            ExecStart=/usr/bin/sh -c ' \\
+                # Determine the correct the architecture string. \\
+                typeset arch="\$\$(/usr/bin/uname -m)"; \\
+                case \$\${arch} in \\
+                  (x86_64)  arch=amd64;; \\
+                  (aarch64) arch=arm64;; \\
+                esac; \\
+                if /usr/bin/rpm -q amazon-ssm-agent; then \\
+                    /usr/bin/systemctl enable amazon-ssm-agent.service; \\
+                    /usr/bin/systemctl start amazon-ssm-agent.service; \\
+                else \\
+                    # Remove any broken stub agent if present, ignore if not found. \\
+                    /usr/bin/rpm-ostree override remove amazon-ssm-agent || true; \\
+                    # Install the agent. \\
+                    /usr/bin/rpm-ostree install "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_\$\${arch}/amazon-ssm-agent.rpm"; \\
+                    /usr/bin/systemctl reboot; \\
+                fi; \\
+            '
+
+            [Install]
+            WantedBy=multi-user.target
+ocEOF
+        done
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+<hr style="border:1px solid CanvasText;"/>
+<div style="font-family:monospace;font-size:large;max-height:20em;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;color:black;background-color:cyan;">
+? Master password: <span style="color:red;font-weight:bold;">[hidden]</span>
+Syncing complete.
+      Name                    Value             Type    Location
+      ----                    -----             ----    --------
+   profile                &lt;not set&gt;             None    None
+access_key     ****************FYL3              env
+secret_key     ****************tAq9              env
+    region                us-east-1              env    ['AWS_REGION', 'AWS_DEFAULT_REGION']
+{
+    "UserId": "AIDAZC76IE25KXVQUCR6W",
+    "Account": "624914081466",
+    "Arn": "arn:aws:iam::624914081466:user/u-ieng--ocp-installer"
+}
+machineconfig.machineconfiguration.openshift.io/99999-00--master--ssm-agent-install created
+machineconfig.machineconfiguration.openshift.io/99999-00--worker--ssm-agent-install created
+</pre>
+    </div>
+</div>
+</body>
+</html>

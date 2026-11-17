@@ -1,0 +1,184 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Postfix - Preparing Host</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../js/global.js"></script>
+    <script type="module" src="../../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="postfix--prepare-host">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_SVC__FQDN\": \"...svcFQDN1...\", \"vEV--_BW__NOTE_NAME\": \"...bwNoteName1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_SVC__FQDN\": \"...svcFQDN2...\", \"vEV--_BW__NOTE_NAME\": \"...bwNoteName2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_SVC__FQDN": "...svcFQDN...",
+                "vEV--_BW__NOTE_NAME": "...bwNoteName..."
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span><select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_SVC__FQDN</span>       <input type="text"  data-var="vEV--_SVC__FQDN" value="" /></label>
+        <label><span class="cw-cls--label-text">_BW__NOTE_NAME</span>   <input type="text"  data-var="vEV--_BW__NOTE_NAME" value="" /></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+__SHELL=0 __DBG=0 \
+    _SVC__OWN_DATA_DIR=/opt/web-app/postfix \
+    _SVC__FQDN='<span style="color:red;font-weight:bold;" data-var="vEV--_SVC__FQDN"></span>' \
+    _BW__NOTE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME"></span>' \
+    BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}" \
+    BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)" \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+                echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+                exit 1
+            }
+            eval "$(
+                bw get notes "${_BW__NOTE_NAME}" || {
+                    echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                    echo false
+                }
+            )"
+            eval "${__shOpt}"; unset __shOpt
+        }
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this \`DEBUG\` session!!!
+
+        typeset ownUsr="$(id -un)"
+        typeset ownGrp=web-app
+        typeset ctrNet=net--web-app
+        typeset ctrCIDR=
+        typeset svcCtrName=svc--postfix
+        typeset quadletUsrDir="${HOME}/.config/containers/systemd"
+        typeset systemdSvcName=container--postfix
+
+        ((__DBG)) &amp;&amp; {
+            podman container run \
+                --name "${svcCtrName}" \
+                --rm -it \
+                --network "${ctrNet}" \
+                -e HOSTNAME="${_SVC__FQDN}" \
+                -e ALLOWED_SENDER_DOMAINS="${_SVC__FQDN#*.}" \
+                -e ALLOW_EMPTY_SENDER_DOMAINS=false \
+                -e POSTFIX_mynetworks="127.0.0.0/8 $(
+                    podman network inspect "${ctrNet}" \
+                        --format '{% raw %}{{range .Subnets}}{{.Subnet}}{{end}}{% endraw %}'
+                )" \
+                -e RELAYHOST="${_SVC__SMTP_RLY__HST}" \
+                -e RELAYHOST_USERNAME="${_SVC__SMTP_RLY__USR}" \
+                -e RELAYHOST_PASSWORD="${_SVC__SMTP_RLY__PWD}" \
+                docker.io/boky/postfix:latest
+            exit 0
+        }
+
+        sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;sudoEOF
+            # Prepare Directories.
+            mkdir -p ${_SVC__OWN_DATA_DIR@Q}
+            chown -R ${ownUsr@Q}:${ownGrp@Q} ${_SVC__OWN_DATA_DIR@Q}/
+            chmod -R 02775 ${_SVC__OWN_DATA_DIR@Q}/
+            setfacl \
+                -Rm u:${ownUsr@Q}:rwx,g::rwx,m::rwx,d:u:${ownUsr@Q}:rwx,d:g::rwx,d:m::rwx \
+                ${_SVC__OWN_DATA_DIR@Q}/
+
+            true
+sudoEOF
+        )"
+
+        # Create Podman Network.
+        podman network create "${ctrNet}" 2&gt; /dev/null || true
+        # Get network subnet CIDR for \`${POSTFIX_mynetworks}\`.
+        ctrCIDR="$(
+            podman network inspect "${ctrNet}" \
+                --format '{% raw %}{{range .Subnets}}{{.Subnet}}{{end}}{% endraw %}'
+        )"; [ -n "${ctrCIDR}" ]
+        # Create Quadlet container file.
+        mkdir -p "${quadletUsrDir}"
+        cat - 0&lt;&lt;cfgEOF 1&gt; "${quadletUsrDir}/${systemdSvcName}.container"
+[Unit]
+Description=Postfix SMTP Relay
+After=network-online.target
+
+[Container]
+Image=docker.io/boky/postfix:latest
+ContainerName=${svcCtrName}
+AutoUpdate=registry
+Network=${ctrNet}
+Environment=HOSTNAME=${_SVC__FQDN@Q}
+Environment=ALLOWED_SENDER_DOMAINS=$(
+    typeset svcFQDN="${_SVC__FQDN#*.}"
+    echo "${svcFQDN@Q}"
+)
+# Enforce domain validation for sender addresses.
+Environment=ALLOW_EMPTY_SENDER_DOMAINS=false
+# Allow relaying to any recipient domain (open relay for internal network).
+Environment=POSTFIX_mynetworks=$(
+    typeset pfNet="127.0.0.0/8 ${ctrCIDR}"
+    echo "${pfNet@Q}"
+)
+# SMTP Upstream Relay.
+Environment=RELAYHOST=${_SVC__SMTP_RLY__HST@Q}
+Environment=RELAYHOST_USERNAME=${_SVC__SMTP_RLY__USR@Q}
+Environment=RELAYHOST_PASSWORD=${_SVC__SMTP_RLY__PWD@Q}
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
+cfgEOF
+        # Reload and start the service.
+        systemctl --user daemon-reload  # Quadlet will generate unit file.
+        if systemctl --user is-active "${systemdSvcName}.service" &amp;&gt; /dev/null; then
+            systemctl --user restart "${systemdSvcName}.service"
+        else
+            systemctl --user start "${systemdSvcName}.service"
+        fi
+        systemctl --user is-enabled podman--auto-update.timer &amp;&gt; /dev/null ||
+            systemctl --user enable --now podman--auto-update.timer
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

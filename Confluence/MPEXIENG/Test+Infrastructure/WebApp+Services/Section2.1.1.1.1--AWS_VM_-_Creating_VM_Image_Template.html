@@ -1,0 +1,63 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS VM - Creating VM Image Template</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../Scripts/js/code-widget.js"></script>
+    <script type="module" src="../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/html-include.js"></script>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/Cloud/AWS/VM_CreatingVMimageTemplate.html"
+    data-mod-js="
+        CodeWidget__UsrLib_OvrCfg(html, {
+            'aws-vm--create-vm-image-template': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vEV--_AWS__NET_PFX&quot;:         &quot;lp-chaos--svc&quot;,
+                                    &quot;vEV--_AWS__ROLE_NAME_SFX&quot;:   [{&quot;val&quot;: &quot;admin&quot;, &quot;txt&quot;: &quot;admin&quot;}, [{&quot;val&quot;: &quot;poweruser&quot;, &quot;txt&quot;: &quot;poweruser&quot;}]],
+                                    &quot;vEV--AWS_ACCOUNT_ID&quot;:        [&quot;624914081466&quot;]
+                                }`
+                            },
+                        },
+                    ],
+                    'vEV--_AWS__NET_PFX': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__APP_KIND': 'web-app',
+                    'vEV--_AWS__EC2__AMI_NAME': 'ami--mpex-ieng--svc--al2023--v1',
+                    'vEV--_AWS__EC2__NAME_SFX--sfx': 'ami--generator',
+                    'vEV--_AWS__ROLE_NAME_SFX': 'poweruser',
+                    'vEV--AWS_REGION': 'us-west-1',
+                    'vEV--AWS_ACCOUNT_ID': [['Please select Team.']],
+                    'vEV--_AWS__AZ_SFX': 'a',
+                    'vEV--_AWS__SN_SFX': 'pub0',
+                    'vEV--_AWS__SSH_KEY__NAME': 'openshift-qe',
+                    'vEV--_AWS__SSH_KEY__PUB--file': 'openshift-qe.pub',
+                    'vEV--_AWS__EC2__INST_TYPE': 't4g.micro',
+                    'vEV--_AWS__EC2__TO_SHUTDOWN': '600s',
+                    'vEV--_AWS__EC2__AMI_DESC': 'OS Image for generic Server (Amazon Linux 2023 - ARM64).',
+                },
+            },
+        });
+    "
+></div>
+</body>
+</html>

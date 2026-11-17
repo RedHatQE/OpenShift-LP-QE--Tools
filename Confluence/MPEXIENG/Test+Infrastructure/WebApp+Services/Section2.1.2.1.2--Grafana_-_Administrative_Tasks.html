@@ -1,0 +1,51 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grafana - Administrative Tasks</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../Scripts/js/code-widget.js"></script>
+    <script type="module" src="../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/html-include.js"></script>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/WebApp/Grafana/Administrative_Tasks/Administrative_Tasks.html"
+    data-mod-js="
+        CodeWidget__UsrLib_OvrCfg(html, {
+            'grafana--admin-tasks': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vSV--apiBaseURL&quot;:    &quot;https://grafana.lp-chaos--svc--web-app.chaos.lp.devcluster.openshift.com/api&quot;
+                                }`
+                            },
+                        },
+                    ],
+                    'vSV--apiBaseURL': ['...PleaseSelectTeam...'],
+                },
+                set: {
+                    'vSV--orgNames': '\'Red Hat HP MPEX Integrity Engineering\'',
+                },
+            },
+        });
+    "
+></div>
+</body>
+</html>

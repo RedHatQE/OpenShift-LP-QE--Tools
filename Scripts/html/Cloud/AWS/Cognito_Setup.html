@@ -1,0 +1,1187 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Cognito - Setup</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../js/global.js"></script>
+    <script type="module" src="../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<h3>User Pool</h3>
+<div class="code-widget" id="aws-cognito--setup--user-pool">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__COG__IDP_NAME\": \"...cogIdPname1...\", \"vEV--AWS_REGION\": \"...awsRegion1...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID1...\", \"vEV--_BW__NOTE_NAME\": \"...bwNoteName1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__COG__IDP_NAME\": \"...cogIdPname2...\", \"vEV--AWS_REGION\": \"...awsRegion2...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID2...\", \"vEV--_BW__NOTE_NAME\": \"...bwNoteName2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_AWS__COG__IDP_NAME": "...cogIdPname...",
+                "vEV--_AWS__COG__IDP_TYPE": "...cogIdPtype...",
+                "vEV--_AWS__ROLE_NAME_SFX": "...roleNameSfx...",
+                "vEV--AWS_REGION": "...awsRegion...",
+                "vEV--AWS_ACCOUNT_ID": [
+                    ["Please select an AWS Account."],
+                    {
+                        "val": "...awsAccID1...",
+                        "txt": "...awsAccName1..."
+                    },
+                    {
+                        "val": "...awsAccID2...",
+                        "txt": "...awsAccName2..."
+                    }
+                ],
+                "vEV--_AWS__COG__IDP_SCOPES": "...cogIdPscopes...",
+                "vEV--_BW__NOTE_NAME": "...bwNoteName...",
+                "vEV--_AWS__COG__APP_NAME": "...cogAppName...",
+                "vEV--_AWS__COG__CLIENT_NAME": "cog--${_AWS__COG__IDP_NAME}--client--${_AWS__COG__APP_NAME}",
+                "vEV--_AWS__COG__CALLBACK_URLS": "...appCallBackURL...",
+                "vEV--_AWS__COG__LOGOUT_URLS": "...appLogOutURL..."
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_AWS__COG__IDP_NAME</span>      <input type="text"          data-var="vEV--_AWS__COG__IDP_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__IDP_TYPE</span>      <input type="text"          data-var="vEV--_AWS__COG__IDP_TYPE" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__RESET_PROFILE</span>      <select class="cw-cls--opt" data-var="vEV--_AWS__RESET_PROFILE">
+            <option value="0"   selected="">0: Keep existing Profile.</option>
+            <option value="1"              >1: Reset Profile.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__ROLE_NAME_SFX</span>      <input type="text"          data-var="vEV--_AWS__ROLE_NAME_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_REGION</span>               <input type="text"          data-var="vEV--AWS_REGION" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_ACCOUNT_ID</span>           <select class="cw-cls--opt" data-var="vEV--AWS_ACCOUNT_ID"></select></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">User Pool and IdP</p>
+        <label><span class="cw-cls--label-text">_AWS__COG__IDP_SCOPES</span>    <input type="text"          data-var="vEV--_AWS__COG__IDP_SCOPES" value="" /></label>
+        <label><span class="cw-cls--label-text">_BW__NOTE_NAME</span>           <input type="text"          data-var="vEV--_BW__NOTE_NAME" value="" /></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">User Pool App. Client</p>
+        <label><span class="cw-cls--label-text">_AWS__COG__ACTION</span>        <select class="cw-cls--opt" data-var="vEV--_AWS__COG__ACTION">
+            <option value="-1"             >     -1: Delete App. Client.</option>
+            <option value="0"              >&nbsp;0: Update App. Client CallBack/LogOut URLs.</option>
+            <option value="1"   selected="">&nbsp;1: Create App. Client.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__APP_NAME</span>      <input type="text"          data-var="vEV--_AWS__COG__APP_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__CLIENT_NAME</span>   <input type="text"          data-var="vEV--_AWS__COG__CLIENT_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__CALLBACK_URLS</span> <input type="text"          data-var="vEV--_AWS__COG__CALLBACK_URLS" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__LOGOUT_URLS</span>   <input type="text"          data-var="vEV--_AWS__COG__LOGOUT_URLS" value="" /></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="font-size:medium;" tabindex="0">
+            <p style="margin:0"><strong>Pre-requisites:</strong></p>
+            <ul style="margin-top:0">
+                <li><strong>(GCP Console)</strong> Configure the GCP OAuth2 Client in the
+                    <a href="https://console.cloud.google.com/apis/credentials">Google Cloud Console</a>:
+                    <ul>
+                        <li>Add <code>amazoncognito.com</code> to the OAuth Consent Screen <strong>Authorized Domains</strong>.</li>
+                        <li>Add the <strong>Authorized Redirect URI</strong>: <code>https://&lt;lowercase(_AWS__COG__IDP_NAME)&gt;.auth.&lt;AWS_REGION&gt;.amazoncognito.com/oauth2/idpresponse</code></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Creating Cognito User Pool and IdP
+__SHELL=0 \
+    _AWS__COG__IDP_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__IDP_NAME"></span>' \
+    _AWS__COG__IDP_TYPE='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__IDP_TYPE"></span>' \
+    _AWS__COG__IDP_SCOPES='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__IDP_SCOPES"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    _BW__NOTE_SUB_FLD='oAuth.OpenSearch' \
+    _BW__NOTE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME"></span>' \
+    BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}" \
+    BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)" \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+                echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+                exit 1
+            }
+            eval "$(
+                typeset bwData=
+                bwData="$(bw get item "${_BW__NOTE_NAME}")" || {
+                    echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                    echo false; exit 1
+                }
+                jq -r \
+                    --arg fn__c "${_BW__NOTE_SUB_FLD}" \
+                    '
+                        .fields[]? | select(.name == $fn__c).value | fromjson |
+                        .web | "
+                            export _IDP__CLIENT_ID=\(.client_id | @sh) _IDP__CLIENT_SECRET=\(.client_secret | @sh)
+                        "
+                    ' \
+                0&lt;&lt;&lt;"${bwData}"
+            )"
+            eval "${__shOpt}"; unset __shOpt
+        }
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset cogUsrPoolName="cog--${_AWS__COG__IDP_NAME}--up"
+        typeset cogUsrPoolDom="${_AWS__COG__IDP_NAME,,}"
+        typeset cogUsrPoolID=
+
+        # Create User Pool.
+        cogUsrPoolID="$(
+            typeset _page= _cur= _id= _nextTkn=
+            while true; do
+                _page="$(
+                    aws cognito-idp list-user-pools \
+                        --max-results 60 \
+                        ${_nextTkn:+--next-token "${_nextTkn}"} \
+                        --output json
+                )"
+                _cur="$(jq -cr \
+                    --arg name "${cogUsrPoolName}" \
+                    '.UserPools[] | select(.Name == $name).Id' \
+                0&lt;&lt;&lt;"${_page}")"
+                [ -n "${_cur}" ] &amp;&amp; {
+                    [ -n "${_id}" ] || [[ "${_cur}" == *$'\n'* ]] &amp;&amp; {
+                        : "ERROR: Multiple User Pools: ${cogUsrPoolName}"
+                        exit 1
+                    }
+                    _id="${_cur}"
+                }
+                _nextTkn="$(jq -cr '(.NextToken // empty)' 0&lt;&lt;&lt;"${_page}")"
+                [ -z "${_nextTkn}" ] &amp;&amp; break
+            done
+            [ -n "${_id}" ] &amp;&amp; { echo "${_id}"; exit 0; }
+            aws cognito-idp create-user-pool \
+                --pool-name "${cogUsrPoolName}" \
+                --auto-verified-attributes email \
+                --username-attributes email \
+                --username-configuration CaseSensitive=false \
+                --output text \
+                --query 'UserPool.Id'
+        )"
+
+        # Create User Pool Domain.
+        if [ "$(
+            aws cognito-idp describe-user-pool-domain \
+                --domain "${cogUsrPoolDom}" \
+                --output text \
+                --query 'DomainDescription.UserPoolId'
+        )" = None ]; then
+            aws cognito-idp create-user-pool-domain \
+                --domain "${cogUsrPoolDom}" \
+                --user-pool-id "${cogUsrPoolID}" \
+                --no-cli-pager
+        fi
+
+        # Create Identity Provider.
+        ( set +x
+            aws cognito-idp describe-identity-provider \
+                --user-pool-id "${cogUsrPoolID}" \
+                --provider-name "${_AWS__COG__IDP_TYPE}" \
+                &amp;&gt; /dev/null ||
+            aws cognito-idp create-identity-provider \
+                --cli-input-json "$(
+                    jq -cn \
+                        --arg upID "${cogUsrPoolID}" \
+                        --arg idpType "${_AWS__COG__IDP_TYPE}" \
+                        --arg idpClientID "${_IDP__CLIENT_ID}" \
+                        --arg idpClientCred "${_IDP__CLIENT_SECRET}" \
+                        --arg idpClientScopes "${_AWS__COG__IDP_SCOPES}" \
+                        '{
+                            UserPoolId: $upID,
+                            ProviderName: $idpType,
+                            ProviderType: $idpType,
+                            ProviderDetails: {
+                                client_id: $idpClientID,
+                                client_secret: $idpClientCred,
+                                authorize_scopes: $idpClientScopes
+                            },
+                            AttributeMapping: {email: "email", username: "sub"}
+                        }'
+                )" 1&gt; /dev/null
+        true )
+
+        cat - 0&lt;&lt;txtEOF 1&gt;&amp;2
+--------------------------------------------------------------------------------
+Cognito User Pool created:
+    Pool ID:    ${cogUsrPoolID}
+    Domain:     https://${cogUsrPoolDom}.auth.${AWS_REGION}.amazoncognito.com
+--------------------------------------------------------------------------------
+txtEOF
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  User Pool App. Client
+__SHELL=0 \
+    _AWS__COG__ACTION=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__ACTION"></span> \
+    _AWS__COG__IDP_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__IDP_NAME"></span>' \
+    _AWS__COG__IDP_TYPE='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__IDP_TYPE"></span>' \
+    _AWS__COG__APP_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__APP_NAME"></span>' \
+    _AWS__COG__CLIENT_NAME="<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__CLIENT_NAME"></span>" \
+    _AWS__COG__CALLBACK_URLS='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__CALLBACK_URLS"></span>' \
+    _AWS__COG__LOGOUT_URLS='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__LOGOUT_URLS"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset cogUsrPoolName="cog--${_AWS__COG__IDP_NAME}--up"
+        typeset cogUsrPoolID= cogClientID=
+
+        case ${_AWS__COG__ACTION} in (-1|0|1);; (*)false;; esac
+
+        cogUsrPoolID="$(
+            typeset _page= _cur= _id= _nextTkn=
+            while true; do
+                _page="$(
+                    aws cognito-idp list-user-pools \
+                        --max-results 60 \
+                        ${_nextTkn:+--next-token "${_nextTkn}"} \
+                        --output json
+                )"
+                _cur="$(jq -cr \
+                    --arg name "${cogUsrPoolName}" \
+                    '.UserPools[] | select(.Name == $name).Id' \
+                0&lt;&lt;&lt;"${_page}")"
+                [ -n "${_cur}" ] &amp;&amp; {
+                    [ -n "${_id}" ] || [[ "${_cur}" == *$'\n'* ]] &amp;&amp; {
+                        : "ERROR: Multiple User Pools: ${cogUsrPoolName}"
+                        exit 1
+                    }
+                    _id="${_cur}"
+                }
+                _nextTkn="$(jq -cr '(.NextToken // empty)' 0&lt;&lt;&lt;"${_page}")"
+                [ -z "${_nextTkn}" ] &amp;&amp; break
+            done
+            echo "${_id}"
+        )"
+        cogClientID="$(
+            cogClientID="$(
+                aws cognito-idp list-user-pool-clients \
+                    --user-pool-id "${cogUsrPoolID}" \
+                    --output text \
+                    --query "UserPoolClients[?
+                        (ClientName == '${_AWS__COG__CLIENT_NAME}')
+                    ].ClientId"
+            )"
+            [ -n "${cogClientID}" ] &amp;&amp; {
+                [[ "${cogClientID}" == *$'\t'* ]] &amp;&amp; {
+                    : "ERROR: Multiple App Clients: ${_AWS__COG__CLIENT_NAME}"
+                    exit 1
+                }
+                case ${_AWS__COG__ACTION} in
+                  (1)   { echo "${cogClientID}"; exit 0; };;
+                esac
+            } || {
+                case ${_AWS__COG__ACTION} in
+                  (-1)  exit 0;;
+                  (0)
+                    : "ERROR: Not found App Clients: ${_AWS__COG__CLIENT_NAME}"
+                    exit 1
+                    ;;
+                esac
+            }
+            case ${_AWS__COG__ACTION} in
+              (-1)
+                # Deleting App. Client.
+                aws cognito-idp delete-user-pool-client \
+                    --user-pool-id "${cogUsrPoolID}" \
+                    --client-id "${cogClientID}" \
+                    --no-cli-pager
+                echo "${cogClientID}"
+                ;;
+              (0)
+                # Updating App. Client.
+                aws cognito-idp update-user-pool-client \
+                    --user-pool-id "${cogUsrPoolID}" \
+                    --client-id "${cogClientID}" \
+                    --supported-identity-providers "${_AWS__COG__IDP_TYPE}" \
+                    --callback-urls "${_AWS__COG__CALLBACK_URLS}" \
+                    --logout-urls "${_AWS__COG__LOGOUT_URLS}" \
+                    --allowed-o-auth-flows code \
+                    --allowed-o-auth-scopes email openid profile \
+                    --allowed-o-auth-flows-user-pool-client \
+                    --output text \
+                    --query 'UserPoolClient.ClientId'
+                ;;
+              (1)
+                # Creating App. Client.
+                aws cognito-idp create-user-pool-client \
+                    --user-pool-id "${cogUsrPoolID}" \
+                    --client-name "${_AWS__COG__CLIENT_NAME}" \
+                    --supported-identity-providers "${_AWS__COG__IDP_TYPE}" \
+                    --output text \
+                    --query 'UserPoolClient.ClientId'
+                ;;
+            esac
+        )"
+
+        cat - 0&lt;&lt;txtEOF 1&gt;&amp;2
+--------------------------------------------------------------------------------
+Cognito App. Client $(
+    case ${_AWS__COG__ACTION} in
+      (-1)  echo deleted;;
+      (0)   echo updated;;
+      (1)   echo created;;
+    esac
+):
+    Client Name:    ${_AWS__COG__CLIENT_NAME}
+    Client ID:      ${cogClientID}
+--------------------------------------------------------------------------------
+txtEOF
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+<hr style="height:2px;border:0;border-block:1px solid CanvasText;"/>
+<h3>Identity Pool</h3>
+<div class="code-widget" id="aws-cognito--setup--identity-pool">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__COG__IDP_NAME\": \"...cogIdPname1...\", \"vEV--AWS_REGION\": \"...awsRegion1...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__COG__IDP_NAME\": \"...cogIdPname2...\", \"vEV--AWS_REGION\": \"...awsRegion2...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_AWS__COG__IDP_NAME": "...cogIdPname...",
+                "vEV--_AWS__COG__APP_NAME": "...cogAppName...",
+                "vEV--_AWS__COG__CLIENT_NAME": "cog--${_AWS__COG__IDP_NAME}--client--${_AWS__COG__APP_NAME}",
+                "vEV--_AWS__COG__ID_POOL_SFX": "",
+                "vEV--_AWS__COG__ALLOW_UNAUTH": "1",
+                "vEV--_AWS__ROLE_NAME_SFX": "...roleNameSfx...",
+                "vEV--AWS_REGION": "...awsRegion...",
+                "vEV--AWS_ACCOUNT_ID": [
+                    ["Please select an AWS Account."],
+                    {
+                        "val": "...awsAccID1...",
+                        "txt": "...awsAccName1..."
+                    },
+                    {
+                        "val": "...awsAccID2...",
+                        "txt": "...awsAccName2..."
+                    }
+                ]
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_AWS__COG__ACTION</span>        <select class="cw-cls--opt" data-var="vEV--_AWS__COG__ACTION">
+            <option value="-1"             >     -1: Remove App. Client Provider.</option>
+            <option value="0"              >&nbsp;0: Create Identity Pool only (without linking to App. Client Provider).</option>
+            <option value="1"   selected="">&nbsp;1: Add App. Client Provider.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__IDP_NAME</span>      <input type="text"          data-var="vEV--_AWS__COG__IDP_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__APP_NAME</span>      <input type="text"          data-var="vEV--_AWS__COG__APP_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__CLIENT_NAME</span>   <input type="text"          data-var="vEV--_AWS__COG__CLIENT_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__ID_POOL_SFX</span>   <input type="text"          data-var="vEV--_AWS__COG__ID_POOL_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__ALLOW_UNAUTH</span>  <select class="cw-cls--opt" data-var="vEV--_AWS__COG__ALLOW_UNAUTH">
+            <option value="1"   selected="">1: Allow Un-authenticated Identities.</option>
+            <option value="0"              >0: Deny Un-authenticated Identities.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__RESET_PROFILE</span>      <select class="cw-cls--opt" data-var="vEV--_AWS__RESET_PROFILE">
+            <option value="0"   selected="">0: Keep existing Profile.</option>
+            <option value="1"              >1: Reset Profile.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__ROLE_NAME_SFX</span>      <input type="text"          data-var="vEV--_AWS__ROLE_NAME_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_REGION</span>               <input type="text"          data-var="vEV--AWS_REGION" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_ACCOUNT_ID</span>           <select class="cw-cls--opt" data-var="vEV--AWS_ACCOUNT_ID"></select></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Cognito Identity Pool
+__SHELL=0 \
+    _AWS__COG__ACTION=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__ACTION"></span> \
+    _AWS__COG__IDP_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__IDP_NAME"></span>' \
+    _AWS__COG__APP_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__APP_NAME"></span>' \
+    _AWS__COG__CLIENT_NAME="<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__CLIENT_NAME"></span>" \
+    _AWS__COG__ID_POOL_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__ID_POOL_SFX"></span>' \
+    _AWS__COG__ALLOW_UNAUTH=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__ALLOW_UNAUTH"></span> \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset cogUsrPoolName="cog--${_AWS__COG__IDP_NAME}--up"
+        typeset cogIdPoolName="cog--${_AWS__COG__IDP_NAME}--ip${_AWS__COG__ID_POOL_SFX:+--${_AWS__COG__ID_POOL_SFX}}"
+        typeset cogProvider="cognito-idp.${AWS_REGION}.amazonaws.com/"
+        typeset cogUsrPoolID= cogClientID= cogIdPoolID=
+
+        case ${_AWS__COG__ACTION} in (-1|0|1);; (*)false;; esac
+
+        cogUsrPoolID="$(
+            typeset _page= _cur= _id= _nextTkn=
+            while true; do
+                _page="$(
+                    aws cognito-idp list-user-pools \
+                        --max-results 60 \
+                        ${_nextTkn:+--next-token "${_nextTkn}"} \
+                        --output json
+                )"
+                _cur="$(jq -cr \
+                    --arg name "${cogUsrPoolName}" \
+                    '.UserPools[] | select(.Name == $name).Id' \
+                0&lt;&lt;&lt;"${_page}")"
+                [ -n "${_cur}" ] &amp;&amp; {
+                    [ -n "${_id}" ] || [[ "${_cur}" == *$'\n'* ]] &amp;&amp; {
+                        : "ERROR: Multiple User Pools: ${cogUsrPoolName}"
+                        exit 1
+                    }
+                    _id="${_cur}"
+                }
+                _nextTkn="$(jq -cr '(.NextToken // empty)' 0&lt;&lt;&lt;"${_page}")"
+                [ -z "${_nextTkn}" ] &amp;&amp; break
+            done
+            echo "${_id}"
+        )"
+        cogProvider+="${cogUsrPoolID}"
+        cogClientID="$(
+            cogClientID="$(
+                aws cognito-idp list-user-pool-clients \
+                    --user-pool-id "${cogUsrPoolID}" \
+                    --output text \
+                    --query "UserPoolClients[?
+                        (ClientName == '${_AWS__COG__CLIENT_NAME}')
+                    ].ClientId"
+            )"
+            ((_AWS__COG__ACTION)) || exit 0
+            [ -n "${cogClientID}" ] &amp;&amp; {
+                [[ "${cogClientID}" == *$'\t'* ]] &amp;&amp; {
+                    : "ERROR: Multiple App Clients: ${_AWS__COG__CLIENT_NAME}"
+                    exit 1
+                }
+                { echo "${cogClientID}"; exit 0; }
+            }
+        )"
+
+        # Create Identity Pool.
+        cogIdPoolID="$(
+            typeset _page= _cur= _id= _nextTkn=
+            while true; do
+                _page="$(
+                    aws cognito-identity list-identity-pools \
+                        --max-results 60 \
+                        ${_nextTkn:+--next-token "${_nextTkn}"} \
+                        --output json
+                )"
+                _cur="$(jq -cr \
+                    --arg name "${cogIdPoolName}" \
+                    '
+                        .IdentityPools[] |
+                        select(.IdentityPoolName == $name).IdentityPoolId
+                    ' \
+                0&lt;&lt;&lt;"${_page}")"
+                [ -n "${_cur}" ] &amp;&amp; {
+                    [ -n "${_id}" ] || [[ "${_cur}" == *$'\n'* ]] &amp;&amp; {
+                        : "ERROR: Multiple Identity Pools: ${cogIdPoolName}"
+                        exit 1
+                    }
+                    _id="${_cur}"
+                }
+                _nextTkn="$(jq -cr '(.NextToken // empty)' 0&lt;&lt;&lt;"${_page}")"
+                [ -z "${_nextTkn}" ] &amp;&amp; break
+            done
+            [ -n "${_id}" ] &amp;&amp; { echo "${_id}"; exit 0; }
+            aws cognito-identity create-identity-pool \
+                --identity-pool-name "${cogIdPoolName}" \
+                --"$(
+                    ((_AWS__COG__ALLOW_UNAUTH)) || echo -n no-
+                )"allow-unauthenticated-identities \
+                --output text \
+                --query 'IdentityPoolId'
+        )"
+        # Update Identity Pool Providers.
+        ((_AWS__COG__ACTION)) &amp;&amp; aws cognito-identity update-identity-pool \
+            --cli-input-json "$(
+                jq -cn \
+                    --argjson idPool "$(
+                        aws cognito-identity describe-identity-pool \
+                            --identity-pool-id "${cogIdPoolID}" \
+                            --output json
+                    )" \
+                    --arg provider "${cogProvider}" \
+                    --arg clientId "${cogClientID}" \
+                    --argjson action "${_AWS__COG__ACTION}" \
+                    '
+                        $idPool |
+                        del(.CreationDate, .LastModifiedDate) |
+                        .CognitoIdentityProviders|=(
+                            (. // []) |
+                            map(select(.ClientId != $clientId)) + (
+                                if ($action == 1) then [{
+                                    ProviderName: $provider,
+                                    ClientId: $clientId,
+                                    ServerSideTokenCheck: false
+                                }] else [] end
+                            )
+                        )
+                    '
+            )" \
+            --no-cli-pager
+
+        cat - 0&lt;&lt;txtEOF 1&gt;&amp;2
+--------------------------------------------------------------------------------
+Cognito Identity Pool Provider Client association $(
+    case ${_AWS__COG__ACTION} in
+      (-1)  echo 'removed';;
+      (0)   echo 'skipped';;
+      (1)   echo 'added';;
+    esac
+):
+    Identity Pool ID:   ${cogIdPoolID}
+    Provider:           ${cogProvider}
+    Client ID:          ${cogClientID}
+--------------------------------------------------------------------------------
+txtEOF
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <div style="font-size:medium;" tabindex="0">
+            <p style="margin-bottom:0"><strong>Notes:</strong></p>
+            <ul style="margin-top:0">
+                <li>The <code>AllowUnauthenticatedIdentities</code> is required by AWS for OpenSearch-Cognito integration.</li>
+                <li>The Un-Authenticated IAM Role (created in the next section) has zero permissions.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+<hr style="height:2px;border:0;border-block:1px solid CanvasText;"/>
+<h3>IAM Roles</h3>
+<div class="code-widget" id="aws-cognito--setup--iam-roles">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__COG__IDP_NAME\": \"...cogIdPname1...\", \"vEV--AWS_REGION\": \"...awsRegion1...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__COG__IDP_NAME\": \"...cogIdPname2...\", \"vEV--AWS_REGION\": \"...awsRegion2...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_AWS__COG__IDP_NAME": "...cogIdPname...",
+                "vEV--_AWS__ROLE_NAME_SFX": "...roleNameSfx...",
+                "vEV--AWS_REGION": "...awsRegion...",
+                "vEV--AWS_ACCOUNT_ID": [
+                    ["Please select an AWS Account."],
+                    {
+                        "val": "...awsAccID1...",
+                        "txt": "...awsAccName1..."
+                    },
+                    {
+                        "val": "...awsAccID2...",
+                        "txt": "...awsAccName2..."
+                    }
+                ],
+                "vEV--_AWS__COG__APP_NAME": "...cogAppName...",
+                "vEV--_AWS__COG__ID_POOL_SFX": "",
+                "vEV--_AWS__COG__APP_AUTH_POL_PERM": "'\\''...iamPolAct...|...iamPolRes...'\\''",
+                "vEV--_AWS__COG__APP_POL_NAME": "...appPolName...",
+                "vEV--_AWS__COG__APP_PRINCIPAL": "...appPrincipal..."
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_AWS__COG__IDP_NAME</span>          <input type="text"          data-var="vEV--_AWS__COG__IDP_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__RESET_PROFILE</span>          <select class="cw-cls--opt" data-var="vEV--_AWS__RESET_PROFILE">
+            <option value="0"   selected="">0: Keep existing Profile.</option>
+            <option value="1"              >1: Reset Profile.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__ROLE_NAME_SFX</span>          <input type="text"          data-var="vEV--_AWS__ROLE_NAME_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_REGION</span>                   <input type="text"          data-var="vEV--AWS_REGION" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_ACCOUNT_ID</span>               <select class="cw-cls--opt" data-var="vEV--AWS_ACCOUNT_ID"></select></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">IAM Auth/Un-Auth Roles</p>
+        <label><span class="cw-cls--label-text">_AWS__COG__ACTION</span>            <select class="cw-cls--opt" data-var="vEV--_AWS__COG__ACTION--authRole">
+            <option value="-1"             >     -1: Remove Identity Pool from Trust Policy.</option>
+            <option value="1"   selected="">&nbsp;1: Add Identity Pool to Trust Policy.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__APP_NAME</span>          <input type="text"          data-var="vEV--_AWS__COG__APP_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__ID_POOL_SFX</span>       <input type="text"          data-var="vEV--_AWS__COG__ID_POOL_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__APP_AUTH_POL_PERM</span> <textarea                   data-var="vEV--_AWS__COG__APP_AUTH_POL_PERM" rows="2"></textarea></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">IAM App. Servicing Role</p>
+        <label><span class="cw-cls--label-text">_AWS__COG__ACTION</span>            <select class="cw-cls--opt" data-var="vEV--_AWS__COG__ACTION--appSvcRole">
+            <option value="-1"             >     -1: Remove WebApp from Trust Policy.</option>
+            <option value="1"   selected="">&nbsp;1: Add WebApp to Trust Policy.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__APP_POL_NAME</span>      <input type="text"          data-var="vEV--_AWS__COG__APP_POL_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__APP_PRINCIPAL</span>     <input type="text"          data-var="vEV--_AWS__COG__APP_PRINCIPAL" value="" /></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  IAM Auth/Un-Auth Roles
+__SHELL=0 \
+    _AWS__COG__ACTION=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__ACTION--authRole"></span> \
+    _AWS__COG__IDP_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__IDP_NAME"></span>' \
+    _AWS__COG__APP_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__APP_NAME"></span>' \
+    _AWS__COG__ID_POOL_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__ID_POOL_SFX"></span>' \
+    _AWS__COG__APP_AUTH_POL_PERM='(
+<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__APP_AUTH_POL_PERM" data-left-pad="        "></span>
+     )' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset cogIdPoolName="cog--${_AWS__COG__IDP_NAME}--ip${_AWS__COG__ID_POOL_SFX:+--${_AWS__COG__ID_POOL_SFX}}"
+        typeset cogIAMroleAuth="cog--${_AWS__COG__IDP_NAME}--role--auth"
+        typeset cogIAMroleUnAuth="cog--${_AWS__COG__IDP_NAME}--role--un-auth"
+        typeset cogIdPoolID=
+        typeset addRolePol= polName= cogIAMroleAuthARN= cogIAMroleUnAuthARN=
+        typeset -a cogIAMpolAuth=${_AWS__COG__APP_AUTH_POL_PERM}
+
+        case ${_AWS__COG__ACTION} in (-1|1);; (*)false;; esac
+
+        cogIdPoolID="$(
+            typeset _page= _cur= _id= _nextTkn=
+            while true; do
+                _page="$(
+                    aws cognito-identity list-identity-pools \
+                        --max-results 60 \
+                        ${_nextTkn:+--next-token "${_nextTkn}"} \
+                        --output json
+                )"
+                _cur="$(jq -cr \
+                    --arg name "${cogIdPoolName}" \
+                    '
+                        .IdentityPools[] |
+                        select(.IdentityPoolName == $name).IdentityPoolId
+                    ' \
+                0&lt;&lt;&lt;"${_page}")"
+                [ -n "${_cur}" ] &amp;&amp; {
+                    [ -n "${_id}" ] || [[ "${_cur}" == *$'\n'* ]] &amp;&amp; {
+                        : "ERROR: Multiple Identity Pools: ${cogIdPoolName}"
+                        exit 1
+                    }
+                    _id="${_cur}"
+                }
+                _nextTkn="$(jq -cr '(.NextToken // empty)' 0&lt;&lt;&lt;"${_page}")"
+                [ -z "${_nextTkn}" ] &amp;&amp; break
+            done
+            echo "${_id}"
+        )"
+        # Create Authenticated Role (for SSO users via Cognito).
+        #   Least-privilege:
+        #       No permissions by default.
+        #       Consuming WebApp grants access via its own FGAC (Fine-Grained
+        #       Access Control).
+        addRolePol="$(
+            jq -cn \
+                --arg ipID "${cogIdPoolID}" \
+                '{
+                    Effect: "Allow",
+                    Principal: {Federated: "cognito-identity.amazonaws.com"},
+                    Action: "sts:AssumeRoleWithWebIdentity",
+                    Condition: {
+                        StringEquals: {
+                            "cognito-identity.amazonaws.com:aud": $ipID
+                        },
+                        "ForAnyValue:StringLike": {
+                            "cognito-identity.amazonaws.com:amr": "authenticated"
+                        }
+                    }
+                }'
+        )"
+        cogIAMroleAuthARN="$(
+            aws iam get-role \
+                --role-name "${cogIAMroleAuth}" \
+                --output text \
+                --query 'Role.Arn' \
+                2&gt; /dev/null ||
+            aws iam create-role \
+                --role-name "${cogIAMroleAuth}" \
+                --assume-role-policy-document "$(
+                    jq -cn --argjson addRolePol "${addRolePol}" '
+                        {"Version": "2012-10-17", "Statement": [$addRolePol]}
+                    '
+                )" \
+                --tags "$(
+                    jq -cn \
+                        --arg svc "cog--${_AWS__COG__IDP_NAME}" \
+                        '[{Key: "Svc", Value: $svc}]'
+                )" \
+                --output text \
+                --query 'Role.Arn'
+        )"
+        # Update Trust Policy.
+        aws iam update-assume-role-policy \
+            --role-name "${cogIAMroleAuth}" \
+            --policy-document "$(
+                jq -cn \
+                    --argjson rolePol "$(
+                        aws iam get-role \
+                            --role-name "${cogIAMroleAuth}" \
+                            --output json \
+                            --query 'Role.AssumeRolePolicyDocument'
+                    )" \
+                    --arg ipID "${cogIdPoolID}" \
+                    --argjson action "${_AWS__COG__ACTION}" \
+                    --argjson addRolePol "${addRolePol}" \
+                    '
+                        $rolePol |
+                        .Statement|=(map(select(
+                            (.Condition.StringEquals."cognito-identity.amazonaws.com:aud" // "") != $ipID
+                        )) + (if ($action == 1) then [$addRolePol] else [] end))
+                    '
+            )" \
+            --no-cli-pager
+        # Inline Permission Policy.
+        ((${#cogIAMpolAuth[@]})) &amp;&amp; {
+            polName="${cogIAMroleAuth}--pol--app--auth--${_AWS__COG__APP_NAME}"
+            case ${_AWS__COG__ACTION} in
+              (-1)
+                {
+                    aws iam get-role-policy \
+                        --role-name "${cogIAMroleAuth}" \
+                        --policy-name "${polName}" \
+                        &amp;&gt; /dev/null &amp;&amp;
+                    aws iam delete-role-policy \
+                        --role-name "${cogIAMroleAuth}" \
+                        --policy-name "${polName}" \
+                        --no-cli-pager
+                }
+                ;;
+              (1)
+                aws iam put-role-policy \
+                    --role-name "${cogIAMroleAuth}" \
+                    --policy-name "${polName}" \
+                    --policy-document "$(
+                        printf '%s\n' "${cogIAMpolAuth[@]}" |
+                        jq -cRs '
+                            split("\n") |
+                            map(
+                                select(length &gt; 0) |
+                                split("|") |
+                                {Effect: "Allow", Action: .[0], Resource: .[1]}
+                            ) |
+                            {Version: "2012-10-17", Statement: .}
+                        '
+                    )" \
+                    --no-cli-pager
+                ;;
+            esac
+        }
+
+        # Create Un-Authenticated Role.
+        addRolePol="$(
+            jq -cn --argjson addRolePol "${addRolePol}" '
+                $addRolePol | .Condition."ForAnyValue:StringLike"|=(
+                    ."cognito-identity.amazonaws.com:amr"="unauthenticated"
+                )
+            '
+        )"
+        cogIAMroleUnAuthARN="$(
+            aws iam get-role \
+                --role-name "${cogIAMroleUnAuth}" \
+                --output text \
+                --query 'Role.Arn' \
+                2&gt; /dev/null ||
+            aws iam create-role \
+                --role-name "${cogIAMroleUnAuth}" \
+                --assume-role-policy-document "$(
+                    jq -cn --argjson addRolePol "${addRolePol}" '
+                        {"Version": "2012-10-17", "Statement": [$addRolePol]}
+                    '
+                )" \
+                --tags "$(
+                    jq -cn \
+                        --arg svc "cog--${_AWS__COG__IDP_NAME}" \
+                        '[{Key: "Svc", Value: $svc}]'
+                )" \
+                --output text \
+                --query 'Role.Arn'
+        )"
+        # Update Trust Policy.
+        aws iam update-assume-role-policy \
+            --role-name "${cogIAMroleUnAuth}" \
+            --policy-document "$(
+                jq -cn \
+                    --argjson rolePol "$(
+                        aws iam get-role \
+                            --role-name "${cogIAMroleUnAuth}" \
+                            --output json \
+                            --query 'Role.AssumeRolePolicyDocument'
+                    )" \
+                    --arg ipID "${cogIdPoolID}" \
+                    --argjson action "${_AWS__COG__ACTION}" \
+                    --argjson addRolePol "${addRolePol}" \
+                    '
+                        $rolePol |
+                        .Statement|=(map(select(
+                            (.Condition.StringEquals."cognito-identity.amazonaws.com:aud" // "") != $ipID
+                        )) + (if ($action == 1) then [$addRolePol] else [] end))
+                    '
+            )" \
+            --no-cli-pager
+        # Inline Permission Policy.
+        polName="${cogIAMroleUnAuth}--pol--deny-all"
+        case ${_AWS__COG__ACTION} in
+          (-1)
+            {
+                aws iam get-role-policy \
+                    --role-name "${cogIAMroleUnAuth}" \
+                    --policy-name "${polName}" \
+                    &amp;&gt; /dev/null &amp;&amp;
+                aws iam delete-role-policy \
+                    --role-name "${cogIAMroleUnAuth}" \
+                    --policy-name "${polName}" \
+                    --no-cli-pager
+            }
+            ;;
+          (1)
+            aws iam put-role-policy \
+                --role-name "${cogIAMroleUnAuth}" \
+                --policy-name "${polName}" \
+                --policy-document "$(jq -cn '{
+                    Version: "2012-10-17",
+                    Statement: [{Effect: "Deny", Action: "*", Resource: "*"}]
+                }')" \
+                --no-cli-pager
+            ;;
+        esac
+
+        # Assign IAM Roles to Identity Pool.
+        aws cognito-identity set-identity-pool-roles \
+            --identity-pool-id "${cogIdPoolID}" \
+            --roles "$(
+                jq -cn \
+                    --arg auth "${cogIAMroleAuthARN}" \
+                    --arg unauth "${cogIAMroleUnAuthARN}" \
+                    '{authenticated: $auth, unauthenticated: $unauth}'
+            )" \
+            --no-cli-pager
+
+        cat - 0&lt;&lt;txtEOF 1&gt;&amp;2
+--------------------------------------------------------------------------------
+Cognito IAM Auth/Un-Auth Roles Trust Relation $(
+    case ${_AWS__COG__ACTION} in
+      (-1)  echo 'removed';;
+      (1)   echo 'added';;
+    esac
+):
+    Auth Role ARN:      ${cogIAMroleAuthARN}
+    Un-Auth Role ARN:   ${cogIAMroleUnAuthARN}
+--------------------------------------------------------------------------------
+txtEOF
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="font-size:medium;" tabindex="0">
+            <p>
+                IAM Role assumed by the App. (AWS Managed Service) to manage Cognito Auth. on the App.'s behalf.<br/>
+                Shared across Apps. Re-run with a different <code>_AWS__COG__APP_POL_NAME</code> and/or <code>_AWS__COG__APP_PRINCIPAL</code> to add another
+                App. (existing trusts are preserved).
+            </p>
+        </div>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  IAM App. Servicing Role
+__SHELL=0 \
+    _AWS__COG__ACTION=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__ACTION--appSvcRole"></span> \
+    _AWS__COG__IDP_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__IDP_NAME"></span>' \
+    _AWS__COG__APP_POL_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__APP_POL_NAME"></span>' \
+    _AWS__COG__APP_PRINCIPAL='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__APP_PRINCIPAL"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset cogIAMroleApp="cog--${_AWS__COG__IDP_NAME}--role--app"
+        typeset cogIAMpolAppARN= addRolePol= cogIAMroleAppARN=
+
+        case ${_AWS__COG__ACTION} in (-1|1);; (*)false;; esac
+
+        cogIAMpolAppARN="$(
+            aws iam list-policies \
+                --output text \
+                --query "Policies[?
+                    (PolicyName == '${_AWS__COG__APP_POL_NAME}')
+                ].Arn"
+        )"
+        addRolePol="$(
+            jq -cn \
+                --arg app "${_AWS__COG__APP_PRINCIPAL}" \
+                '{
+                    Effect: "Allow",
+                    Principal: {Service: $app},
+                    Action: "sts:AssumeRole"
+                }'
+        )"
+
+        # Create App. Servicing Role.
+        cogIAMroleAppARN="$(
+            aws iam get-role \
+                --role-name "${cogIAMroleApp}" \
+                --output text \
+                --query 'Role.Arn' \
+                2&gt; /dev/null ||
+            aws iam create-role \
+                --role-name "${cogIAMroleApp}" \
+                --assume-role-policy-document "$(
+                    jq -cn --argjson addRolePol "${addRolePol}" '
+                        {"Version": "2012-10-17", "Statement": [$addRolePol]}
+                    '
+                )" \
+                --tags "$(
+                    jq -cn \
+                        --arg svc "cog--${_AWS__COG__IDP_NAME}" \
+                        '[{Key: "Svc", Value: $svc}]'
+                )" \
+                --output text \
+                --query 'Role.Arn'
+        )"
+        # Update Trust Policy.
+        aws iam update-assume-role-policy \
+            --role-name "${cogIAMroleApp}" \
+            --policy-document "$(
+                jq -cn \
+                    --argjson rolePol "$(
+                        aws iam get-role \
+                            --role-name "${cogIAMroleApp}" \
+                            --output json \
+                            --query 'Role.AssumeRolePolicyDocument'
+                    )" \
+                    --arg app "${_AWS__COG__APP_PRINCIPAL}" \
+                    --argjson action "${_AWS__COG__ACTION}" \
+                    --argjson addRolePol "${addRolePol}" \
+                    '
+                        $rolePol |
+                        .Statement|=(map(select(
+                            (.Principal.Service // "") != $app
+                        )) + (if ($action == 1) then [$addRolePol] else [] end))
+                    '
+            )" \
+            --no-cli-pager
+        # Managed Permission Policy.
+        case ${_AWS__COG__ACTION} in
+          (-1)
+            aws iam detach-role-policy \
+                --role-name "${cogIAMroleApp}" \
+                --policy-arn "${cogIAMpolAppARN}" \
+                --no-cli-pager
+            ;;
+          (1)
+            aws iam attach-role-policy \
+                --role-name "${cogIAMroleApp}" \
+                --policy-arn "${cogIAMpolAppARN}" \
+                --no-cli-pager
+            ;;
+        esac
+
+        cat - 0&lt;&lt;txtEOF 1&gt;&amp;2
+--------------------------------------------------------------------------------
+Cognito IAM App. Servicing Role Trust Relation $(
+    case ${_AWS__COG__ACTION} in
+      (-1)  echo 'removed';;
+      (1)   echo 'added';;
+    esac
+):
+    Role ARN:   ${cogIAMroleAppARN}
+    Principal:  ${_AWS__COG__APP_PRINCIPAL}
+    Policy:     ${_AWS__COG__APP_POL_NAME}
+--------------------------------------------------------------------------------
+txtEOF
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

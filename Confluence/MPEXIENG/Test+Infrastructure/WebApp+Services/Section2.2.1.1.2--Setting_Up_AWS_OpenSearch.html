@@ -1,0 +1,108 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setting Up AWS OpenSearch</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../Scripts/js/code-widget.js"></script>
+    <script type="module" src="../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/html-include.js"></script>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/Cloud/AWS/OpenSearch_Setup.html"
+    data-mod-js="
+        CodeWidget__UsrLib_OvrCfg(html, {
+            'aws-opensearch--setup--domain': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vEV--_AWS__COG__IDP_NAME&quot;:       &quot;RedHat--LP-Chaos--svc--web-app&quot;,
+                                    &quot;vEV--_AWS__DNS_BASE_DOM&quot;:        &quot;chaos.lp.devcluster.openshift.com&quot;,
+                                    &quot;vEV--_AWS__DNS_SUB_DOM&quot;:         &quot;lp-chaos--svc--web-app&quot;,
+                                    &quot;vEV--_AWS__OS__DOM_NAME&quot;:        &quot;open-search&quot;,
+                                    &quot;vEV--_AWS__OS__MASTER_ROLE_SFX&quot;: [{&quot;val&quot;: &quot;admin&quot;, &quot;txt&quot;: &quot;admin&quot;}, [{&quot;val&quot;: &quot;poweruser&quot;, &quot;txt&quot;: &quot;poweruser&quot;}]],
+                                    &quot;vEV--_AWS__ROLE_NAME_SFX&quot;:       [{&quot;val&quot;: &quot;admin&quot;, &quot;txt&quot;: &quot;admin&quot;}, [{&quot;val&quot;: &quot;poweruser&quot;, &quot;txt&quot;: &quot;poweruser&quot;}]],
+                                    &quot;vEV--AWS_ACCOUNT_ID&quot;:            [&quot;624914081466&quot;]
+                                }`,
+                            },
+                        },
+                    ],
+                    'vEV--_AWS__COG__IDP_NAME': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__DNS_BASE_DOM': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__DNS_SUB_DOM': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__OS__DOM_NAME': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__OS__ENG_VER': 'OpenSearch_3.3',
+                    'vEV--_AWS__OS__MASTER_ROLE_SFX': 'poweruser',
+                    'vEV--_AWS__ROLE_NAME_SFX': 'poweruser',
+                    'vEV--AWS_REGION': 'us-west-1',
+                    'vEV--AWS_ACCOUNT_ID': [['Please select Team.']],
+                },
+            },
+            'aws-opensearch--setup--access-ctrl': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vEV--_AWS__COG__IDP_NAME&quot;:       &quot;RedHat--LP-Chaos--svc--web-app&quot;,
+                                    &quot;vEV--_AWS__OS__FQDN&quot;:            &quot;open-search.lp-chaos--svc--web-app.chaos.lp.devcluster.openshift.com&quot;,
+                                    &quot;vEV--_AWS__ROLE_NAME_SFX&quot;:       [{&quot;val&quot;: &quot;admin&quot;, &quot;txt&quot;: &quot;admin&quot;}, [{&quot;val&quot;: &quot;poweruser&quot;, &quot;txt&quot;: &quot;poweruser&quot;}]],
+                                    &quot;vEV--AWS_ACCOUNT_ID&quot;:            [&quot;624914081466&quot;],
+                                    &quot;vEV--_AWS__OS__MASTER_ROLE_SFX&quot;: [{&quot;val&quot;: &quot;admin&quot;, &quot;txt&quot;: &quot;admin&quot;}, [{&quot;val&quot;: &quot;poweruser&quot;, &quot;txt&quot;: &quot;poweruser&quot;}]]
+                                }`,
+                            },
+                        },
+                    ],
+                    'vEV--_AWS__COG__IDP_NAME': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__OS__FQDN': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__ROLE_NAME_SFX': 'poweruser',
+                    'vEV--AWS_REGION': 'us-west-1',
+                    'vEV--AWS_ACCOUNT_ID': [['Please select Team.']],
+                    'vEV--_AWS__OS__MASTER_ROLE_SFX': 'poweruser',
+                    'vEV--_AWS__OS__ADM_EML': 'user@redhat.com',
+                },
+            },
+            'aws-opensearch--cognito-app-client': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vSV--osEP&quot;:      &quot;search-open-search-&lt;hash&gt;.us-west-1.es.amazonaws.com&quot;,
+                                    &quot;vSV--osFQDN&quot;:    &quot;open-search.lp-chaos--svc--web-app.chaos.lp.devcluster.openshift.com&quot;
+                                }`,
+                            },
+                        },
+                    ],
+                    'vSV--osEP':   ['...PleaseSelectTeam...'],
+                    'vSV--osFQDN': ['...PleaseSelectTeam...'],
+                },
+            },
+        });
+    "
+></div>
+</body>
+</html>

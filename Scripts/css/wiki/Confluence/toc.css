@@ -1,0 +1,136 @@
+/* Confluence-Style Table of Contents */
+#toc {
+    position: sticky;
+    top: 20px;
+    grid-column: 2;
+    grid-row: 1 / span 999;
+    align-self: stretch;
+    max-height: 80vh;
+    overflow: auto;
+    border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+    border-radius: 3px;
+    padding: 12px 16px;
+    background-color: Canvas;
+}
+
+.toc-title {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 8px;
+    color: CanvasText;
+}
+
+.toc-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.toc-list ul {
+    padding-left: 16px;
+}
+
+/* Numbered ToC styling with hierarchical numbering. */
+.toc-numbered {
+    list-style: none;
+    padding-left: 0;
+    counter-reset: level1;
+}
+
+.toc-numbered ul {
+    list-style: none;
+    padding-left: 20px;
+}
+
+/* Counter reset for nested levels */
+.toc-numbered .toc-level-1 {
+    counter-increment: level1;
+    counter-reset: level2;
+}
+
+.toc-numbered .toc-level-2 {
+    counter-increment: level2;
+    counter-reset: level3;
+}
+
+.toc-numbered .toc-level-3 {
+    counter-increment: level3;
+    counter-reset: level4;
+}
+
+.toc-numbered .toc-level-4 {
+    counter-increment: level4;
+    counter-reset: level5;
+}
+
+.toc-numbered .toc-level-5 {
+    counter-increment: level5;
+    counter-reset: level6;
+}
+
+.toc-numbered .toc-level-6 {
+    counter-increment: level6;
+}
+
+/* Display hierarchical numbers */
+.toc-numbered .toc-level-1 > .toc-link::before {
+    content: counter(level1) ". ";
+}
+
+.toc-numbered .toc-level-2 > .toc-link::before {
+    content: counter(level1) "." counter(level2) " ";
+}
+
+.toc-numbered .toc-level-3 > .toc-link::before {
+    content: counter(level1) "." counter(level2) "." counter(level3) " ";
+}
+
+.toc-numbered .toc-level-4 > .toc-link::before {
+    content: counter(level1) "." counter(level2) "." counter(level3) "." counter(level4) " ";
+}
+
+.toc-numbered .toc-level-5 > .toc-link::before {
+    content: counter(level1) "." counter(level2) "." counter(level3) "." counter(level4) "." counter(level5) " ";
+}
+
+.toc-numbered .toc-level-6 > .toc-link::before {
+    content: counter(level1) "." counter(level2) "." counter(level3) "." counter(level4) "." counter(level5) "." counter(level6) " ";
+}
+
+.toc-item {
+    margin: 4px 0;
+}
+
+.toc-link {
+    display: block;
+    font-size: 14px;
+    margin-left: -8px;
+    border-radius: 3px;
+    padding: 4px 8px;
+    color: LinkText;
+    text-decoration: none;
+    line-height: 1.4;
+    transition: all 0.2s ease-in-out;
+}
+
+.toc-link:hover {
+    background-color: color-mix(in srgb, CanvasText 10%, Canvas);
+}
+
+.toc-link.toc-active {
+    font-weight: 600;
+    border-left: 3px solid LinkText;
+    padding-left: 5px;
+    background-color: color-mix(in srgb, LinkText 15%, Canvas);
+}
+
+article {
+    display: grid;
+    grid-template-columns: 1fr max(20ch, 20%);
+    column-gap: 24px;
+}
+
+article > *:not(#toc) {
+    grid-column: 1;
+    min-width: 40ch;
+}

@@ -1,0 +1,722 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Manual Destruction</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../../js/global.js"></script>
+    <script type="module" src="../../../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="OCP--aws--Manual-Uninstall">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vSV--mainDNSdomArr\": \"\\n{\\\"rows\\\": 2}\\n'...mainDNSdom1_1...'\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vSV--mainDNSdomArr\": \"\\n{\\\"rows\\\": 2}\\n'...mainDNSdom2_1...'\"}"
+                        }
+                    }
+                ],
+                "vSV--ocpClsDir": "...clusterInstallDir...",
+                "vSV--ocpClsName": "...clusterName...",
+                "vSV--ocpInfra": "...clusterUniqueInfrastructureID...",
+                "vSV--mainDNSdomArr": "{\"rows\": 5}\n'...mainDNSdom1...'\n'...mainDNSdom2...'\n ...\n'...mainDNSdomN...'"
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Cluster Information</p>
+        <label><span class="cw-cls--label-text">Cluster Install Directory</span>    <input type="text"  data-var="vSV--ocpClsDir" value="" /></label>
+        <label><span class="cw-cls--label-text">Cluster Name</span>                 <input type="text"  data-var="vSV--ocpClsName" value="" /></label>
+        <label><span class="cw-cls--label-text">Cluster Infrastructure ID</span>    <input type="text"  data-var="vSV--ocpInfra" value="" /></label>
+        <label><span class="cw-cls--label-text">Main DNS Domains</span>             <textarea           data-var="vSV--mainDNSdomArr" rows="1"></textarea></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+( set -u
+    typeset ocpClsDir='<span style="color:red;font-weight:bold;" data-var="vSV--ocpClsDir"></span>'
+    [ -n "${ocpClsDir}" ] &amp;&amp; [ -f "${ocpClsDir}/metadata.json" ] &amp;&amp; eval "$(
+        jq -r '
+            "typeset ocpClsName=\(.clusterName | @sh)\n" +
+            "typeset ocpInfra=\(.infraID | @sh)\n"
+        ' "${ocpClsDir}/metadata.json"
+    )" || {
+        # Manually set the required information ONLY if the `ocpClsDir` is set
+        #   to empty string or the corresponding installation `metadata.json`
+        #   does not exist.
+        typeset ocpClsName='<span style="color:red;font-weight:bold;" data-var="vSV--ocpClsName"></span>'
+        typeset ocpInfra='<span style="color:red;font-weight:bold;" data-var="vSV--ocpInfra"></span>'
+    }
+    typeset e=
+    typeset -a mainDNSdomArr=(
+<span style="color:red;font-weight:bold;" data-var="vSV--mainDNSdomArr" data-left-pad="        "></span>
+    )
+
+    ############################################################################
+    #    1. Clean Up Load Balancer Resources
+    ##      V2 Load Balancers's Listeners.
+    (
+        arns="$(
+            aws resourcegroupstaggingapi get-resources \
+                --tag-filters "Key=kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --resource-type-filters elasticloadbalancing:listener \
+                --output text \
+                --query 'ResourceTagMappingList[*].ResourceARN'
+        )"
+        [ "${arns}" ] &amp;&amp; {
+            # List V2 Load Balancers's Listeners.
+            aws elbv2 describe-listeners \
+                --listener-arns ${arns} \
+                --output table \
+                --query 'Listeners[*].{
+                    Port:Port,
+                    ForwardsTo:DefaultActions[0].TargetGroupArn,
+                    Protocol:Protocol
+                }'
+            # Delete V2 Load Balancers's Listeners.
+            for e in ${arns}; do
+                echo "Deleting \`${e}\`..."
+                aws elbv2 delete-listener --listener-arn "${e}" --no-cli-pager
+            done
+        }
+    )
+    ##      V2 Load Balancers's Target Groups.
+    (
+        arns="$(
+            aws resourcegroupstaggingapi get-resources \
+                --tag-filters "Key=kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --resource-type-filters elasticloadbalancing:targetgroup \
+                --output text \
+                --query 'ResourceTagMappingList[*].ResourceARN'
+        )"
+        [ "${arns}" ] &amp;&amp; {
+            # List V2 Load Balancers's Target Groups.
+            aws elbv2 describe-target-groups \
+                --target-group-arns ${arns} \
+                --output table \
+                --query 'TargetGroups[*].{
+                    Name:TargetGroupName, Port:Port, Protocol:Protocol, Type:TargetType
+                }'
+            # Delete V2 Load Balancers's Target Groups.
+            for e in ${arns}; do
+                echo "Deleting \`${e}\`..."
+                aws elbv2 delete-target-group --target-group-arn "${e}" --no-cli-pager
+            done
+        }
+    )
+    ##      V2 Load Balancers.
+    (
+        arns="$(
+            aws resourcegroupstaggingapi get-resources \
+                --tag-filters "Key=kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --resource-type-filters elasticloadbalancing:loadbalancer \
+                --output text \
+                --query 'ResourceTagMappingList[*].ResourceARN' |
+            tr '\t' '\n' | grep -E '/(app|net)/'
+        )"
+        [ "${arns}" ] &amp;&amp; {
+            # List V2 Load Balancers.
+            aws elbv2 describe-load-balancers \
+                --load-balancer-arns ${arns} \
+                --output table \
+                --query 'LoadBalancers[*].{
+                    Name:LoadBalancerName, Scheme:Scheme, Type:Type
+                }'
+            # Delete V2 Load Balancers.
+            for e in ${arns}; do
+                echo "Deleting \`${e}\`..."
+                aws elbv2 delete-load-balancer --load-balancer-arn "${e}" --no-cli-pager
+            done
+            echo "Waiting for ALL V2 Load Balancers to be deleted..."
+            aws elbv2 wait load-balancers-deleted --load-balancer-arns ${arns} &amp;&amp;
+                echo '    Done.' || echo '    Timed out.'
+        }
+    )
+    ##      V1 Load Balancers.
+    (
+        names="$(
+            aws resourcegroupstaggingapi get-resources \
+                --tag-filters "Key=kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --resource-type-filters elasticloadbalancing:loadbalancer \
+                --output text \
+                --query 'ResourceTagMappingList[*].ResourceARN' |
+            tr '\t' '\n' | grep -vE '/(app|net)/' | cut -d / -f2
+        )"
+        [ "${names}" ] &amp;&amp; {
+            # List V1 Load Balancers.
+            aws elb describe-load-balancers \
+                --load-balancer-names ${names} \
+                --output table \
+                --query 'LoadBalancerDescriptions[*].{
+                    Name:LoadBalancerName,
+                    Scheme:Scheme,
+                    "EC2 Instances":Instances[].InstanceId
+                }'
+            # Delete V1 Load Balancers.
+            for e in ${names}; do
+                for e2 in $(
+                    aws elb describe-load-balancers \
+                        --load-balancer-names "${e}" \
+                        --output text \
+                        --query 'LoadBalancerDescriptions[*].Instances[*].InstanceId'
+                ); do
+                    echo "Deregistering \`${e2}\` from V1 Load Balancer \`${e}\`..."
+                    aws elb deregister-instances-from-load-balancer \
+                        --load-balancer-name "${e}" \
+                        --instances "${e2}" \
+                        --no-cli-pager
+                    aws elb wait instance-deregistered --load-balancer-name "${e}" --instances "${e2}" &amp;&amp;
+                        echo '    Done.' || echo '    Timed out.'
+                done
+                echo "Deleting \`${e}\`..."
+                aws elb delete-load-balancer --load-balancer-name "${e}" --no-cli-pager
+            done
+        }
+    )
+    ############################################################################
+    #    2. Clean Up Compute Resources.
+    ##      EC2 Instances.
+    (
+        ids=$(
+            aws ec2 describe-instances \
+                --filters "Name=tag:kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --output text \
+                --query 'Reservations[*].Instances[?(State.Name != `terminated`)].InstanceId'
+        )
+        [ "${ids}" ] &amp;&amp; {
+            while true; do
+                # List EC2 Instances.
+                aws ec2 describe-instances \
+                    --instance-ids ${ids} \
+                    --output table \
+                    --query 'Reservations[*].Instances[*].{
+                        ID:InstanceId,
+                        Name:Tags[?(Key == `"Name"`)]|[0].Value,
+                        State:State.Name
+                    }'
+                [ -v monPID ] || {
+                    # Terminate EC2 Instances.
+                    echo "Terminating EC2 Instances..."
+                    aws ec2 terminate-instances --instance-ids ${ids} --no-cli-pager
+                    aws ec2 wait instance-terminated --instance-ids ${ids} &amp; monPID=$!
+                    continue
+                }
+                sleep 15
+                { kill -0 ${monPID} 2&gt;/dev/null; } || {
+                    wait ${monPID} &amp;&amp; echo '    Done.' || echo '    Timed out.'
+                    break
+                }
+            done
+        }
+    )
+    ############################################################################
+    #    3. Clean Up Networking Resources.
+    ##      VPC's NAT Gateways.
+    (
+        ids=$(
+            aws ec2 describe-nat-gateways \
+                --filter "Name=tag:kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --output text \
+                --query 'NatGateways[?(State != `deleted`)].NatGatewayId'
+        )
+        [ "${ids}" ] &amp;&amp; {
+            # List VPC's NAT Gateways.
+            aws ec2 describe-nat-gateways \
+                --nat-gateway-ids ${ids} \
+                --output table \
+                --query 'NatGateways[*].{
+                    ID:NatGatewayId, State:State, SubNet:SubnetId, VPC:VpcId
+                }'
+            # Delete VPC's NAT Gateways.
+            for e in ${ids}; do
+                echo "Deleting \`${e}\`..."
+                aws ec2 delete-nat-gateway --nat-gateway-id "${e}" --no-cli-pager
+            done
+            echo "Waiting for ALL NAT Gateways to be deleted..."
+            aws ec2 wait nat-gateway-deleted --nat-gateway-ids ${ids} &amp;&amp;
+                echo '    Done.' || echo '    Timed out.'
+        }
+    )
+    ##      VPC's EndPoints.
+    (
+        ids=$(
+            aws ec2 describe-vpc-endpoints \
+                --filters "Name=tag:kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --output text \
+                --query 'VpcEndpoints[*].VpcEndpointId'
+        )
+        [ "${ids}" ] &amp;&amp; {
+            # List VPC's EndPoints.
+            aws ec2 describe-vpc-endpoints \
+                --vpc-endpoint-ids ${ids} \
+                --output table \
+                --query 'VpcEndpoints[*].{
+                    ID:VpcEndpointId, Service:ServiceName, Type:VpcEndpointType, VPC:VpcId
+                }'
+            # Delete VPC's EndPoints.
+            echo "Deleting VPC's EndPoints..."
+            aws ec2 delete-vpc-endpoints --vpc-endpoint-ids ${ids} --no-cli-pager
+        }
+    )
+    ##      VPC's Internet Gateways.
+    (
+        # List VPC's Internet Gateways.
+        aws ec2 describe-internet-gateways \
+            --filters "Name=tag:kubernetes.io/cluster/${ocpInfra},Values=owned" \
+            --output table \
+            --query 'InternetGateways[*].{
+                ID:InternetGatewayId,
+                Name:Tags[?(Key == `"Name"`)]|[0].Value,
+                VPC:Attachments[0].VpcId
+            }'
+        # Delete VPC's Internet Gateways.
+        while read -r e e2; do
+            echo "Detaching \`${e}\` from \`${e2}\`..."
+            aws ec2 detach-internet-gateway --internet-gateway-id "${e}" --vpc-id "${e2}"
+            echo "Deleting \`${e}\`..."
+            aws ec2 delete-internet-gateway --internet-gateway-id "${e}" --no-cli-pager
+        done 0&lt; &lt;(
+            aws ec2 describe-internet-gateways \
+                --filters "Name=tag:kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --output text \
+                --query 'InternetGateways[*].[InternetGatewayId, Attachments[0].VpcId]'
+        )
+    )
+    ##      VPC's Security Groups.
+    (
+        ids="$({
+            aws ec2 describe-security-groups \
+                --filters "Name=tag:kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --output text \
+                --query 'SecurityGroups[*].GroupId'
+            aws ec2 describe-security-groups \
+                --filters "Name=tag:sigs.k8s.io/cluster-api-provider-aws/cluster/${ocpInfra},Values=owned" \
+                --output text \
+                --query 'SecurityGroups[*].GroupId'
+        } | tr '\t' '\n' | sort -u)"
+        [ "${ids}" ] &amp;&amp; {
+            # List VPC's Security Groups.
+            aws ec2 describe-security-groups \
+                --group-ids ${ids} \
+                --output table \
+                --query 'SecurityGroups[*].{ID:GroupId, Name:GroupName, VPC:VpcId}'
+            # Revoke VPC's Security Group Rules.
+            for e in ${ids}; do
+                sgDesc="$(aws ec2 describe-security-groups --group-ids "${e}")"
+                rules="$(echo "${sgDesc}" | jq -c '.SecurityGroups[0].IpPermissions')"
+                [ "${rules}" != "[]" ] &amp;&amp; {
+                    echo "Revoking Inbound Rules for \`${e}\`..."
+                    aws ec2 revoke-security-group-ingress \
+                        --group-id "${e}" \
+                        --ip-permissions "${rules}" \
+                        --no-cli-pager
+                }
+                rules="$(echo "${sgDesc}" | jq -c '.SecurityGroups[0].IpPermissionsEgress')"
+                [ "${rules}" != "[]" ] &amp;&amp; {
+                    echo "Revoking Outbound Rules for \`${e}\`..."
+                    aws ec2 revoke-security-group-egress \
+                        --group-id "${e}" \
+                        --ip-permissions "${rules}" \
+                        --no-cli-pager
+                }
+            done
+            # Delete VPC's Security Groups.
+            for e in ${ids}; do
+                echo "Deleting \`${e}\`..."
+                aws ec2 delete-security-group --group-id "${e}" --no-cli-pager
+            done
+        }
+    )
+    ##      VPC's Sub-Nets.
+    (
+        ids=$(
+            aws ec2 describe-subnets \
+                --filters "Name=tag:kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --output text \
+                --query 'Subnets[*].SubnetId'
+        )
+        [ "${ids}" ] &amp;&amp; {
+            # List VPC's Sub-Nets.
+            aws ec2 describe-subnets \
+                --subnet-ids ${ids} \
+                --output table \
+                --query 'Subnets[*].{
+                    ID:SubnetId, Name:Tags[?(Key == `"Name"`)]|[0].Value, VPC:VpcId
+                }'
+            # Delete VPC's Sub-Nets.
+            for e in ${ids}; do
+                echo "Deleting \`${e}\`..."
+                aws ec2 delete-subnet --subnet-id "${e}" --no-cli-pager
+            done
+        }
+    )
+    ##      VPC's Route Tables.
+    (
+        ids=$(
+            aws ec2 describe-route-tables \
+                --filters "Name=tag:kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --output text \
+                --query 'RouteTables[*].RouteTableId'
+        )
+        [ "${ids}" ] &amp;&amp; {
+            # List VPC's Route Tables.
+            aws ec2 describe-route-tables \
+                --route-table-ids ${ids} \
+                --output table \
+                --query 'RouteTables[*].{
+                    ID:RouteTableId, Name:Tags[?(Key == `"Name"`)]|[0].Value, VPC:VpcId
+                }'
+            # Delete VPC's Route Tables.
+            for e in ${ids}; do
+                echo "Deleting \`${e}\`..."
+                aws ec2 delete-route-table --route-table-id "${e}" --no-cli-pager
+            done
+        }
+    )
+    ##      VPC's EIPs.
+    (
+        ids=$(
+            aws ec2 describe-addresses \
+                --filters "Name=tag:kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --output text \
+                --query 'Addresses[*].AllocationId'
+        )
+        [ "${ids}" ] &amp;&amp; {
+            # List VPC's EIPs.
+            aws ec2 describe-addresses \
+                --allocation-ids ${ids} \
+                --output table \
+                --query 'Addresses[*].{
+                    ID:AllocationId,
+                    Name:Tags[?(Key == `"Name"`)]|[0].Value,
+                    "Public IP":PublicIp
+                }'
+            # Delete VPC's EIPs.
+            for e in ${ids}; do
+                echo "Deleting \`${e}\`..."
+                aws ec2 release-address --allocation-id "${e}" --no-cli-pager
+            done
+        }
+    )
+    ##      VPCs.
+    (
+        ids=$(
+            aws ec2 describe-vpcs \
+                --filters "Name=tag:kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --output text \
+                --query 'Vpcs[*].VpcId'
+        )
+        [ "${ids}" ] &amp;&amp; {
+            # List VPCs.
+            aws ec2 describe-vpcs \
+                --vpc-ids ${ids} \
+                --output table \
+                --query 'Vpcs[*].{ID:VpcId, Name:Tags[?(Key == `"Name"`)]|[0].Value}'
+            # Delete VPCs.
+            for e in ${ids}; do
+                echo "Deleting \`${e}\`..."
+                aws ec2 delete-vpc --vpc-id "${e}" --no-cli-pager
+            done
+        }
+    )
+    ##      Route 53 Hosted Zones.
+    (
+        # List Route 53 Hosted Zones.
+        aws route53 list-hosted-zones \
+            --output table \
+            --query "HostedZones[?contains('$(
+                aws resourcegroupstaggingapi get-resources \
+                    --tag-filters "Key=kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                    --resource-type-filters route53:hostedzone \
+                    --output text \
+                    --query 'ResourceTagMappingList[*].ResourceARN' |
+                cut -d : -f6 |
+                sed 's|^|/|'
+            )', Id)].{ID:Id, Name:Name, \"Num. of Records\":ResourceRecordSetCount}"
+        # Delete Route 53 Hosted Zones.
+        for e in $(
+            aws resourcegroupstaggingapi get-resources \
+                --tag-filters "Key=kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --resource-type-filters route53:hostedzone \
+                --output text \
+                --query 'ResourceTagMappingList[*].ResourceARN' |
+            cut -d : -f6 |
+            sed 's|^|/|'
+        ); do
+            echo "Deleting non-default DNS records from Hosted Zone \`${e}\`..."
+            aws route53 change-resource-record-sets \
+                --hosted-zone-id "${e}" \
+                --change-batch "$(
+                    aws route53 list-resource-record-sets \
+                        --hosted-zone-id "${e}" \
+                        --query "
+                            ResourceRecordSets[?((Type != 'NS') &amp;&amp; (Type != 'SOA'))]
+                        " |
+                    jq -c '{"Changes": [
+                        .[] | {"Action": "DELETE", "ResourceRecordSet": .}
+                    ]}'
+                )" \
+                --no-cli-pager
+            echo "Deleting Hosted Zone \`${e}\`..."
+            aws route53 delete-hosted-zone --id "/${e}" --no-cli-pager
+        done
+    )
+    ##      Route 53 Main Hosted Zone Cluster Records.
+    (
+        # List Route 53 Main Hosted Zone Cluster Records.
+        e="$(printf '%s. ' "${mainDNSdomArr[@]}")"
+        while read -r e2 e3; do
+            aws route53 list-resource-record-sets \
+                --hosted-zone-id "${e2}" \
+                --output table \
+                --query "
+                    ResourceRecordSets[?(
+                        (Type != 'NS') &amp;&amp;
+                        (Type != 'SOA') &amp;&amp;
+                        ends_with(Name, '${ocpClsName}.${e3}')
+                    )].{\"DNS Name\":AliasTarget.DNSName, Name:Name}
+                "
+        done 0&lt; &lt;(
+            aws route53 list-hosted-zones \
+                    --output text \
+                    --query "HostedZones[?contains('${e}', Name)].[Id, Name]"
+        )
+        # Delete Route 53 Main Hosted Zone Cluster Records.
+        e="$(printf '%s. ' "${mainDNSdomArr[@]}")"
+        while read -r e2 e3; do
+            e4="$(
+                aws route53 list-resource-record-sets \
+                    --hosted-zone-id "${e2}" \
+                    --query "
+                        ResourceRecordSets[?(
+                                (Type != 'NS') &amp;&amp;
+                                (Type != 'SOA') &amp;&amp;
+                                ends_with(Name, '${ocpClsName}.${e3}')
+                        )]
+                    "
+            )"
+            [ "${e4}" = '[]' ] &amp;&amp; continue
+            echo "Deleting Cluster DNS records from Hosted Zone \`${e2}\`..."
+            aws route53 change-resource-record-sets \
+                --hosted-zone-id "${e2}" \
+                --change-batch "$(
+                    jq -nc --argjson r "${e4}" \
+                        '{"Changes": [
+                            $r[] | {"Action": "DELETE", "ResourceRecordSet": .}
+                        ]}'
+                )" \
+                --no-cli-pager
+        done 0&lt; &lt;(
+            aws route53 list-hosted-zones \
+                    --output text \
+                    --query "HostedZones[?contains('${e}', Name)].[Id, Name]"
+        )
+    )
+    ############################################################################
+    #    4. Clean Up Storage Resources.
+    ##      S3 Buckets.
+    (
+        names=$(
+            aws resourcegroupstaggingapi get-resources \
+                --tag-filters "Key=kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --resource-type-filters s3 \
+                --output text \
+                --query 'ResourceTagMappingList[*].ResourceARN' |
+            cut -d : -f6
+        )
+        [ "${names}" ] &amp;&amp; {
+            # List S3 Buckets.
+            echo "${names}"
+            # Delete S3 Buckets.
+            for e in ${names}; do
+                echo "Deleting \`${e}\`..."
+                aws s3 rb "s3://${e}" --force --no-cli-pager
+            done
+        }
+    )
+    ############################################################################
+    #    5. Clean Up IAM Resources.
+    ##      IAM Instance Profiles.
+    (
+        # List IAM Instance Profiles.
+        aws iam list-instance-profiles \
+            --output table \
+            --query "InstanceProfiles[?contains('$(
+                aws resourcegroupstaggingapi get-resources \
+                    --tag-filters "Key=kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                    --resource-type-filters iam:instance-profile \
+                    --output text \
+                    --query 'ResourceTagMappingList[*].ResourceARN'
+            )', Arn)].{
+                ID:InstanceProfileId, Name:InstanceProfileName, Roles:Roles[*].RoleName
+            }"
+        # Delete IAM Instance Profiles and Roles.
+        for e in $(
+            aws resourcegroupstaggingapi get-resources \
+                --tag-filters "Key=kubernetes.io/cluster/${ocpInfra},Values=owned" \
+                --resource-type-filters iam:instance-profile \
+                --output text \
+                --query 'ResourceTagMappingList[*].ResourceARN'
+        ); do
+            while IFS='|' read -r e2 e3; do
+                IFS=, read -ra e3 0&lt;&lt;&lt;"${e3}"
+                for e4 in "${e3}"; do
+                    echo "Detaching IAM Role \`${e4}\` from IAM Instance Profile \`${e2}\`..."
+                    aws iam remove-role-from-instance-profile \
+                        --instance-profile-name "${e2}" \
+                        --role-name "${e4}" \
+                        --no-cli-pager
+                done
+                echo "Deleting IAM Instance Profile \`${e2}\`..."
+                aws iam delete-instance-profile \
+                    --instance-profile-name "${e2}" \
+                    --no-cli-pager
+                while read -r e2; do
+                    echo "Detaching IAM Permission Policies \`${e2}\` from IAM Role \`${e4}\`..."
+                    aws iam detach-role-policy \
+                        --role-name "${e4}" \
+                        --policy-arn "${e2}" \
+                        --no-cli-pager
+                done 0&lt; &lt;(
+                    aws iam list-attached-role-policies --role-name "${e4}" \
+                        --output text --query 'AttachedPolicies[*].[PolicyArn]'
+                )
+                while read -r e2; do
+                    echo "Deleting AIM Inline Permission Policies \`${e2}\` from IAM Role \`${e4}\`..."
+                    aws iam delete-role-policy \
+                        --role-name "${e4}" \
+                        --policy-name "${e2}" \
+                        --no-cli-pager
+                done 0&lt; &lt;(
+                    aws iam list-role-policies --role-name "${e4}" \
+                        --output text --query 'PolicyNames[*].[@]'
+                )
+                echo "Deleting IAM Role \`${e4}\`..."
+                aws iam delete-role --role-name "${e4}" --no-cli-pager
+            done 0&lt; &lt;(
+                aws iam list-instance-profiles \
+                    --query "InstanceProfiles[?(Arn == '${e}')].{
+                        Name:InstanceProfileName, Roles:Roles[*].RoleName
+                }" |
+                jq -r '.[] | .Name + "|" + (.Roles | join(","))'
+            )
+        done
+    )
+    ##      IAM Users.
+    (
+        # List IAM Users.
+        aws iam list-users \
+            --output table \
+            --query "Users[?starts_with(UserName, '${ocpInfra}-')].{
+                Created:CreateDate
+                Name:UserName
+            }"
+        # Delete IAM Users.
+        #   Get a list of users by filtering on the cluster's unique name/ID.
+        for e in $(
+            aws iam list-users \
+                --output text \
+                --query "Users[?starts_with(UserName, '${ocpInfra}-')].UserName"
+        ); do
+            for e2 in $(
+                aws iam list-access-keys \
+                    --user-name "${e}" \
+                    --output text \
+                    --query 'AccessKeyMetadata[*].AccessKeyId'
+            ); do
+                echo "Deleting Access Key \`${e2}\` of IAM User \`${e}\`..."
+                aws iam delete-access-key \
+                    --user-name "${e}" \
+                    --access-key-id "${e2}" \
+                    --no-cli-pager
+            done
+            for e2 in $(
+                aws iam list-attached-user-policies \
+                    --user-name "${e}" \
+                    --output text \
+                    --query 'AttachedPolicies[*].PolicyArn'
+            ); do
+                echo "Detaching IAM Permission Policies \`${e2}\` from IAM User \`${e}\`..."
+                aws iam detach-user-policy \
+                    --user-name "${e}" \
+                    --policy-arn "${e2}"
+                    --no-cli-pager
+            done
+            for e2 in $(
+                aws iam list-user-policies \
+                    --user-name "${e}" \
+                    --output text \
+                    --query 'PolicyNames[*]' |
+                tr '\t' '\n'
+            ); do
+                echo "Deleting AIM Inline Permission Policies \`${e2}\` from IAM User \`${e}\`."
+                aws iam delete-user-policy \
+                    --user-name "${e}" \
+                    --policy-name "${e2}" \
+                    --no-cli-pager
+            done
+            echo "Deleting IAM User \`${e}\`..."
+            aws iam delete-user \
+                --user-name "${e}" \
+                --no-cli-pager
+        done
+    )
+    ############################################################################
+    #    6. Clean Up Check.
+    ##      List EBS Volumes.
+    aws ec2 describe-volumes \
+        --filters "Name=tag:kubernetes.io/cluster/${ocpInfra},Values=owned" \
+        --output table \
+        --query 'Volumes[*].{ID:VolumeId, Size:Size, State:State}'
+    ##      List VPC's ENIs.
+    aws ec2 describe-network-interfaces \
+        --filters "Name=tag:kubernetes.io/cluster/${ocpInfra},Values=owned" \
+        --output table \
+        --query 'NetworkInterfaces[*].{
+            ID:NetworkInterfaceId, Type:InterfaceType, VPC:VpcId
+        }'
+    ##      List Any Resources.
+    aws resourcegroupstaggingapi get-resources \
+        --tag-filters "Key=kubernetes.io/cluster/${ocpInfra},Values=owned" \
+        --output table \
+        --query 'ResourceTagMappingList[*].ResourceARN'
+    aws resourcegroupstaggingapi get-resources \
+        --tag-filters "Key=sigs.k8s.io/cluster-api-provider-aws/cluster/${ocpInfra},Values=owned" \
+        --output table \
+        --query 'ResourceTagMappingList[*].ResourceARN'
+); echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

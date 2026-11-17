@@ -1,0 +1,54 @@
+/* Main wrapper for an interactive component. */
+.code-widget {
+    display: block flow-root;
+}
+
+/* Container for the input fields. */
+.cw-cls--inputs {
+    display: block;
+    background-color: ButtonFace;
+    font-family: monospace;
+    margin: 3px 0 3px;
+    border: 2px solid ButtonBorder;
+    border-radius: 1em;
+    padding: 1em;
+}
+
+.cw-cls--title {
+    font-weight: bold;
+    margin: 0 0 0.5em;
+}
+
+.cw-cls--label-text::after {
+    content: ": ";
+}
+
+.cw-cls--inputs label {
+    display: flex;
+    margin-left: 2em;
+}
+
+.cw-cls--inputs .cw-cls--label-text {
+    flex-basis: max(20em, 20%);
+    flex-shrink: 0;
+}
+
+.cw-cls--inputs input,
+.cw-cls--inputs select,
+.cw-cls--inputs textarea {
+    flex-grow: 1;
+    background-color: Field;
+    font-family: monospace;
+}
+
+.cw-cls--inputs textarea {
+    white-space: nowrap;
+}
+
+.cw-cls--inputs input[readonly],
+.cw-cls--inputs textarea[readonly] {
+  color: GrayText;
+  background-color: Canvas;
+  cursor: not-allowed;   /* Optional: show a 'not allowed' cursor on hover */
+}
+

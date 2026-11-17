@@ -1,0 +1,75 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CI Operator Emulator - Synchronize Test Environment</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;margin:0;">
+[user@host /ws/local/repo/openshift/release/pr-000]$ [CI Operator Emulator] ci--sync--tst-env <span style="color:red;font-weight:bold;">&lt;dummyPRnum&gt;</span>
+</pre>
+<pre style="font-size:medium;margin:0;color:black;background-color:cyan;">
+Make sure the Pre-Test Job is running:
+    (`/pj-rehearse pull-ci-RedHatQE-interop-testing-master-ciOpEmul--preTest-run-prior-steps`)?
+Press any key to continue or `Ctrl-C` to cancel...
+----------------------------------------
+Please login to the executing CI Operator Build Server's Web Console
+(Job `pull-ci-RedHatQE-interop-testing-master-ciOpEmul--preTest-run-prior-steps`)
+and get the CLI Login Command, `oc login ...`.
+Preferably, also set the Context to the NameSpace the above Job is running:
+    oc project <rehearsedJobNS>
+Exit this Interactive Session, when the login is successfully completed, to
+continue (Exit Status 255 will cancel the Test Env. sync. attempt).
+----------------------------------------
+</pre>
+<pre style="font-size:medium;margin:0;">
+[user@host /ws/local/repo/openshift/release/pr-000]$ [CI Operator Build Cluster Login] oc login --token=*** --server=https://api.build03.ci.devcluster.openshift.com:6443
+</pre>
+<pre style="font-size:medium;margin:0;color:black;background-color:cyan;">
+Logged into "https://api.build05.ci.devcluster.openshift.com:6443" as "etirtara" using the token provided.
+
+You have access to the following projects and can switch between them with 'oc project <projectname>':
+
+  * ci-op-48h99j83
+    openshift-virtualization-os-images
+
+Using project "ci-op-48h99j83".
+</pre>
+<pre style="font-size:medium;margin:0;">
+[user@host /ws/local/repo/openshift/release/pr-000]$ [CI Operator Emulator] exit
+</pre>
+<pre style="font-size:medium;margin:0;color:black;background-color:cyan;">
+exit
+Waited 301/86400 sec.: Executing prior Steps... [2026-09-28T19:36:05Z] Current Step: N/A
+----------------------------------------
+The Test Environment has been synchronized. All required test assets and
+credentials are now available locally.
+----------------------------------------
+</pre>
+<pre style="font-size:medium;margin:0;">
+[user@host /ws/local/repo/openshift/release/pr-000]$ [CI Operator Emulator] ci--wait--test # Check remaining run time (in min.) for the Stub Step.
+</pre>
+<pre style="font-size:medium;margin:0;color:black;background-color:cyan;">
+235
+</pre>
+<pre style="font-size:medium;margin:0;">
+[user@host /ws/local/repo/openshift/release/pr-000]$ [CI Operator Build Cluster Login] ci--wait--test 240 # Reset the Stub Step wait time to 240 minutes (4 hours).
+</pre>
+    </div>
+</div>
+</body>
+</html>

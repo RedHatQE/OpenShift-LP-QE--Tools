@@ -1,0 +1,689 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cleaning Up Stale Global Resources</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../../js/global.js"></script>
+    <script type="module" src="../../../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="aws--cleaning-up--stale-global-resources">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_BW__NOTE_NAME\": \"...bwNoteName1...\", \"vEV--_AWS__PRUNED_REGIONS--S3-Bucket\": \"(...awsPrunedReg1_1... ...awsPrunedReg1_2...)\", \"vEV--_AWS__PRUNER_EXEMP_LIST--S3-Bucket\": \"(...awsPrunerExemp1_1... ...awsPrunerExemp1_2...)\", \"vEV--_AWS__PRUNER_TTL__H--S3-Bucket\": \"...awsPrunerTTLinHour1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_BW__NOTE_NAME\": \"...bwNoteName2...\", \"vEV--_AWS__PRUNED_REGIONS--S3-Bucket\": \"(...awsPrunedReg2_1... ...awsPrunedReg2_2...)\", \"vEV--_AWS__PRUNER_EXEMP_LIST--S3-Bucket\": \"(...awsPrunerExemp2_1... ...awsPrunerExemp2_2...)\", \"vEV--_AWS__PRUNER_TTL__H--S3-Bucket\": \"...awsPrunerTTLinHour2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_BW__NOTE_NAME": "...bwNoteName...",
+                "vEV--AWS_REGION": "...awsRegion...",
+                "vEV--_AWS__PRUNED_REGIONS--S3-Bucket": "(...awsPrunedReg1... ...awsPrunedReg2... ... ...awsPrunedRegN...)",
+                "vEV--_AWS__PRUNER_EXEMP_LIST--S3-Bucket": "(...awsPrunerExemp1... ...awsPrunerExemp2... ... ...awsPrunerExempN...)",
+                "vEV--_AWS__PRUNER_TTL__H--S3-Bucket": "...awsPrunerTTLinHour..."
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_BW__NOTE_NAME</span>           <input type="text"          data-var="vEV--_BW__NOTE_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_REGION</span>               <input type="text"          data-var="vEV--AWS_REGION" value="" /></label>
+        <label><span class="cw-cls--label-text">__DRY_RUN</span>                <select class="cw-cls--opt" data-var="vEV--__DRY_RUN">
+            <option value="0"              > 0: Execution Mode.</option>
+            <option value="1"  selected="" > 1: Dry Run Mode.</option>
+        </select></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">S3 General Purpose Bucket</p>
+        <label><span class="cw-cls--label-text">_AWS__PRUNED_REGIONS</span>     <input type="text"          data-var="vEV--_AWS__PRUNED_REGIONS--S3-Bucket" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__PRUNER_EXEMP_LIST</span>  <input type="text"          data-var="vEV--_AWS__PRUNER_EXEMP_LIST--S3-Bucket" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__PRUNER_TTL__H</span>      <input type="text"          data-var="vEV--_AWS__PRUNER_TTL__H--S3-Bucket" value="" /></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Cleaning Up Stale IAM Roles
+__SHELL=0 \
+    __DRY_RUN=<span style="color:red;font-weight:bold;" data-var="vEV--__DRY_RUN"></span> \
+    _BW__NOTE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME"></span>' \
+    BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}" \
+    BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)" \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+                echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+                exit 1
+            }
+            eval "$(
+                bw get notes "${_BW__NOTE_NAME}" || {
+                    echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                    echo false
+                }
+            )"
+            eval "${__shOpt}"; unset __shOpt
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        }
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset iamRoleName= ocpClsID= hdr= e=
+        typeset -a awsRegArr=(); IFS=$'\t' read -ra awsRegArr 0&lt; &lt;(
+            aws ec2 describe-regions \
+                --output text \
+                --query 'Regions[].RegionName'
+        )
+
+        while read -r iamRoleName; do
+            # Check IAM Role Name Pattern: ...clsName...-...5charID...
+            ocpClsID="$([[ "${iamRoleName}" =~ ^(.+-[a-z0-9]{5})-(master|worker)-role$ ]] &amp;&amp; echo "${BASH_REMATCH[1]}")" || continue
+
+            # Check OCP Tag: kubernetes.io/cluster/${ocpClsID}
+            [ "$(
+                aws iam list-role-tags --role-name "${iamRoleName}" \
+                    --output text --query "Tags[?(Key == 'kubernetes.io/cluster/${ocpClsID}')].[Value]"
+            )" = owned ] || continue
+
+            # Check Trusted Entity: ec2.amazonaws.com
+            [ -z "$(
+                aws iam get-role --role-name "${iamRoleName}" \
+                    --output text \
+                    --query "Role.AssumeRolePolicyDocument.Statement[?((Effect == 'Allow') &amp;&amp; contains(Principal.Service, 'ec2.amazonaws.com'))]"
+            )" ] &amp;&amp; continue
+
+            # Check if there is any running EC2 resource belongs to the Cluster.
+            for e in "${awsRegArr[@]}"; do
+                {
+                    aws ec2 describe-instances \
+                        --region "${e}" \
+                        --filters \
+                            "Name=tag-key,Values=kubernetes.io/cluster/${ocpClsID}" \
+                            "Name=tag-value,Values=owned" \
+                            "Name=instance-state-name,Values=running" \
+                        --output text \
+                        --query 'Reservations[*].Instances[*].InstanceId' |
+                    grep -q .
+                } &amp;&amp; continue 2
+            done
+
+            if ((__DRY_RUN)); then
+                echo "${hdr:=$'List of stale IAM Roles:\n    '}${iamRoleName}"
+                hdr='    '
+            else
+                # Find the IAM Instance Profiles the Role is attached to and remove from it.
+                while read -r e; do
+                    echo "Detaching IAM Role \`${iamRoleName}\` from IAM Instance Profile \`${e}\`..."
+                    aws iam remove-role-from-instance-profile --instance-profile-name "${e}" --role-name "${iamRoleName}" --no-cli-pager
+                done 0&lt; &lt;(
+                    aws iam list-instance-profiles \
+                        --output text --query "InstanceProfiles[?contains(Roles[*].RoleName, '${iamRoleName}')].[InstanceProfileName]"
+                )
+                # Delete IAM Instance Profiles without any Roles.
+                while read -r e; do
+                    echo "Deleting empty IAM Instance Profile \`${e}\`..."
+                    aws iam delete-instance-profile --instance-profile-name "${e}" --no-cli-pager
+                done 0&lt; &lt;(
+                    aws iam list-instance-profiles \
+                        --output text --query 'InstanceProfiles[?(length(Roles) == `0`)].[InstanceProfileName]'
+                )
+
+                # Detach all AIM Permission Policies.
+                while read -r e; do
+                    echo "Detaching IAM Permission Policies \`${e}\` from IAM Role \`${iamRoleName}\`..."
+                    aws iam detach-role-policy --role-name "${iamRoleName}" --policy-arn "${e}" --no-cli-pager
+                done 0&lt; &lt;(
+                    aws iam list-attached-role-policies --role-name "${iamRoleName}" \
+                        --output text --query 'AttachedPolicies[*].[PolicyArn]'
+                )
+
+                # Delete all AIM Inline Permission Policies.
+                while read -r e; do
+                    echo "Deleting AIM Inline Permission Policies \`${e}\` from IAM Role \`${iamRoleName}\`..."
+                    aws iam delete-role-policy --role-name "${iamRoleName}" --policy-name "${e}" --no-cli-pager
+                done 0&lt; &lt;(
+                    aws iam list-role-policies --role-name "${iamRoleName}" \
+                        --output text --query 'PolicyNames[*].[@]'
+                )
+
+                # Delete the AIM Role.
+                echo "Deleting IAM Role \`${iamRoleName}\`..."
+                aws iam delete-role --role-name "${iamRoleName}" --no-cli-pager
+            fi
+        done 0&lt; &lt;(aws iam list-roles --output text --query 'Roles[*].[RoleName]')
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Cleaning Up Stale IAM Users
+__SHELL=0 \
+    __DRY_RUN=<span style="color:red;font-weight:bold;" data-var="vEV--__DRY_RUN"></span> \
+    _BW__NOTE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME"></span>' \
+    BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}" \
+    BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)" \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+                echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+                exit 1
+            }
+            eval "$(
+                bw get notes "${_BW__NOTE_NAME}" || {
+                    echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                    echo false
+                }
+            )"
+            eval "${__shOpt}"; unset __shOpt
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        }
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset iamUserName= ocpClsID= hdr= e=
+        typeset -a awsRegArr=(); IFS=$'\t' read -ra awsRegArr 0&lt; &lt;(
+            aws ec2 describe-regions \
+                --output text \
+                --query 'Regions[].RegionName'
+        )
+
+        while read -r iamUserName; do
+            # Check OCP Tag: kubernetes.io/cluster/...clsName...-...5charID...
+            ocpClsID="$(
+                aws iam list-user-tags --user-name "${iamUserName}" \
+                    --output text \
+                    --query 'Tags[?(starts_with(Key, `kubernetes.io/cluster/`) &amp;&amp; (Value == `owned`))].Key' |
+                sed -nE 's|^kubernetes.io/cluster/(.*-[a-z0-9]{5})$|\1|p'
+            )" || continue
+            [ -z "${ocpClsID}" ] &amp;&amp; continue
+
+            # Check if there is any running EC2 resource belongs to the Cluster.
+            for e in "${awsRegArr[@]}"; do
+                {
+                    aws ec2 describe-instances \
+                        --region "${e}" \
+                        --filters \
+                            "Name=tag-key,Values=kubernetes.io/cluster/${ocpClsID}" \
+                            "Name=tag-value,Values=owned" \
+                            "Name=instance-state-name,Values=running" \
+                        --output text \
+                        --query 'Reservations[*].Instances[*].InstanceId' |
+                    grep -q .
+                } &amp;&amp; continue 2
+            done
+
+            if ((__DRY_RUN)); then
+                echo "${hdr:=$'List of stale IAM Users:\n    '}${iamUserName}"
+                hdr='    '
+            else
+                # Delete Access Keys.
+                while read -r e; do
+                    echo "Deleting IAM Access Key \`${e}\` from IAM User \`${iamUserName}\`..."
+                    aws iam delete-access-key --user-name "${iamUserName}" --access-key-id "${e}" --no-cli-pager
+                done 0&lt; &lt;(
+                    aws iam list-access-keys --user-name "${iamUserName}" \
+                        --output text --query 'AccessKeyMetadata[*].[AccessKeyId]'
+                )
+
+                # Detach IAM Permission Policies.
+                while read -r e; do
+                    echo "Detaching IAM Permission Policy \`${e}\` from IAM User \`${iamUserName}\`..."
+                    aws iam detach-user-policy --user-name "${iamUserName}" --policy-arn "${e}" --no-cli-pager
+                done 0&lt; &lt;(
+                    aws iam list-attached-user-policies --user-name "${iamUserName}" \
+                        --output text --query 'AttachedPolicies[*].[PolicyArn]'
+                )
+
+                # Delete IAM Inline Permission Policies.
+                while read -r e; do
+                    echo "Deleting IAM Inline Permission Policy \`${e}\` from IAM User \`${iamUserName}\`..."
+                    aws iam delete-user-policy --user-name "${iamUserName}" --policy-name "${e}" --no-cli-pager
+                done 0&lt; &lt;(
+                    aws iam list-user-policies --user-name "${iamUserName}" \
+                        --output text --query 'PolicyNames[*].[@]'
+                )
+
+                # Remove IAM User from all Groups.
+                while read -r e; do
+                    echo "Removing IAM User \`${iamUserName}\` from IAM Group \`${e}\`..."
+                    aws iam remove-user-from-group --user-name "${iamUserName}" --group-name "${e}" --no-cli-pager
+                done 0&lt; &lt;(
+                    aws iam list-groups-for-user --user-name "${iamUserName}" \
+                        --output text --query 'Groups[*].[GroupName]'
+                )
+
+                # Delete Login Profile (if exists).
+                echo "Deleting Login Profile for IAM User \`${iamUserName}\`..."
+                aws iam delete-login-profile --user-name "${iamUserName}" --no-cli-pager 2&gt; /dev/null || true
+
+                # Delete MFA Devices.
+                while read -r e; do
+                    echo "Deleting MFA Device \`${e}\` from IAM User \`${iamUserName}\`..."
+                    aws iam deactivate-mfa-device --user-name "${iamUserName}" --serial-number "${e}" --no-cli-pager
+                    # Only delete if it's a virtual MFA Device (ARN format).
+                    [[ "${e}" =~ ^arn:aws:iam: ]] &amp;&amp;
+                        aws iam delete-virtual-mfa-device --serial-number "${e}" --no-cli-pager
+                done 0&lt; &lt;(
+                    aws iam list-mfa-devices --user-name "${iamUserName}" \
+                        --output text --query 'MFADevices[*].[SerialNumber]'
+                )
+
+                # Delete Signing Certificates.
+                while read -r e; do
+                    echo "Deleting Signing Certificate \`${e}\` from IAM User \`${iamUserName}\`..."
+                    aws iam delete-signing-certificate --user-name "${iamUserName}" \
+                        --certificate-id "${e}" --no-cli-pager
+                done 0&lt; &lt;(
+                    aws iam list-signing-certificates --user-name "${iamUserName}" \
+                        --output text --query 'Certificates[*].[CertificateId]'
+                )
+
+                # Delete SSH Public Keys.
+                while read -r e; do
+                    echo "Deleting SSH Public Key \`${e}\` from IAM User \`${iamUserName}\`..."
+                    aws iam delete-ssh-public-key --user-name "${iamUserName}" \
+                        --ssh-public-key-id "${e}" --no-cli-pager
+                done 0&lt; &lt;(
+                    aws iam list-ssh-public-keys --user-name "${iamUserName}" \
+                        --output text --query 'SSHPublicKeys[*].[SSHPublicKeyId]'
+                )
+
+                # Delete Service Specific Credentials.
+                while read -r e; do
+                    echo "Deleting Service Specific Credential \`${e}\` from IAM User \`${iamUserName}\`..."
+                    aws iam delete-service-specific-credential --user-name "${iamUserName}" \
+                        --service-specific-credential-id "${e}" --no-cli-pager
+                done 0&lt; &lt;(
+                    aws iam list-service-specific-credentials --user-name "${iamUserName}" \
+                        --output text --query 'ServiceSpecificCredentials[*].[ServiceSpecificCredentialId]'
+                )
+
+                # Delete the IAM User.
+                echo "Deleting IAM User \`${iamUserName}\`..."
+                aws iam delete-user --user-name "${iamUserName}" --no-cli-pager
+            fi
+        done 0&lt; &lt;(aws iam list-users --output text --query 'Users[*].[UserName]')
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Cleaning Up Stale Route53 Hosted Zones
+__SHELL=0 \
+    __DRY_RUN=<span style="color:red;font-weight:bold;" data-var="vEV--__DRY_RUN"></span> \
+    _BW__NOTE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME"></span>' \
+    BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}" \
+    BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)" \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+                echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+                exit 1
+            }
+            eval "$(
+                bw get notes "${_BW__NOTE_NAME}" || {
+                    echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                    echo false
+                }
+            )"
+            eval "${__shOpt}"; unset __shOpt
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        }
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset hzID= hzName= ocpClsID= dnsRec= hdr= e=
+        typeset -a awsRegArr=(); IFS=$'\t' read -ra awsRegArr 0&lt; &lt;(
+            aws ec2 describe-regions \
+                --output text \
+                --query 'Regions[].RegionName'
+        )
+
+        # Cleaning Up Stale Private Hosted Zones
+        while IFS=$'\t' read -r hzID hzName; do
+            # Check Hosted Zone Tag Key Pattern: kubernetes.io/cluster/...clsName...-...5charID...
+            ocpClsID="$(
+                aws route53 list-tags-for-resource \
+                    --resource-type hostedzone \
+                    --resource-id "${hzID}" \
+                    --output text \
+                    --query 'ResourceTagSet.Tags[?(
+                        starts_with(Key, `kubernetes.io/cluster/`) &amp;&amp;
+                        (Value == `owned`)
+                    )].Key' |
+                sed -nE 's|^kubernetes.io/cluster/(.*-[a-z0-9]{5})$|\1|p'
+            )" || continue
+            [ -z "${ocpClsID}" ] &amp;&amp; continue
+
+            # Check if there is any running EC2 resource belongs to the Cluster.
+            for e in "${awsRegArr[@]}"; do
+                {
+                    aws ec2 describe-instances \
+                        --region "${e}" \
+                        --filters \
+                            "Name=tag-key,Values=kubernetes.io/cluster/${ocpClsID}" \
+                            "Name=tag-value,Values=owned" \
+                            "Name=instance-state-name,Values=running" \
+                        --output text \
+                        --query 'Reservations[*].Instances[*].InstanceId' |
+                    grep -q .
+                } &amp;&amp; continue 2
+            done
+
+            if ((__DRY_RUN)); then
+                echo "${hdr:=$'List of stale Private Hosted Zones:\n    '}${hzName}"
+                hdr='    '
+            else
+                # Delete Private Hosted Zone.
+                dnsRec="$(
+                        aws route53 list-resource-record-sets \
+                            --hosted-zone-id "${hzID}" \
+                            --query "ResourceRecordSets[?((Type != 'NS') &amp;&amp; (Type != 'SOA'))] "
+                )"
+                [ "${dnsRec}" != '[]' ] &amp;&amp; {
+                    echo "Deleting non-default DNS records from Private Hosted Zone \`${hzName}\`..."
+                    aws route53 change-resource-record-sets \
+                        --hosted-zone-id "${hzID}" \
+                        --change-batch "$(
+                            jq -nc --argjson r "${dnsRec}" \
+                                '{"Changes": [
+                                    $r[] | {"Action": "DELETE", "ResourceRecordSet": .}
+                                ]}'
+                        )" \
+                        --no-cli-pager
+                }
+                echo "Deleting Private Hosted Zone \`${hzName}\`..."
+                aws route53 delete-hosted-zone --id "${hzID}" --no-cli-pager
+
+                # Delete Cluster Records from Public Hosted Zones.
+                e="${hzName}"
+                while IFS=$'\t' read -r hzID hzName; do
+                    dnsRec="$(
+                        aws route53 list-resource-record-sets \
+                            --hosted-zone-id "${hzID}" \
+                            --query "
+                                ResourceRecordSets[?(
+                                    (Type != 'NS') &amp;&amp;
+                                    (Type != 'SOA') &amp;&amp;
+                                    ends_with(Name, '${e}.')
+                                )]
+                            "
+                    )"
+                    [ "${dnsRec}" != '[]' ] &amp;&amp; {
+                        echo "Deleting Cluster DNS records from Public Hosted Zone \`${hzName}: *${e}\`..."
+                        aws route53 change-resource-record-sets \
+                            --hosted-zone-id "${hzID}" \
+                            --change-batch "$(
+                                jq -nc --argjson r "${dnsRec}" \
+                                    '{"Changes": [
+                                        $r[] | {"Action": "DELETE", "ResourceRecordSet": .}
+                                    ]}'
+                            )" \
+                            --no-cli-pager
+                    }
+                done 0&lt; &lt;(
+                    aws route53 list-hosted-zones \
+                        --output text \
+                        --query 'HostedZones[?(Config.PrivateZone == `false`)].[Id, Name]' |
+                    sed -E 's|^/hostedzone/||;s/\.$//'
+                )
+            fi
+        done 0&lt; &lt;(
+            aws route53 list-hosted-zones \
+                --output text \
+                --query 'HostedZones[?(Config.PrivateZone == `true`)].[Id, Name]' |
+            sed -E 's|^/hostedzone/||;s/\.$//'
+        )
+
+        # Cleaning up orphaned Cluster Records in Public Hosted Zones.
+        hdr=
+        while IFS=$'\t' read -r hzID hzName; do
+            while IFS= read -r e; do
+                # Check the Private Hosted Zone Name Pattern: ...clsName.......baseDomain...
+                #   The `clsName` should not have `.` as part of OCP Cluster Name restriction.
+                dnsRec="$([[ "${e}" =~ ^(\\052\.apps|api)\.([^.]+\."${hzName}")$ ]] &amp;&amp; echo "${BASH_REMATCH[2]}")" || continue
+
+                # Check the corresponding Private Hosted Zone.
+                [ -z "$(
+                    aws route53 list-hosted-zones \
+                        --output text \
+                        --query "
+                            HostedZones[?(
+                                (Config.PrivateZone == \`true\`) &amp;&amp;
+                                (Name == '${dnsRec}.')
+                            )].[Name]
+                        "
+                )" ] || continue
+
+                if ((__DRY_RUN)); then
+                    echo "${hdr:='List of orphaned Cluster Records in Public Hosted Zones \`'\"${hzName}\"$'\`:\n    '}${e}"
+                    hdr='    '
+                else
+                    # Delete orphaned Cluster records from Public Hosted Zone.
+                    dnsRec="$(
+                        aws route53 list-resource-record-sets \
+                            --hosted-zone-id "${hzID}" \
+                            --query "
+                                ResourceRecordSets[?(
+                                    (Type != 'NS') &amp;&amp;
+                                    (Type != 'SOA') &amp;&amp;
+                                    (Name == '${e}.')
+                                )]
+                            "
+                    )"
+                    [ "${dnsRec}" != '[]' ] &amp;&amp; {
+                        echo "Deleting orphaned Cluster Records from Public Hosted Zone \`${hzName}: ${e}\`..."
+                        aws route53 change-resource-record-sets \
+                            --hosted-zone-id "${hzID}" \
+                            --change-batch "$(
+                                jq -nc --argjson r "${dnsRec}" \
+                                    '{"Changes": [
+                                        $r[] | {"Action": "DELETE", "ResourceRecordSet": .}
+                                    ]}'
+                            )" \
+                            --no-cli-pager
+                    }
+                fi
+            done 0&lt; &lt;(
+                aws route53 list-resource-record-sets \
+                    --hosted-zone-id "${hzID}" \
+                    --output text \
+                    --query "ResourceRecordSets[?((Type != 'NS') &amp;&amp; (Type != 'SOA'))].[Name]" |
+                sed -E 's/\.$//'
+            )
+        done 0&lt; &lt;(
+            aws route53 list-hosted-zones \
+                --output text \
+                --query 'HostedZones[?(Config.PrivateZone == `false`)].[Id, Name]' |
+            sed -E 's|^/hostedzone/||;s/\.$//'
+        )
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Cleaning Up Stale S3 General Purpose Buckets
+__SHELL=0 \
+    __DRY_RUN=<span style="color:red;font-weight:bold;" data-var="vEV--__DRY_RUN"></span> \
+    _AWS__PRUNED_REGIONS='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__PRUNED_REGIONS--S3-Bucket"></span>' \
+    _AWS__PRUNER_EXEMP_LIST='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__PRUNER_EXEMP_LIST--S3-Bucket"></span>' \
+    _AWS__PRUNER_TTL__H='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__PRUNER_TTL__H--S3-Bucket"></span>' \
+    _BW__NOTE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME"></span>' \
+    BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}" \
+    BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)" \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+                echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+                exit 1
+            }
+            eval "$(
+                bw get notes "${_BW__NOTE_NAME}" || {
+                    echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                    echo false
+                }
+            )"
+            eval "${__shOpt}"; unset __shOpt
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        }
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\\[DEBUG\\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset s3Bucket= ocpClsID= hdr= e=
+        typeset -a awsPrunerExempList="${_AWS__PRUNER_EXEMP_LIST}"
+        typeset -a awsRegArr=(); IFS=$'\t' read -ra awsRegArr 0&lt; &lt;(
+            aws ec2 describe-regions \
+                --output text \
+                --query 'Regions[].RegionName'
+        )
+
+        while read -r s3Bucket; do
+            # Check if S3 Bucket is in exemption list.
+            for e in "${awsPrunerExempList[@]}"; do
+                [ "${s3Bucket}" = "${e}" ] &amp;&amp; continue 2
+            done
+
+            # Check S3 Bucket Tag Key Pattern: kubernetes.io/cluster/...clsName...-...5charID...
+            ocpClsID="$(
+                aws s3api get-bucket-tagging \
+                    --bucket "${s3Bucket}" \
+                    --output text \
+                    --query 'TagSet[?(starts_with(Key, `kubernetes.io/cluster/`) &amp;&amp; (Value == `owned`))].Key' \
+                    2&gt; /dev/null |
+                sed -nE 's|^kubernetes.io/cluster/(.*-[a-z0-9]{5})$|\1|p'
+            )" || true
+
+            if [ -n "${ocpClsID}" ]; then
+                # Check if there is any running EC2 resource belongs to the Cluster.
+                for e in "${awsRegArr[@]}"; do
+                    {
+                        aws ec2 describe-instances \
+                            --region "${e}" \
+                            --filters \
+                                "Name=tag-key,Values=kubernetes.io/cluster/${ocpClsID}" \
+                                "Name=tag-value,Values=owned" \
+                                "Name=instance-state-name,Values=running" \
+                            --output text \
+                            --query 'Reservations[*].Instances[*].InstanceId' |
+                        grep -q .
+                    } &amp;&amp; continue 2
+                done
+            else
+                # No OCP tag found, check if Bucket is in pruned regions and satisfied the TTL.
+                e="$(
+                    aws s3api get-bucket-location \
+                        --bucket "${s3Bucket}" \
+                        --output text
+                )"
+                [ "${e}" = None ] &amp;&amp; e=us-east-1    # For `us-east-1` it returns `None`, normalize it.
+                [[ "${_AWS__PRUNED_REGIONS}" =~ (\(|\ )"${e}"(\ |\)) ]] || continue
+                (( $(date +%s) - (_AWS__PRUNER_TTL__H * 3600) &gt; $(date -d "$(
+                    aws s3api list-buckets \
+                        --query "Buckets[?Name=='${s3Bucket}'].CreationDate" \
+                        --output text
+                )" +%s))) || continue
+            fi
+
+            if ((__DRY_RUN)); then
+                echo "${hdr:=$'List of stale S3 General Purpose Buckets:\n    '}${s3Bucket}"
+                hdr='    '
+            else
+                echo "Processing S3 GP Bucket \`${s3Bucket}\`:"
+
+                # Remove Object Versions.
+                while read -r e; do
+                    echo "    Deleting Object Version \`$(
+                        echo "${e}" | jq -r '.Objects[] | "\(.Key);\(.VersionId)"'
+                    )\`..."
+                    aws s3api delete-objects \
+                        --bucket "${s3Bucket}" \
+                        --delete "${e}" \
+                        --no-cli-pager \
+                        1&gt; /dev/null
+                done 0&lt; &lt;(
+                    aws s3api list-object-versions \
+                        --bucket "${s3Bucket}" \
+                        --output json \
+                        --query 'Versions[*] || `[]`' |
+                    jq -c '.[] | {Objects: [{Key: .Key, VersionId: .VersionId}]}'
+                )
+
+                # Remove Delete Markers.
+                while read -r e; do
+                    echo "    Deleting Delete Marker \`$(
+                        echo "${e}" | jq -r '.Objects[] | "\(.Key);\(.VersionId)"'
+                    )\`..."
+                    aws s3api delete-objects \
+                        --bucket "${s3Bucket}" \
+                        --delete "${e}" \
+                        --no-cli-pager \
+                        1&gt; /dev/null
+                done 0&lt; &lt;(
+                    aws s3api list-object-versions \
+                        --bucket "${s3Bucket}" \
+                        --output json \
+                        --query 'DeleteMarkers[*] || `[]`' |
+                    jq -c '.[] | {Objects: [{Key: .Key, VersionId: .VersionId}]}'
+                )
+
+                # Delete the S3 Bucket.
+                echo "Deleting S3 Bucket \`${s3Bucket}\`..."
+                aws s3api delete-bucket --bucket "${s3Bucket}" --no-cli-pager
+            fi
+        done 0&lt; &lt;(aws s3api list-buckets --output text --query 'Buckets[*].[Name]')
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

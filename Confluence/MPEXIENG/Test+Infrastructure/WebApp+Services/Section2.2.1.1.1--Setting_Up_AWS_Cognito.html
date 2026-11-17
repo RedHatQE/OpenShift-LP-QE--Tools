@@ -1,0 +1,116 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setting Up AWS Cognito</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../Scripts/js/code-widget.js"></script>
+    <script type="module" src="../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/html-include.js"></script>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/Cloud/AWS/Cognito_Setup.html"
+    data-mod-js="
+        CodeWidget__UsrLib_OvrCfg(html, {
+            'aws-cognito--setup--user-pool': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vEV--_AWS__COG__IDP_NAME&quot;:       &quot;RedHat--LP-Chaos--svc--web-app&quot;,
+                                    &quot;vEV--_AWS__ROLE_NAME_SFX&quot;:       [{&quot;val&quot;: &quot;admin&quot;, &quot;txt&quot;: &quot;admin&quot;}, [{&quot;val&quot;: &quot;poweruser&quot;, &quot;txt&quot;: &quot;poweruser&quot;}]],
+                                    &quot;vEV--AWS_ACCOUNT_ID&quot;:            [&quot;624914081466&quot;],
+                                    &quot;vEV--_BW__NOTE_NAME&quot;:            &quot;note.GCP--_hp--mpex--ieng_--Auth&quot;,
+                                    &quot;vEV--_AWS__COG__CLIENT_NAME&quot;:    &quot;AmazonOpenSearchService-open-search-us-west-1-&lt;randomHash&gt;&quot;,
+                                    &quot;vEV--_AWS__COG__CALLBACK_URLS&quot;:  &quot;https://open-search.lp-chaos--svc--web-app.chaos.lp.devcluster.openshift.com/_dashboards/app/home&quot;,
+                                    &quot;vEV--_AWS__COG__LOGOUT_URLS&quot;:    &quot;https://open-search.lp-chaos--svc--web-app.chaos.lp.devcluster.openshift.com/_dashboards&quot;
+                                }`,
+                            },
+                        },
+                    ],
+                    'vEV--_AWS__COG__IDP_NAME': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__COG__IDP_TYPE': 'Google',
+                    'vEV--_AWS__ROLE_NAME_SFX': 'poweruser',
+                    'vEV--AWS_REGION': 'us-west-1',
+                    'vEV--AWS_ACCOUNT_ID': [['Please select Team.']],
+                    'vEV--_AWS__COG__IDP_SCOPES': 'email profile openid',
+                    'vEV--_BW__NOTE_NAME': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__COG__APP_NAME': '',
+                    'vEV--_AWS__COG__CLIENT_NAME': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__COG__CALLBACK_URLS': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__COG__LOGOUT_URLS': ['...PleaseSelectTeam...'],
+                },
+            },
+            'aws-cognito--setup--identity-pool': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vEV--_AWS__COG__IDP_NAME&quot;:       &quot;RedHat--LP-Chaos--svc--web-app&quot;,
+                                    &quot;vEV--_AWS__COG__CLIENT_NAME&quot;:    &quot;AmazonOpenSearchService-open-search-us-west-1-&lt;randomHash&gt;&quot;,
+                                    &quot;vEV--_AWS__ROLE_NAME_SFX&quot;:       [{&quot;val&quot;: &quot;admin&quot;, &quot;txt&quot;: &quot;admin&quot;}, [{&quot;val&quot;: &quot;poweruser&quot;, &quot;txt&quot;: &quot;poweruser&quot;}]],
+                                    &quot;vEV--AWS_ACCOUNT_ID&quot;:            [&quot;624914081466&quot;]
+                                }`,
+                            },
+                        },
+                    ],
+                    'vEV--_AWS__COG__IDP_NAME': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__COG__APP_NAME': '',
+                    'vEV--_AWS__COG__CLIENT_NAME': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__ROLE_NAME_SFX': 'poweruser',
+                    'vEV--AWS_REGION': 'us-west-1',
+                    'vEV--AWS_ACCOUNT_ID': [['Please select Team.']],
+                },
+            },
+            'aws-cognito--setup--iam-roles': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vEV--_AWS__COG__IDP_NAME&quot;:   &quot;RedHat--LP-Chaos--svc--web-app&quot;,
+                                    &quot;vEV--AWS_ACCOUNT_ID&quot;:        [&quot;624914081466&quot;]
+                                }`,
+                            },
+                        },
+                    ],
+                    'vEV--_AWS__COG__IDP_NAME': ['...PleaseSelectTeam...'],
+                    'vEV--AWS_REGION': 'us-west-1',
+                    'vEV--AWS_ACCOUNT_ID': [['Please select Team.']],
+                    'vEV--_AWS__COG__APP_NAME': 'open-search',
+                    'vEV--_AWS__COG__APP_AUTH_POL_PERM': &quot;'\\''es:ESHttp*|arn:aws:es:*:*:domain/*'\\''&quot;,
+                    'vEV--_AWS__COG__APP_POL_NAME': 'AmazonOpenSearchServiceCognitoAccess',
+                    'vEV--_AWS__COG__APP_PRINCIPAL': 'es.amazonaws.com',
+                },
+                set: {
+                    'vEV--_AWS__ROLE_NAME_SFX': 'admin',
+                },
+            },
+        });
+    "
+></div>
+</body>
+</html>

@@ -1,0 +1,1090 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BM ABI Installation</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../../js/global.js"></script>
+    <script type="module" src="../../../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="OCP--bm--ABI-Install">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_OCP__ABI__BM__BASE_DOM\": \"...baseDomain1...\", \"vEV--_OCP__ABI__BM__CLS_NAME\": \"...clusterName1...\", \"vEV--_OCP__ABI__CFG\": \"...abiCfgFile1...\", \"vEV--_SVC__TUN__CRD_USR\": \"...chiselCrdUsr1...\", \"vEV--_SVC__TUN__CP_URL\": \"...chiselServerCPurl1...\", \"vEV--_SVC__TUN__DP_BASE_URL\": \"...chiselServerDPbaseURL1...\", \"vEV--_SVC__TUN__DP_PORT--defVal\": \"...chiselServerDPportDefVal1...\", \"vEV--_BW__NOTE_NAME__BMC\": \"...bwNoteNameForBMCdefaultCredentials1...\", \"vEV--_BW__NOTE_NAME__SVC__TUN\": \"...bwNoteNameForTunnelServiceCredentials1...\", \"vEV--_BW__NOTE_NAME__OCP__KCFG\": \"...bwNoteNameForOCPkubeconfig1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_OCP__ABI__BM__BASE_DOM\": \"...baseDomain2...\", \"vEV--_OCP__ABI__BM__CLS_NAME\": \"...clusterName2...\", \"vEV--_OCP__ABI__CFG\": \"...abiCfgFile2...\", \"vEV--_SVC__TUN__CRD_USR\": \"...chiselCrdUsr2...\", \"vEV--_SVC__TUN__CP_URL\": \"...chiselServerCPurl2...\", \"vEV--_SVC__TUN__DP_BASE_URL\": \"...chiselServerDPbaseURL2...\", \"vEV--_SVC__TUN__DP_PORT--defVal\": \"...chiselServerDPportDefVal2...\", \"vEV--_BW__NOTE_NAME__BMC\": \"...bwNoteNameForBMCdefaultCredentials2...\", \"vEV--_BW__NOTE_NAME__SVC__TUN\": \"...bwNoteNameForTunnelServiceCredentials2...\", \"vEV--_BW__NOTE_NAME__OCP__KCFG\": \"...bwNoteNameForOCPkubeconfig2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_OCP__INSTLR_DIR":                  "...ocpInstallerDir...",
+                "vEV--_OCP__INSTLR_WAIT__NODE_READY__M":  "...maxWaitForNodeToBeReadyInMin...",
+                "vEV--_OCP__INSTLR_WAIT__BOOTSTRAP__TRY": "...numOfTryToWaitForBootStrap...",
+                "vEV--_OCP__INSTLR_WAIT__CLUSTER__TRY":   "...numOfTryToWaitForCluster...",
+                "vEV--_OCP__CLUSTER_DIR":                  "...ocpClusterDir...",
+                "vEV--_OCP__ABI__BM__BASE_DOM":            "...baseDomain...",
+                "vEV--_OCP__ABI__BM__CLS_NAME":            "...clusterName...",
+                "vEV--_OCP__ABI__BM__PULL_CRD":            "...pullSecretFile...",
+                "vEV--_OCP__ABI__BM__SSH_KEY__PRV":        "...sshKeyFilePrv...",
+                "vEV--_OCP__ABI__BM__SSH_KEY__PUB":        "...sshKeyFilePub...",
+                "vEV--_OCP__ABI__CFG":                     "...abiCfgFile...",
+                "vEV--_BMC__CRD_USR":                      "...bmcCrdUsr...",
+                "vEV--_SVC__TUN__CRD_USR":                 "...chiselCrdUsr...",
+                "vEV--_SVC__TUN__CP_URL":                  "...chiselServerCPurl...",
+                "vEV--_SVC__TUN__DP_BASE_URL":             "...chiselServerDPbaseURL...",
+                "vEV--_SVC__TUN__DP_PORT--defVal":         "8443",
+                "vEV--_BW__NOTE_NAME__BMC":                "...bwNoteNameForBMCdefaultCredentials...",
+                "vEV--_BW__NOTE_NAME__SVC__TUN":           "...bwNoteNameForTunnelServiceCredentials...",
+                "vEV--_BW__NOTE_NAME__OCP__KCFG":          "...bwNoteNameForOCPkubeconfig...",
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_OCP__INSTLR_ACTION</span>                  <select class="cw-cls--opt" data-var="vEV--_OCP__INSTLR_ACTION">
+            <option value="1"   selected="">&nbsp;1: Deploy Cluster.</option>
+            <option value="i"              >&nbsp;i: Enter CLI Interactive Session.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_OCP__INSTLR_DIR</span>                     <input type="text" data-var="vEV--_OCP__INSTLR_DIR" value="" /></label>
+        <label><span class="cw-cls--label-text">_OCP__INSTLR_MIN_ISO</span>                 <select class="cw-cls--opt" data-var="vEV--_OCP__INSTLR_MIN_ISO">
+            <option value="0"              >&nbsp;0: Full ISO.</option>
+            <option value="1"   selected="">&nbsp;1: Minimal ISO.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_OCP__INSTLR_WAIT__NODE_READY__M</span>     <input type="text" data-var="vEV--_OCP__INSTLR_WAIT__NODE_READY__M" value="" /></label>
+        <label><span class="cw-cls--label-text">_OCP__INSTLR_WAIT__BOOTSTRAP__TRY</span>    <input type="text" data-var="vEV--_OCP__INSTLR_WAIT__BOOTSTRAP__TRY" value="" /></label>
+        <label><span class="cw-cls--label-text">_OCP__INSTLR_WAIT__CLUSTER__TRY</span>      <input type="text" data-var="vEV--_OCP__INSTLR_WAIT__CLUSTER__TRY" value="" /></label>
+        <label><span class="cw-cls--label-text">_OCP__CLUSTER_DIR</span>                    <input type="text" data-var="vEV--_OCP__CLUSTER_DIR" value="" /></label>
+        <label><span class="cw-cls--label-text">_OCP__ABI__BM__BASE_DOM</span>              <input type="text" data-var="vEV--_OCP__ABI__BM__BASE_DOM" value="" /></label>
+        <label><span class="cw-cls--label-text">_OCP__ABI__BM__CLS_NAME</span>              <input type="text" data-var="vEV--_OCP__ABI__BM__CLS_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_OCP__ABI__BM__PULL_CRD</span>              <input type="text" data-var="vEV--_OCP__ABI__BM__PULL_CRD" value="" /></label>
+        <label><span class="cw-cls--label-text">_OCP__ABI__BM__SSH_KEY__PRV</span>          <input type="text" data-var="vEV--_OCP__ABI__BM__SSH_KEY__PRV" value="" /></label>
+        <label><span class="cw-cls--label-text">_OCP__ABI__BM__SSH_KEY__PUB</span>          <input type="text" data-var="vEV--_OCP__ABI__BM__SSH_KEY__PUB" value="" /></label>
+        <label><span class="cw-cls--label-text">_OCP__ABI__CFG</span>                       <input type="text" data-var="vEV--_OCP__ABI__CFG" value="" /></label>
+        <label><span class="cw-cls--label-text">_BMC__CRD_USR</span>                        <input type="text" data-var="vEV--_BMC__CRD_USR" value="" /></label>
+        <label><span class="cw-cls--label-text">_SVC__TUN__CRD_USR</span>                   <input type="text" data-var="vEV--_SVC__TUN__CRD_USR" value="" /></label>
+        <label><span class="cw-cls--label-text">_SVC__TUN__CP_URL</span>                    <input type="text" data-var="vEV--_SVC__TUN__CP_URL" value="" /></label>
+        <label><span class="cw-cls--label-text">_SVC__TUN__DP_BASE_URL</span>               <input type="text" data-var="vEV--_SVC__TUN__DP_BASE_URL" value="" /></label>
+        <label><span class="cw-cls--label-text">_SVC__TUN__DP_PORT (default value)</span>   <input type="text" data-var="vEV--_SVC__TUN__DP_PORT--defVal" value="" /></label>
+        <label><span class="cw-cls--label-text">_BW__NOTE_NAME__BMC</span>                  <input type="text" data-var="vEV--_BW__NOTE_NAME__BMC" value="" /></label>
+        <label><span class="cw-cls--label-text">_BW__NOTE_NAME__SVC__TUN</span>             <input type="text" data-var="vEV--_BW__NOTE_NAME__SVC__TUN" value="" /></label>
+        <label><span class="cw-cls--label-text">_BW__NOTE_NAME__OCP__KCFG</span>            <input type="text" data-var="vEV--_BW__NOTE_NAME__OCP__KCFG" value="" /></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+# OCP Installation ABI (Agent-Based Installation) on Bare Metal.
+#   Installation Phases:
+#     Day-0   Cluster Configuration.
+#               First `CreateABIcfg` creates a bare-minimum
+#               `install-config.yaml` and generates an `agent-config.yaml`
+#               template. Then `UpdateCfg Day0` applies overrides from user
+#               (`_OCP__ABI__CFG`). Use the custom script and/or interactive
+#               session to further modify them, if desired. Both configuration
+#               files must be complete before proceeding to Day-1.
+#     Day-1   Manifest Customization.
+#               Runs `agent create cluster-manifests`, if customization is
+#               requested, to generate the full manifest tree under
+#               `openshift/`. Then `UpdateCfg Day1` applies overrides from user
+#               (`_OCP__ABI__CFG`), if any. Use the custom script and/or
+#               interactive session to modify those manifest files, if
+#               desired, before the ISO is built.
+#     Day-1.5 Post-Bootstrap Operations.
+#               Runs after `agent wait-for bootstrap-complete`. Applies custom
+#               actions as configured by user (`_OCP__ABI__CFG`), if any.
+#     Day-2   Post-Deployment Customization.
+#               Runs after `agent wait-for install-complete` and `KUBECONFIG`
+#               is set. Use the custom script and/or interactive session to
+#               configure the running cluster (e.g. install operators, apply
+#               policies, configure identity providers), if desired.
+#   The `_OCP__INSTLR_FLG__CUSTOM` is a bit flag to control phase behaviour.
+#     0x00000001    Interactive Session at the end of Day-0 Phase.
+#     0x00000002    Interactive Session at the end of Day-1 Phase.
+#     0x00000004    Interactive Session at the end of Day-2 Phase.
+#       NOTE:   Exiting any of these Sessions with Exit Status 255 will stop
+#               the whole Installation procedure.
+#     0x00000008    Executing `_OCP__INSTLR_DAY0` during Day-0 Phase.
+#     0x00000010    Executing `_OCP__INSTLR_DAY1` during Day-1 Phase.
+#     0x00000020    Executing `_OCP__INSTLR_DAY2` during Day-2 Phase.
+#       NOTE:   The content of these Env. Var. is executed via
+#               `eval "( set -euxo pipefail; shopt -s inherit_errexit;
+#               ${_OCP__INSTLR_...}; true )"` (in a sub-shell).
+__SHELL=0 \
+    _OCP__INSTLR_ACTION='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__INSTLR_ACTION"></span>' \
+    _OCP__INSTLR_FLG__CUSTOM=$((0x00)) \
+    _OCP__INSTLR_DIR='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__INSTLR_DIR"></span>' \
+    _OCP__INSTLR_DAY0="${_OCP__INSTLR_DAY0:-: 'Custom Day-0 Script.'}" \
+    _OCP__INSTLR_DAY1="${_OCP__INSTLR_DAY1:-: 'Custom Day-1 Script.'}" \
+    _OCP__INSTLR_DAY2="${_OCP__INSTLR_DAY2:-: 'Custom Day-2 Script.'}" \
+    _OCP__INSTLR_MIN_ISO='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__INSTLR_MIN_ISO"></span>' \
+    _OCP__INSTLR_WAIT__NODE_READY__M='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__INSTLR_WAIT__NODE_READY__M"></span>' \
+    _OCP__INSTLR_WAIT__BOOTSTRAP__TRY='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__INSTLR_WAIT__BOOTSTRAP__TRY"></span>' \
+    _OCP__INSTLR_WAIT__CLUSTER__TRY='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__INSTLR_WAIT__CLUSTER__TRY"></span>' \
+    _OCP__CLUSTER_DIR='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__CLUSTER_DIR"></span>' \
+    _OCP__INSTLR_LOG_LEVEL=info \
+    _OCP__ABI__BM__BASE_DOM='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__ABI__BM__BASE_DOM"></span>' \
+    _OCP__ABI__BM__CLS_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__ABI__BM__CLS_NAME"></span>' \
+    _OCP__ABI__BM__PULL_CRD='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__ABI__BM__PULL_CRD"></span>' \
+    _OCP__ABI__BM__SSH_KEY__PRV='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__ABI__BM__SSH_KEY__PRV"></span>' \
+    _OCP__ABI__BM__SSH_KEY__PUB='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__ABI__BM__SSH_KEY__PUB"></span>' \
+    _OCP__ABI__CFG='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__ABI__CFG"></span>' \
+    _BMC__CRD_USR='<span style="color:red;font-weight:bold;" data-var="vEV--_BMC__CRD_USR"></span>' \
+    _SVC__TUN__CRD_USR='<span style="color:red;font-weight:bold;" data-var="vEV--_SVC__TUN__CRD_USR"></span>' \
+    _SVC__TUN__CP_URL='<span style="color:red;font-weight:bold;" data-var="vEV--_SVC__TUN__CP_URL"></span>' \
+    _SVC__TUN__DP_BASE_URL='<span style="color:red;font-weight:bold;" data-var="vEV--_SVC__TUN__DP_BASE_URL"></span>' \
+    _SVC__TUN__DP_PORT="${_SVC__TUN__DP_PORT:-<span style="color:red;font-weight:bold;" data-var="vEV--_SVC__TUN__DP_PORT--defVal"></span>}" \
+    _BW__NOTE_NAME__BMC='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME__BMC"></span>' \
+    _BW__NOTE_NAME__SVC__TUN='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME__SVC__TUN"></span>' \
+    _BW__NOTE_NAME__OCP__KCFG='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME__OCP__KCFG"></span>' \
+    _RC__SRCS='()' \
+    BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}" \
+    BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)" \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+                echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+                exit 1
+            }
+            # BMC.
+            eval "$(
+                typeset bwData=
+                bwData="$(bw get item "${_BW__NOTE_NAME__BMC}")" || {
+                    echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME__BMC}\`." 1&gt;&amp;2
+                    echo false; exit 1
+                }
+                jq -r \
+                    --arg fn__c "cred.BMC.${_BMC__CRD_USR}" \
+                    '
+                        .fields[]? | select(.name == $fn__c).value | fromjson |
+                        (
+                            "typeset -x " +
+                            "bmcCrdUsr=\(.usr | @sh) " +
+                            "bmcCrdPwd=\(.pwd | @sh)"
+                        )
+                    ' \
+                0&lt;&lt;&lt;"${bwData}"
+            )"
+            # Chisel Tunnel Service.
+            chisel --version
+            eval "$(
+                typeset bwData=
+                bwData="$(bw get item "${_BW__NOTE_NAME__SVC__TUN}")" || {
+                    echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME__SVC__TUN}\`." 1&gt;&amp;2
+                    echo false; exit 1
+                }
+                jq -r \
+                    --arg fn__c "cred.${_SVC__TUN__CRD_USR}" \
+                    '
+                        .fields[]? | select(.name == $fn__c).value | fromjson |
+                        (
+                            "typeset -x " +
+                            "chiselCrdUsr=\(.usr | @sh) " +
+                            "chiselCrdPwd=\(.pwd | @sh)"
+                        )
+                    ' \
+                0&lt;&lt;&lt;"${bwData}"
+            )"
+            eval "${__shOpt}"; unset __shOpt
+        }
+        eval "$(
+            typeset e1=
+            mkdir -p -- "${_OCP__CLUSTER_DIR}"
+            for e1 in _OCP__{CLUSTER,INSTLR}_DIR; do
+                eval "${e1}=\"\$(CDPATH= cd -L \"\${${e1}}\" &amp;&amp; pwd)\""
+            done
+            for e1 in _RC__SRCS; do
+                eval "eval \"a1=\${${e1}}\""
+                for e2 in "${a1[@]}"; do
+                    eval "a2+=(\"\$(CDPATH= cd -L ${e2@Q} &amp;&amp; pwd)\")"
+                done
+                eval "${e1}=\"(${a2[@]@Q})\""
+            done
+            typeset -p _OCP__{CLUSTER,INSTLR}_DIR _RC__SRCS
+        )"
+        typeset -i _OCP__INSTLR_FLG__CUSTOM="${_OCP__INSTLR_FLG__CUSTOM}"
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset kubeCfg="${_OCP__CLUSTER_DIR}/kubecfg"
+        typeset bmcInfo="${_OCP__CLUSTER_DIR}/ocp--bmc--info.json"
+        typeset +x bmcCrdUsr bmcCrdPwd
+        typeset +x chiselCrdUsr chiselCrdPwd
+
+        [ -r "${_OCP__ABI__CFG}" ]
+
+        function openshift-install () {
+            typeset -i es=0
+            {
+                echo \
+"$(date -Iseconds)|${FUNCNAME[0]@Q} ${*@Q}"$'\n'"$(printf '%.0s-' {1..80})"
+                "${_OCP__INSTLR_DIR}/openshift-install" \
+                    --dir "${_OCP__CLUSTER_DIR}/" \
+                    ${_OCP__INSTLR_LOG_LEVEL:+--log-level "${_OCP__INSTLR_LOG_LEVEL}"} \
+                    "$@" 2&gt;&amp;1 || es=$?
+                echo "$(printf '%.0s=' {1..80})"
+                exit ${es}
+            } | tee -a "${_OCP__CLUSTER_DIR}/ocp--installer--cluster.log"
+            return ${PIPESTATUS[0]}
+        }
+        function EnterShell () {
+            typeset -i asChild="${1:-1}"; (($#)) &amp;&amp; shift
+            export -f openshift-install
+            cd "${_OCP__CLUSTER_DIR}/"
+            if ((asChild)); then
+                echo \
+                    'Exit this interactive session, when you are finished, to' \
+                    'continue (Exit Status 255 will cancel the installation).'
+                "${SHELL}" || (($? != 255))
+                cd - 1&gt; /dev/null
+            else
+                echo 'Do NOT forget to exit this interactive session!!!'
+                exec "${SHELL}"
+            fi
+            true
+        }
+        function CreateABIcfg () {
+            # Create bare-minimum `install-config.yaml`.
+            {
+                yq -p yaml -o json eval . |
+                jq -c \
+                    --arg clsName "${_OCP__ABI__BM__CLS_NAME}" \
+                    --arg baseDom "${_OCP__ABI__BM__BASE_DOM}" \
+                    --rawfile pullCrd &lt;(
+                        jq -csj \
+                            '.[0].auths += .[1].auths | .[0]' \
+                            "/var/run/secrets/registry-pull--build-farms/.dockerconfigjson" \
+                            "${_OCP__ABI__BM__PULL_CRD}"
+                    ) \
+                    --rawfile sshKey &lt;(set +x; cat "${_OCP__ABI__BM__SSH_KEY__PUB}") \
+                    '
+                        .baseDomain=$baseDom |
+                        .metadata.name=$clsName |
+                        .pullSecret=$pullCrd |
+                        .sshKey=$sshKey
+                    ' |
+                yq -p json -o yaml eval .
+            } 0&lt;&lt;'fileEOF' 1&gt; "${_OCP__CLUSTER_DIR}/install-config.yaml"
+apiVersion: v1
+baseDomain: ''
+metadata:
+  name: ''
+platform: {none: {}}
+pullSecret: ''
+sshKey: ''
+fileEOF
+            # Enrich with OCP-version-aware defaults.
+            openshift-install create install-config
+            # Update for Bare Metal target.
+            yq -i eval \
+                '.platform={"baremetal": {}}' \
+                "${_OCP__CLUSTER_DIR}/install-config.yaml"
+
+            # Create `agent-config.yaml` template.
+            openshift-install agent create agent-config-template
+            # Being idempotent on re-run.
+            [ -s "${_OCP__CLUSTER_DIR}/agent-config.yaml" ] || {
+                jq -r \
+                    '."*agentconfig.AgentConfig".File.Data' \
+                    "${_OCP__CLUSTER_DIR}/.openshift_install_state.json" |
+                base64 -d 1&gt; "${_OCP__CLUSTER_DIR}/agent-config.yaml"
+            }
+
+            true
+        }
+        function UpdateCfg () {
+            typeset topKey="${1:?}"; (($#)) &amp;&amp; shift
+            typeset cfgType= cfgFile= cfgCont= updateOp=
+            while IFS=$'\t' read -r cfgType cfgFile cfgCont; do
+                [[ "${cfgFile}" == */* ]] &amp;&amp;
+                    mkdir -p "${_OCP__CLUSTER_DIR}/${cfgFile%/*}"
+                1&gt;&gt; "${_OCP__CLUSTER_DIR}/${cfgFile}"
+                exec 3&lt; &lt;(0&lt; "${_OCP__CLUSTER_DIR}/${cfgFile}"); wait $!
+                case ${cfgType} in
+                  (*+)  updateOp='select(fileIndex==0) *+ ' ;;
+                  (*-)  updateOp='select(fileIndex==0) * '  ;;
+                  (*=)  updateOp=''                         ;;
+                esac
+                updateOp+='select(fileIndex==1)'
+                case ${cfgType} in
+                  (yaml+|yaml-|yaml=)
+                    yq eval-all "${updateOp}" \
+                        - \
+                        &lt;(set +x; yq -p json -o yaml eval . 0&lt;&lt;&lt;"${cfgCont}") \
+                        0&lt;&amp;3 1&gt;"${_OCP__CLUSTER_DIR}/${cfgFile}"
+                    ;;
+                  (json+|json-|json=)
+                    yq -p json -o json eval-all "${updateOp}" \
+                        - \
+                        &lt;(set +x; echo "${cfgCont}") \
+                        0&lt;&amp;3 1&gt;"${_OCP__CLUSTER_DIR}/${cfgFile}"
+                    ;;
+                  (*)   : "Invalid Type: ${cfgType}"; false;;
+                esac
+                exec 3&lt;&amp;-
+            done 0&lt; &lt;(
+                yq -o json eval . "${_OCP__ABI__CFG}" |
+                jq -r --arg k "${topKey}" '
+                    (.[$k].configFileOverride // empty) | to_entries[] |
+                    .key as $type | .value[]? | to_entries[] |
+                    [$type, .key, (
+                        if ($type | startswith("json")) then .value
+                        else (.value | tojson)
+                        end
+                    )] | join("\t")
+                '
+            )
+            true
+        }
+        function ExtractBMCinfo () {
+            typeset bmcInfo="${1:?}"; (($#)) &amp;&amp; shift
+
+            # Retrieve BMC Information from `agent-config.yaml`.
+            #   Currently, if all Master Nodes are ready to be installed, but
+            #   not all Worker Nodes are registering, the
+            #   `wait-for bootstrap-complete` will exit out with error.
+            #   As workaround, we boot the Worker Nodes first, and the
+            #   Rendezvous Host last.
+            {
+                yq -p yaml -o json eval . |
+                jq \
+                    --rawfile usr &lt;(set +x; printf '%s' "${bmcCrdUsr}") \
+                    --rawfile pwd &lt;(set +x; printf '%s' "${bmcCrdPwd}") \
+                    --argjson rIP "$(yq -o json '(select(
+                        (.rendezvousIP | length) &gt; 0) | .rendezvousIP
+                    ) // ([
+                        (.hosts[] | select(.role == "master")),
+                        (.hosts[] | select(.role == "arbiter")),
+                        (.hosts[] | select((.role == "") or (.role == null)))
+                    ] | .[0] | [.networkConfig.interfaces[] |
+                        select(.ipv4.enabled == true) |
+                        .ipv4.address[0].ip
+                    ] | .[0]) // error(
+                        "rendezvousIP could not be determined"
+                    ) ' "${_OCP__CLUSTER_DIR}/agent-config.yaml")" \
+                    '[(
+                        (.hosts[] | select(.role == "worker")),
+                        ((
+                            (.hosts[] | select((.role == "") or (.role == null))),
+                            (.hosts[] | select(.role == "auto-assign")),
+                            (.hosts[] | select(.role == "arbiter")),
+                            (.hosts[] | select(.role == "master"))
+                        ) | select(any((
+                            .networkConfig.interfaces[] |
+                            select(.ipv4.enabled == true) |
+                            .ipv4.address[]?.ip
+                        ); . == $rIP) | not)),
+                        (.hosts[] | select(any((
+                            .networkConfig.interfaces[] |
+                            select(.ipv4.enabled == true) |
+                            .ipv4.address[]?.ip
+                        ); . == $rIP)))
+                    ) | {
+                        url: ("https://" + (.bmc.address | split("://")[-1])),
+                        usr: (.bmc.username // $usr),
+                        pwd: (.bmc.password // $pwd),
+                        hostIPv4: ([
+                            .networkConfig.interfaces[] |
+                            select(.ipv4.enabled == true) |
+                            .ipv4.address[0]?.ip
+                        ][0] // null)
+                    }]'
+            } 0&lt; "${_OCP__CLUSTER_DIR}/agent-config.yaml" 1&gt; "${bmcInfo}"
+
+            # Strip BMC Credentials from `agent-config.yaml`.
+            exec 3&lt; &lt;(0&lt; "${_OCP__CLUSTER_DIR}/agent-config.yaml"); wait $!
+            {
+                yq -p yaml -o json eval . |
+                jq '.hosts[].bmc|=del(.username, .password)' |
+                yq -p json -o yaml eval .
+            } 0&lt;&amp;3 1&gt; "${_OCP__CLUSTER_DIR}/agent-config.yaml"
+            exec 3&lt;&amp;-
+
+            true
+        }
+
+        case ${_OCP__INSTLR_ACTION} in
+          (1)     (
+            typeset -i iSes=0 fCstm=0 lsb=0
+            {   # Preparation Phase.
+                rm -f "${_OCP__CLUSTER_DIR}/auth/kubeconfig"
+                unset KUBECONFIG
+            }
+            {   # Day-0 Phase.
+                iSes=$((_OCP__INSTLR_FLG__CUSTOM &amp; 0x01))
+                fCstm=$(((_OCP__INSTLR_FLG__CUSTOM &amp;= ~0x01) &amp; ~0x03))
+                CreateABIcfg
+                UpdateCfg Day0
+                while ((fCstm)); do
+                    lsb=$((fCstm &amp; -fCstm))
+                    case ${lsb} in
+                      (8)   printf "Day-0 Phase (0x%08x):\n" ${lsb};;&amp;
+                      (8)           (   # 0x000008  Executing Custom Day-0 Script.
+eval '( set -euxo pipefail; shopt -s inherit_errexit
+'"${_OCP__INSTLR_DAY0}"$'\ntrue )'
+                      );;
+                    esac
+                    ((fCstm ^= lsb)) || true
+                done
+                ((iSes)) &amp;&amp; echo 'Manual Day-0 Operation.' &amp;&amp;
+                    PROMPT_COMMAND='PS1="${PS1%\[Day-0\] }[Day-0] "' EnterShell
+                ExtractBMCinfo "${bmcInfo}"
+                ((_OCP__INSTLR_MIN_ISO)) &amp;&amp; (
+                    export __IMG__ROOT_FS="${_SVC__TUN__DP_BASE_URL%%/}/${_SVC__TUN__DP_PORT}/boot-artifacts"
+                    yq -i eval '
+                        .minimalISO=true |
+                        .bootArtifactsBaseURL=strenv(__IMG__ROOT_FS)
+                    ' "${_OCP__CLUSTER_DIR}/agent-config.yaml"
+                )
+            }
+            {   # Day-1 Phase.
+                iSes=$((_OCP__INSTLR_FLG__CUSTOM &amp; 0x02))
+                fCstm=$(((_OCP__INSTLR_FLG__CUSTOM &amp;= ~0x02) &amp; ~0x03))
+                { ((fCstm | iSes)) || {
+                    yq -e eval '
+                        .Day1.configFileOverride |
+                        to_entries | .[].value[]
+                    ' "${_OCP__ABI__CFG}" 1&gt; /dev/null 2&gt;&amp;1
+                }; } &amp;&amp; openshift-install agent create cluster-manifests
+                UpdateCfg Day1
+                while ((fCstm)); do
+                    lsb=$((fCstm &amp; -fCstm))
+                    case ${lsb} in
+                      (16) printf "Day-1 Phase (0x%08x):\n" ${lsb};;&amp;
+                      (16)          (   # 0x000010  Executing Custom Day-1 Script.
+eval '( set -euxo pipefail; shopt -s inherit_errexit
+'"${_OCP__INSTLR_DAY1}"$'\ntrue )'
+                      );;
+                    esac
+                    ((fCstm ^= lsb)) || true
+                done
+                ((iSes)) &amp;&amp; echo 'Manual Day-1 Operation.' &amp;&amp;
+                    PROMPT_COMMAND='PS1="${PS1%\[Day-1\] }[Day-1] "' EnterShell
+            }
+            {   # ISO Creation Phase.
+                openshift-install agent create image
+            }
+            {   # Deployment Phase.
+                (
+                    typeset isoFile="$(
+                        shopt -s nullglob
+                        echo "${_OCP__CLUSTER_DIR}/agent."*.iso
+                    )"
+                    typeset isoURL="${_SVC__TUN__DP_BASE_URL%%/}/${_SVC__TUN__DP_PORT}/${isoFile##*/}"
+                    typeset -i httpSvcPort=8080
+                    typeset -ai taskPIDs=()
+
+                    function HandleSIGCHLD () {
+                        typeset -i i=0
+                        for i in "${!taskPIDs[@]}"; do
+                            kill -0 "${taskPIDs[i]}" 2&gt;/dev/null ||
+                            unset "taskPIDs[i]"
+                        done
+                        true
+                    }
+                    function RedfishAPIcall () {
+                        typeset bmcInfo="${1:?}"; (($#)) &amp;&amp; shift
+                        typeset bmcURL="${1:?}"; (($#)) &amp;&amp; shift
+                        typeset apiMethod="${1:?}"; (($#)) &amp;&amp; shift
+                        typeset apiEP="${1?}"; (($#)) &amp;&amp; shift
+                        typeset -i es=0 tryLeft=6 httpCode=0
+                        typeset httpResp=
+                        while ((tryLeft)); do
+                            es=0
+                            httpResp=$(curl -sSLk -X "${apiMethod}" \
+                                --fail-with-body \
+                                -w '\n%{response_code}' \
+                                -K &lt;(
+                                    set +x
+                                    jq -r \
+                                        --arg url "${bmcURL}" \
+                                        '
+                                            .[] |
+                                            select(.url == $url) |
+                                            "-u \("\(.usr):\(.pwd)" | @json)"
+                                        ' \
+                                    0&lt; "${bmcInfo}"
+                                ) \
+                                -H 'Content-Type: application/json' \
+                                -H 'Accept: application/json' \
+                                "$@" \
+                                "${bmcURL}/redfish/v1/${apiEP#/}") || es=$?
+                            httpCode="${httpResp##*$'\n'}"
+                            # Retry on 500,503: Transient server failure.
+                            case ${httpCode} in
+                              (500|503) ;;
+                              (*)       break;;
+                            esac
+                            sleep 10
+                            ((--tryLeft))
+                        done
+                        printf '%s' "${httpResp%$'\n'${httpCode}}"
+                        return ${es}
+                    }
+                    function VCD-Eject () {
+                        typeset bmcInfo="${1:?}"; (($#)) &amp;&amp; shift
+                        typeset bmcURL="${1:?}"; (($#)) &amp;&amp; shift
+                        typeset bmcMgrId="${1:?}"; (($#)) &amp;&amp; shift
+                        {
+                            RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET \
+                                "Managers/${bmcMgrId}/VirtualMedia/CD" |
+                            jq -e '.Inserted' &gt; /dev/null
+                        } &amp;&amp; {
+                            RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
+                                "Managers/${bmcMgrId}/VirtualMedia/CD/Actions/VirtualMedia.EjectMedia" \
+                                -d '{}' ||
+                            true
+                        }
+                        true
+                    }
+                    function Host-PowerControl () {
+                        typeset bmcInfo="${1:?}"; (($#)) &amp;&amp; shift
+                        typeset bmcURL="${1:?}"; (($#)) &amp;&amp; shift
+                        typeset bmcSysId="${1:?}"; (($#)) &amp;&amp; shift
+                        typeset resetType="${1:?}"; (($#)) &amp;&amp; shift
+                        typeset -i es=0
+                        RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
+                            "Systems/${bmcSysId}/Actions/ComputerSystem.Reset" \
+                            -d "{\"ResetType\": \"${resetType}\"}" || es=$?
+                        return ${es}
+                    }
+                    function WipeDisks () {
+                        typeset -i tPID="${1:?}"; (($#)) &amp;&amp; shift
+                        typeset bmcInfo="${1:?}"; (($#)) &amp;&amp; shift
+                        typeset bmcURL="${1:?}"; (($#)) &amp;&amp; shift
+                        typeset bmcSysId="${1:?}"; (($#)) &amp;&amp; shift
+                        typeset bmcMgrId="${1:?}"; (($#)) &amp;&amp; shift
+                        typeset wipeMethod="${1?}"; (($#)) &amp;&amp; shift
+                        typeset rmtScript=
+                        typeset -i es=0
+                        case ${wipeMethod} in
+                          ('')  rmtScript="$(cat - 0&lt;&lt;'sshEOF'
+sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'shEOF'
+    grep -qE '\bcoreos\.live(\.|iso=)' /proc/cmdline || exit 193
+    true
+shEOF
+)"
+sshEOF
+                          )";;&amp;
+                          (OS)  rmtScript="$(cat - 0&lt;&lt;'sshEOF'
+sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'shEOF'
+    typeset dev=
+    grep -qE '\bcoreos\.live(\.|iso=)' /proc/cmdline || exit 193
+    udevadm settle
+    while IFS= read -r dev; do
+        sgdisk --zap-all "${dev}"
+        wipefs -a "${dev}"
+        blkdiscard "${dev}" 2&gt; /dev/null || true
+    done 0&lt; &lt;(
+        lsblk -dpno NAME,TYPE | awk '($2 == "disk"){print $1}'
+    )
+    true
+shEOF
+)"
+sshEOF
+                            )";;&amp;
+                          ('')  ;&amp;
+                          (OS)  (
+                            typeset stdErr= rgx=
+                            typeset hostIPv4=
+                            hostIPv4="$(jq -r \
+                                --arg url "${bmcURL}" \
+                                '.[] | select(.url == $url).hostIPv4' \
+                            0&lt; "${bmcInfo}")"
+                            typeset -i tryLeft=$((2 * _OCP__INSTLR_WAIT__NODE_READY__M)) es=0
+                            while ((tryLeft)); do
+                                kill -0 "${tPID}" 2&gt;/dev/null || break
+                                sleep 30
+                                es=0
+                                stdErr="$({
+                                    ssh -n \
+                                        -o UserKnownHostsFile=/dev/null \
+                                        -o StrictHostKeyChecking=no \
+                                        -o ConnectTimeout=5 \
+                                        -i "${_OCP__ABI__BM__SSH_KEY__PRV}" \
+                                        "core@${hostIPv4}" \
+                                        "${rmtScript}" \
+                                        2&gt; &gt;(tee /dev/fd/3) 1&gt;&amp;3 ||
+                                    es=$?
+                                } 3&gt;&amp;2; exit ${es})" || es=$?
+                                case ${es} in
+                                  (0)   break;;
+                                  (193) exit ${es};;
+                                  (255)
+                                    rgx='\bPermission denied \(.*\bpublickey\b.*\)'
+                                    [[ "${stdErr}" =~ ${rgx} ]] &amp;&amp; exit 255
+                                    ;;
+                                esac
+                                ((--tryLeft))
+                            done
+                          ) || es=$?;;
+                          (BMC) (
+                            typeset ctrlId= volEP= driveEP= jobId=
+                            typeset -a jobIds=()
+                            while IFS= read -r ctrlId; do
+                                while IFS= read -r volEP; do
+                                    # Try `Volume.Initialize`.
+                                    jobId="$(
+                                        RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
+                                            "${volEP#/redfish/v1/}/Actions/Volume.Initialize" \
+                                            -d '{
+                                                "InitializeType": "Slow",
+                                                "@Redfish.OperationApplyTime": "OnReset"
+                                            }' -o /dev/null -D - |
+                                        sed -nE 's/^[Ll]ocation: ([^\r]*)\r?$/\1/p;T;q'
+                                    )" || true
+                                    jobId="${jobId##*/}"
+                                    [ -n "${jobId}" ] &amp;&amp; jobIds+=("${jobId}") &amp;&amp; continue
+                                    # Fallback to `SecureErase` the Volume's Physical Drives.
+                                    while IFS= read -r driveEP; do
+                                        jobId="$(
+                                            RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
+                                                "${driveEP#/redfish/v1/}/Actions/Drive.SecureErase" \
+                                                -d '{}' -o /dev/null -D - |
+                                            sed -nE 's/^[Ll]ocation: ([^\r]*)\r?$/\1/p;T;q'
+                                        )" || true
+                                        jobId="${jobId##*/}"
+                                        [ -n "${jobId}" ] &amp;&amp; jobIds+=("${jobId}")
+                                    done 0&lt; &lt;(
+                                        RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET \
+                                            "${volEP#/redfish/v1/}" |
+                                        jq -r '.Links.Drives[]?."@odata.id" // empty'
+                                    )
+                                done 0&lt; &lt;(
+                                    RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET \
+                                        "Systems/${bmcSysId}/Storage/${ctrlId}/Volumes" |
+                                    jq -r '.Members[]?."@odata.id" // empty'
+                                )
+                            done 0&lt; &lt;(
+                                RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET \
+                                    "Systems/${bmcSysId}/Storage" |
+                                jq -r '.Members[]."@odata.id" | split("/")[-1]'
+                            )
+                            # Restart Host.
+                            Host-PowerControl "${bmcInfo}" "${bmcURL}" "${bmcSysId}" ForceRestart
+                            # Wait for all wipe Jobs to complete.
+                            while true; do
+                                kill -0 "${tPID}" 2&gt;/dev/null || break
+                                sleep 60
+                                for jobId in "${jobIds[@]}"; do
+                                    {
+                                        RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET \
+                                            "Managers/${bmcMgrId}/Jobs/${jobId}" |
+                                        jq -e '
+                                            .JobState | test("^Completed"; "i")
+                                        ' 1&gt; /dev/null
+                                    } &amp;&amp; {
+                                        RedfishAPIcall "${bmcInfo}" "${bmcURL}" DELETE \
+                                            "Managers/${bmcMgrId}/Jobs/${jobId}" ||
+                                        true
+                                    } || continue 2
+                                done
+                                break
+                            done
+                          ) || es=$?;;
+                          (*)   : "Unknown method: ${wipeMethod}"; es=1;;
+                        esac
+                        return ${es}
+                    }
+
+                    ((__SHELL)) || trap 'HandleSIGCHLD' CHLD
+                    trap '
+                        ((${#taskPIDs[@]})) &amp;&amp; {
+                            kill "${taskPIDs[@]}" 2&gt; /dev/null || true
+                            wait "${taskPIDs[@]}" 2&gt; /dev/null || true
+                        }
+                    ' EXIT
+
+                    # Start Python HTTP Server (MUST support HTTP Range
+                    #   Request) to serve ISO.
+                    python3 -c "$(cat - 0&lt;&lt;'pyEOF'
+import http.server, os, sys, functools, shutil
+from datetime import datetime, timezone
+
+class RangeHandler(http.server.SimpleHTTPRequestHandler):
+    def send_head(self):
+        path = self.translate_path(self.path)
+        if os.path.isdir(path): return super().send_head()
+        try: f = open(path, 'rb')
+        except OSError:
+            self.send_error(404); return None
+        fs = os.fstat(f.fileno())
+        size = fs.st_size
+        ctype = self.guess_type(path)
+        rng = self.headers.get('Range', '')
+        (start, end) = (0, (size - 1))
+        if rng.startswith('bytes='):
+            try:
+                (s, e) = rng[6:].split('-', 1)
+                start = int(s) if s else 0
+                end = int(e) if e else size - 1
+            except ValueError:
+                f.close()
+                self.send_error(400)
+                return None
+            end = min(end, (size - 1))
+            if (start &gt; end):
+                f.close()
+                self.send_error(416)
+                return None
+            f.seek(start)
+            self._copy_length = end - start + 1
+            self.send_response(206)
+            self.send_header('Content-Range', f'bytes {start}-{end}/{size}')
+        else:
+            self._copy_length = None
+            self.send_response(200)
+        length = end - start + 1
+        self.send_header('Content-type', ctype)
+        self.send_header('Content-Length', str(length))
+        self.send_header('Accept-Ranges', 'bytes')
+        self.send_header('Last-Modified', self.date_time_string(fs.st_mtime))
+        self.end_headers()
+        return f
+    def copyfile(self, source, outputfile):
+        try:
+            remaining = getattr(self, '_copy_length', None)
+            if remaining is not None:
+                self._copy_length = None
+                buf = shutil.COPY_BUFSIZE
+                while (remaining &gt; 0):
+                    data = source.read(min(buf, remaining))
+                    if not data: break
+                    outputfile.write(data)
+                    remaining -= len(data)
+            else: super().copyfile(source, outputfile)
+        except (BrokenPipeError, ConnectionResetError): pass
+    def log_message(self, fmt, *args):
+        hdrs = ''.join(f'  {k}: {v}\n' for k, v in self.headers.items())
+        sys.stderr.write(
+            f'[{datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}] '
+            f'{fmt % args}\n{hdrs}'
+        )
+        sys.stderr.flush()
+
+http.server.test(
+    HandlerClass=functools.partial(
+        RangeHandler,
+        directory=(sys.argv[2] if len(sys.argv) &gt; 2 else '.'),
+    ),
+    port=int(sys.argv[1]) if len(sys.argv) &gt; 1 else 8080,
+    bind='0.0.0.0',
+)
+pyEOF
+                    )" "${httpSvcPort}" "${_OCP__CLUSTER_DIR}" \
+                        1&gt; "${_OCP__CLUSTER_DIR}/ocp--installer--httpd.log" 2&gt;&amp;1 &amp; taskPIDs+=($!)
+                    # Start Chisel Reverse Tunnel to expose HTTP Server.
+                    {
+                        typeset __shOpt="$(shopt -po xtrace)"; set +x
+                        chisel client \
+                            --auth "${chiselCrdUsr}:${chiselCrdPwd}" \
+                            "${_SVC__TUN__CP_URL%%/}/" \
+                            "R:0.0.0.0:${_SVC__TUN__DP_PORT}:localhost:${httpSvcPort}" \
+                            1&gt; "${_OCP__CLUSTER_DIR}/ocp--installer--chisel.log" 2&gt;&amp;1 &amp; taskPIDs+=($!)
+                        eval "${__shOpt}"; unset __shOpt
+                    }
+                    # Probe ISO URL readiness via Chisel Tunnel.
+                    (
+                        typeset -i tryLeft=5
+                        while ((tryLeft)); do
+                            sleep 5
+                            curl -fsSL -I -o /dev/null \
+                                --connect-timeout 2 --max-time 5 \
+                                "${isoURL}" &amp;&amp; break
+                            ((--tryLeft))
+                        done
+                    )
+
+                    # Reboot Nodes into OCP Agent Installation ISO.
+                    ({
+                        typeset bmcURL= bmcVend= bmcSysId= bmcMgrId=
+                        typeset diskWipeMethod=
+                        typeset -i tryLeft=0 didBMCwipe=0
+                        typeset -i myPID="${BASHPID}"
+                        typeset -i tPID="$(ps -o ppid= -p "${myPID}")"
+                        while IFS= read -r bmcURL; do
+                            # Auto-discover BMC Vendor and Identifiers.
+                            bmcVend=$(
+                                RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET '' |
+                                jq -r '.Vendor // "Unknown"'
+                            )
+                            bmcSysId=$(
+                                RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET 'Systems' |
+                                jq -r '.Members[0]["@odata.id"] | split("/")[-1]'
+                            )
+                            bmcMgrId=$(
+                                RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET 'Managers' |
+                                jq -r '.Members[0]["@odata.id"] | split("/")[-1]'
+                            )
+
+                            # Vendor-specific preparation.
+                            case ${bmcVend} in
+                            (Dell)
+                                # Ignore Cert. on `.RFS.1` (VirtualMedia/CD).
+                                RedfishAPIcall "${bmcInfo}" "${bmcURL}" PATCH \
+                                    "Managers/${bmcMgrId}/Attributes" \
+                                    -d '{"Attributes": {"RFS.1.IgnoreCertWarning": "Yes"}}'
+                                ;;
+                            (*)   false;;
+                            esac
+
+                            # Ensure booting to ISO.
+# Note:
+#   The BMC does not always guarantee booting to ISO. It has been observed the
+#   Node can boot to the old OS, despite
+#   `BootSourceOverrideEnabled=Continuous`. The `WipeDisks()` implements ISO
+#   Boot detection and fails if it detects the Node booted to the old OS, so
+#   the entire boot attempt can be retried.
+                            tryLeft=5 didBMCwipe=0
+                            while ((tryLeft)); do
+                                kill -0 "${tPID}" 2&gt;/dev/null || break
+                                diskWipeMethod=
+
+                                # Eject previously mounted media.
+                                VCD-Eject "${bmcInfo}" "${bmcURL}" "${bmcMgrId}"
+                                # Set Boot Order.
+                                {
+                                    # Try to set to VCD for wiping Disks via Host OS.
+                                    RedfishAPIcall "${bmcInfo}" "${bmcURL}" PATCH \
+                                        "Systems/${bmcSysId}" \
+                                        -d '{"Boot": {
+                                            "BootSourceOverrideEnabled": "Continuous",
+                                            "BootSourceOverrideTarget": "Cd"
+                                        }}' &amp;&amp;
+                                    diskWipeMethod=OS
+                                } || ((didBMCwipe)) || {
+                                    # Fallback to wiping Disks via BMC.
+# Note:
+#   Currently, we do not have a solution to perform BMC wipe on for Dell BOSS
+#   Disk, if it is set as RAID. The BOSS RAID Disk is most likely used as the
+#   Boot Disk, hence the above ISO Booting instability issue may still cause
+#   the Node to boot to the old OS.
+                                    WipeDisks "${tPID}" "${bmcInfo}" \
+                                        "${bmcURL}" "${bmcSysId}" "${bmcMgrId}" \
+                                        BMC
+                                    didBMCwipe=1
+                                }
+                                # Mount ISO.
+                                RedfishAPIcall "${bmcInfo}" "${bmcURL}" POST \
+                                    "Managers/${bmcMgrId}/VirtualMedia/CD/Actions/VirtualMedia.InsertMedia" \
+                                    -d "$(
+                                        jq -cnr \
+                                            --arg img "${isoURL}" \
+                                            '{
+                                                "Image": $img,
+                                                "TransferProtocolType": "HTTPS",
+                                                "TransferMethod": "Stream"
+                                            }'
+                                    )"
+                                # Set boot `Once` if BMC Wipe (`Continuous` not supported).
+                                [ -n "${diskWipeMethod}" ] || {
+                                    RedfishAPIcall "${bmcInfo}" "${bmcURL}" PATCH \
+                                        "Systems/${bmcSysId}" \
+                                        -d '{"Boot": {
+                                            "BootSourceOverrideEnabled": "Once",
+                                            "BootSourceOverrideTarget": "Cd"
+                                        }}'
+                                }
+                                # Restart Host.
+                                Host-PowerControl "${bmcInfo}" "${bmcURL}" "${bmcSysId}" ForceRestart
+                                # Wipe Disks via Host OS (Only detect ISO Boot for BMC Wipe).
+                                WipeDisks "${tPID}" "${bmcInfo}" \
+                                    "${bmcURL}" "${bmcSysId}" "${bmcMgrId}" \
+                                    "${diskWipeMethod}" &amp;&amp; break
+                                ((--tryLeft))
+                            done
+                            # Restore Boot Order.
+                            [ -z "${diskWipeMethod}" ] || {
+                                RedfishAPIcall "${bmcInfo}" "${bmcURL}" PATCH \
+                                    "Systems/${bmcSysId}" \
+                                    -d '{"Boot": {
+                                        "BootSourceOverrideEnabled": "Disabled",
+                                        "BootSourceOverrideTarget": "None"
+                                    }}'
+                            }
+                        done &lt; &lt;(jq -r '
+                            .[] | .url
+                        ' 0&lt; "${bmcInfo}")
+                    } |&amp; tee "${_OCP__CLUSTER_DIR}/ocp--installer--bmc.log") &amp; taskPIDs+=($!)
+                    # Wait for BootStrap Node to finish.
+                    (
+                        typeset -i tryLeft="${_OCP__INSTLR_WAIT__BOOTSTRAP__TRY}"
+                        while ((tryLeft)); do
+                            openshift-install agent wait-for bootstrap-complete &amp;&amp; break
+                            ((--tryLeft))
+                        done
+                    )
+
+                    # Day-1.5 Phase.
+                    (
+                        typeset cfgKey= cfgVal=
+                        export KUBECONFIG="${_OCP__CLUSTER_DIR}/auth/kubeconfig"
+                        while IFS=$'\t' read -r cfgKey cfgVal; do
+                            case ${cfgKey} in
+                              (NodeProv)
+                                [ "${cfgVal}" = false ] &amp;&amp; {
+                                    # Workers are provisioned by ABI. No
+                                    #   BareMetalHost CRDs or Ironic
+                                    #   provisioning network.
+                                    while true; do
+                                        oc -n openshift-machine-api \
+                                            scale MachineSets \
+                                            --replicas 0 --all \
+                                        &amp;&amp; break || sleep 60
+                                    done
+                                }
+                                ;;
+                            esac
+                        done 0&lt; &lt;(
+                            yq -o json eval '
+                                ."Day1.5".config // []
+                            ' "${_OCP__ABI__CFG}" |
+                            jq -r '
+                                .[] | to_entries[] |
+                                [.key, (.value | tostring)] | join("\t")
+                            '
+                        )
+                        true
+                    ) &amp; taskPIDs+=($!)
+                    # Wait for OCP Installation to complete.
+                    (
+                        typeset -i tryLeft="${_OCP__INSTLR_WAIT__CLUSTER__TRY}"
+                        while ((tryLeft)); do
+                            openshift-install agent wait-for install-complete &amp;&amp; break
+                            ((--tryLeft))
+                        done
+                    )
+
+                    # Eject Virtual Media on all Nodes.
+                    while IFS= read -r bmcURL; do
+                        VCD-Eject "${bmcInfo}" "${bmcURL}" "$(
+                            RedfishAPIcall "${bmcInfo}" "${bmcURL}" GET 'Managers' |
+                            jq -r '.Members[0]["@odata.id"] | split("/")[-1]'
+                        )"
+                    done &lt; &lt;(jq -r '.[] | .url' 0&lt; "${bmcInfo}")
+                )
+                cp "${_OCP__CLUSTER_DIR}/auth/kubeconfig" "${kubeCfg}"
+                export KUBECONFIG="${kubeCfg}"
+
+                # Update BitWarden.
+                [ -z "${_BW__NOTE_NAME__OCP__KCFG}" ] || ( set +x
+                    typeset bwAttFilePath="${_OCP__CLUSTER_DIR}/auth/kubeconfig"
+                    typeset bwData= bwItemID= e=
+                    bw sync
+                    bwData="$(bw get item "${_BW__NOTE_NAME__OCP__KCFG}")" || {
+                        echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME__OCP__KCFG}\`." 1&gt;&amp;2
+                        exit 1
+                    }
+                    bwItemID="$(jq -cr '.id' 0&lt;&lt;&lt;"${bwData}")"
+                    while IFS='' read -r e; do
+                        bw delete --itemid "${bwItemID}" attachment "${e}" || {
+                            echo "You do NOT have R/W access to BitWarden Note \`${_BW__NOTE_NAME__OCP__KCFG}\`." 1&gt;&amp;2
+                            exit 1
+                        }
+                    done 0&lt; &lt;(jq -r --arg fn "${bwAttFilePath##*/}" '
+                        (.attachments // [])[] | select(.fileName == $fn) | .id
+                    ' 0&lt;&lt;&lt;"${bwData}")
+                    bw create --file "${bwAttFilePath}" --itemid "${bwItemID}" attachment 1&gt; /dev/null
+                    bwData="$(jq -r \
+                        --arg fn__c 'cred.OCP' \
+                        --rawfile fv__c &lt;(
+                            jq -cnj \
+                                --arg usr kubeadmin \
+                                --rawfile pwd &lt;(set +x; printf '%s' "$(0&lt; "${_OCP__CLUSTER_DIR}/auth/kubeadmin-password")") \
+                                '{usr: $usr, pwd: $pwd}'
+                        ) \
+                        '.fields|=((. // []) | (
+                            map(select(.name != $fn__c)) +
+                            [{name: $fn__c, value: $fv__c, type: 1}]
+                        ))' \
+                    0&lt;&lt;&lt;"${bwData}")"
+                    bw encode 0&lt;&lt;&lt;"${bwData}" | bw edit item "${bwItemID}" 1&gt; /dev/null
+                true )
+            }
+            {   # Verification Phase.
+                oc wait Nodes --all --for condition=Ready --timeout=300s
+                (   # Isolate `SECONDS` reset.
+                    # Monitor ClusterOperators readiness.
+                    SECONDS=0 wInt=30 wMax=1800     # 30 Min. Max.
+                    while ((SECONDS &lt; wMax)); do
+                        { oc get ClusterOperators -o json | jq -e '
+                            .items | all(
+                                .status.conditions |
+                                ((.[] | select(.type == "Available")).status == "True")  and
+                                ((.[] | select(.type == "Degraded")).status  == "False")
+                            )
+                        ' 1&gt; /dev/null; } &amp;&amp; break
+                        sleep ${wInt}
+                        echo "Waited ${SECONDS}/${wMax} sec.: "\
+'Checking ClusterOperators...' 1&gt;&amp;2
+                    done
+                    ((SECONDS &gt;= wMax)) &amp;&amp; { echo 'Timed out waiting for '\
+'ClusterOperators to be ready.' 1&gt;&amp;2; exit 2; }
+                    # Final status.
+                    oc get ClusterOperators
+                )
+            }
+            {   # Day-2 Phase.
+                iSes=$((_OCP__INSTLR_FLG__CUSTOM &amp; 0x04))
+                fCstm=$(((_OCP__INSTLR_FLG__CUSTOM &amp;= ~0x04) &amp; ~0x03))
+                while ((fCstm)); do
+                    lsb=$((fCstm &amp; -fCstm))
+                    case ${lsb} in
+                      (32) printf "Day-2 Phase (0x%08x):\n" ${lsb};;&amp;
+                      (32)          (   # 0x000020  Executing Custom Day-2 Script.
+eval '( set -euxo pipefail; shopt -s inherit_errexit
+'"${_OCP__INSTLR_DAY2}"$'\ntrue )'
+                      );;
+                    esac
+                    ((fCstm ^= lsb)) || true
+                done
+                ((iSes)) &amp;&amp; echo 'Manual Day-2 Operation.' &amp;&amp;
+                    PROMPT_COMMAND='PS1="${PS1%\[Day-2\] }[Day-2] "' EnterShell
+            }
+            true
+          );;
+          (i)   PROMPT_COMMAND='PS1="${PS1%\[ABI-BM\] }[ABI-BM] "' EnterShell 0;;
+          (*)   false;;
+        esac
+        cat - 0&lt;&lt;tailEOF
+Please keep the files \`${_OCP__CLUSTER_DIR}/auth/*\` safe, because they are
+not recoverable.
+It is recommended to use the copy of KUBECONFIG file instead:
+    export KUBECONFIG=${kubeCfg@Q}
+tailEOF
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

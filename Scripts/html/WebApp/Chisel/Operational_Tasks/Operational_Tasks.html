@@ -1,0 +1,98 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chisel - Operational Tasks</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../js/global.js"></script>
+    <script type="module" src="../../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="chisel--oper-tasks">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vSV--svcFQDN\": \"...svcFQDN1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vSV--svcFQDN\": \"...svcFQDN2...\"}"
+                        }
+                    }
+                ],
+                "vSV--svcFQDN": "...svcFQDN...",
+                "vSV--svcDPport": "8443",
+                "vSV--localPort": "8080"
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Shell Variables</p>
+        <label><span class="cw-cls--label-text">svcFQDN</span>      <input type="text"      data-var="vSV--svcFQDN" value="" /></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">Connect Chisel Client</p>
+        <label><span class="cw-cls--label-text">svcDPport</span>    <input type="number"    data-var="vSV--svcDPport" value="" /></label>
+        <label><span class="cw-cls--label-text">localPort</span>    <input type="number"    data-var="vSV--localPort" value="" /></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Connect Chisel Client
+( set -euo pipefail; shopt -s inherit_errexit
+    typeset svcFQDN='<span style="color:red;font-weight:bold;" data-var="vSV--svcFQDN"></span>'
+    typeset -i svcDPport=<span style="color:red;font-weight:bold;" data-var="vSV--svcDPport"></span>   # Any port matching Server `_SVC__PORT__DP_RGX`.
+    typeset -i localPort=<span style="color:red;font-weight:bold;" data-var="vSV--localPort"></span>   # Local service port on this machine.
+
+    # Start Chisel Client (connect to control plane and set up reverse tunnel).
+    #   R:0.0.0.0:&lt;svcDPport&gt;:localhost:&lt;localPort&gt;
+    #       Chisel Server binds `&lt;svcDPport&gt;` on all interfaces.
+    #       Incoming connections on Chisel Server are forwarded to
+    #           `localhost:&lt;localPort&gt;` on Chisel Client's system.
+    chisel client \
+        "https://${svcFQDN}/cp/" \
+        "R:0.0.0.0:${svcDPport}:localhost:${localPort}"
+true ); echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Access Tunneled Service (Data Plane)
+( set -euo pipefail; shopt -s inherit_errexit
+    typeset svcFQDN='<span style="color:red;font-weight:bold;" data-var="vSV--svcFQDN"></span>'
+    typeset -i svcDPport=<span style="color:red;font-weight:bold;" data-var="vSV--svcDPport"></span>   # Must match the port used by the Chisel Client.
+
+    # Example: retrieve a file from the tunneled Python HTTP Server.
+    curl -fsSL "https://${svcFQDN}/dp/${svcDPport}/path/to/file"
+true ); echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

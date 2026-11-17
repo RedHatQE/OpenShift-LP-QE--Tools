@@ -1,0 +1,287 @@
+---
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Owner</title>
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <!--
+        {
+            "Preempting Subject": ["yyyy-MM-dd", "yyyy-MM-dd"],
+            "Preempting Subject": ["yyyy-MM-dd", numOfDays]
+        }
+    -->
+    <script type="module" src="../../../../../Scripts/js/global.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script type="application/json" id="data--bm-gs-hw-cluster--preemption">
+    </script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<div id="weekOwnerDiv" style="font-size: 16px; font-family: sans-serif;">
+    Loading...
+</div>
+<script src="https://cdn.jsdelivr.net/npm/date-fns/cdn.min.js"></script>
+<script>
+    async function SetPreemptInfoFromURL() {
+        const pDataElem = document
+            .getElementById('data--bm-gs-hw-cluster--preemption');
+        const params = new URLSearchParams(window.location.search);
+
+        /*  Prioritize `dataPreemption` query parameter.                      */
+        const dataPreemption = params.get('dataPreemption');
+        if (dataPreemption) {
+            if (pDataElem) pDataElem.textContent = dataPreemption;
+            return;
+        }
+
+        /*  Fall back to fetching from URL if `url` query parameter is set.   */
+        const url = params.get('url'); if (! url) return;
+
+        /*  GIS OAuth flow if `ssoGIS` query parameter is set.                */
+        const ssoGIS = params.get('ssoGIS');
+        if (ssoGIS) {
+            const cacheKey = 'gis--token';
+            const cached = JSON.parse(
+                (localStorage.getItem(cacheKey) || 'null'),
+            );
+            const now = Date.now();
+
+            if (cached?.expiry > now) {
+                params.set('hdrAuth', `Bearer ${cached.token}`);
+            } else {
+                await new Promise((resolve) => {
+                    const ownerDiv = document.getElementById('weekOwnerDiv');
+                    ownerDiv.innerHTML = `
+                        <button
+                            id="gisSignInBtn"
+                            style="
+                                padding:4px 8px;
+                                border-radius:5px;
+                                border:1px solid ButtonBorder;
+                                color:ButtonText;
+                                background-color:ButtonFace;
+                                cursor:pointer;
+                        ">
+                            Sign In with Google
+                        </button>
+                    `;
+                    const client = google.accounts.oauth2.initTokenClient({
+                        client_id: ssoGIS,
+                        scope: 'https://www.googleapis.com/auth/drive.readonly',
+                        callback: (rsp) => {
+                            if (rsp.error) {
+                                console.error('GIS error:', rsp);
+                                return;
+                            }
+                            localStorage.setItem(cacheKey, JSON.stringify({
+                                token:  rsp.access_token,
+                                expiry: now + ((rsp.expires_in - 30) * 1000),
+                            }));
+                            params.set('hdrAuth', `Bearer ${rsp.access_token}`);
+                            resolve();
+                        },
+                    });
+                    document.getElementById('gisSignInBtn').onclick =
+                        () => client.requestAccessToken();
+                });
+                document.getElementById('gisSignInBtn').remove();
+            }
+        }
+
+        const fetchOpt = {
+            headers: {},
+            ...(params.has('useAgentCookies') && {credentials: 'include'}),
+        };
+
+        //  HTTP Method (default: GET).
+        const method = params.get('method');
+        if (method) fetchOpt.method = method.toUpperCase();
+
+        //  HTTP Headers.
+        const hdrAuth = params.get('hdrAuth');
+        if (hdrAuth) fetchOpt.headers['Authorization'] = hdrAuth;
+        const hdrExtras = params.get('hdrExtras');
+        if (hdrExtras)
+            try {
+                Object.assign(fetchOpt.headers, JSON.parse(hdrExtras));
+            } catch (err) {
+                console.error((
+                    'Failed to parse `hdrExtras` as JSON' +
+                    `:${hdrExtras}: ${err}`
+                ));
+            }
+
+        //  HTTP Request Body (for POST/PUT/PATCH).
+        const body = params.get('body');
+        if (body) fetchOpt.body = body;
+
+        try {
+            const rsp = await fetch(url, fetchOpt);
+            if (! rsp.ok)
+                throw new Error(`HTTP ${rsp.status}: ${rsp.statusText}`);
+            const data = await rsp.text();
+            if (pDataElem) pDataElem.textContent = data;
+        } catch (err) {
+            console.error((
+                `Failed to fetch preemption data from ${url}: ` +
+                `${err}`
+            ));
+        }
+    }
+
+    function GetPreemptInfo() {
+        const pDataElem = document
+            .getElementById('data--bm-gs-hw-cluster--preemption');
+        let pData = {};
+
+        try {
+            pData = JSON.parse((pDataElem?.textContent.trim() || '{}'));
+        } catch (err) {
+            console.error((
+                'Failed to parse JSON for ' +
+                `\`#data--bm-gs-hw-cluster--preemption\`: ${err}`
+            ));
+        }
+        // Normalize dates and remove invalid entries.
+        for (const [k, v] of Object.entries(pData)) {
+            if (!Array.isArray(v)) {
+                console.error(
+                    'Unexpected pData entry:', k, '=', v,
+                    '| raw:', pDataElem?.textContent,
+                );
+                continue;
+            }
+            v.unshift(dateFns.parseISO(v.shift()));
+            if (typeof v[1] === 'number')
+                v.push(dateFns.addDays(v[0], (v.pop() - 1)));
+             else
+                v.push(dateFns.parseISO(v.pop()));
+            if (dateFns.isBefore(v[1], v[0])) {
+                delete pData[k];
+            }
+        }
+
+        return pData;
+    }
+
+    function UpdWeekOwner() {
+        if (document.getElementById('gisSignInBtn')) return;
+        const now = new Date();
+        const dispFmt = "yyyy-MM-dd'T'HH:mmxxx";
+        const wNum = dateFns.getISOWeek(
+            dateFns.subSeconds(now, (now.getTimezoneOffset() * 60)),
+        );
+        const wBgn = dateFns.startOfISOWeek(now);
+        const wEnd = dateFns.endOfISOWeek(now);
+        const owner = `${(wNum % 2) ? "Chaos" : "Interop"} Team`;
+        const pData = GetPreemptInfo();
+        let preempted = false;
+        const ownerDiv = document.getElementById('weekOwnerDiv');
+        ownerDiv.innerHTML = `
+            <button
+                id="curTimeBtn"
+                style="
+                    padding:4px 8px;
+                    border-radius:5px;
+                    border:1px solid ButtonBorder;
+                    color:ButtonText;
+                    background-color:ButtonFace;
+                    cursor:pointer;
+            ">
+                Refresh Current Time
+            </button>
+        `;
+        let curTimeBtn = document.getElementById('curTimeBtn');
+
+        curTimeBtn.innerHTML =
+            `${dateFns.format(now, dispFmt)} (${
+                Intl.DateTimeFormat(
+                    'en-US',
+                    {timeZoneName: 'short'},
+                ).formatToParts(now)
+                    .find((part) => part.type === 'timeZoneName').value
+            })`;
+        for (const [k, v] of Object.entries(pData)) {
+            const pBgn = dateFns.startOfDay(v[0]);
+            const pEnd = dateFns.endOfDay(v[1]);
+
+            if (dateFns.isWithinInterval(now, {start: pBgn, end: pEnd})) {
+                preempted = true;
+                ownerDiv.innerHTML =
+                    `Current Access Owner (preempted): ${curTimeBtn.outerHTML}` +
+                    ` <strong id=owner>${k}</strong> (<em>${
+                        dateFns.format(dateFns.subSeconds(
+                            pBgn,
+                            (pBgn.getTimezoneOffset() * 60),
+                        ), dispFmt)
+                    }</em> - <em>${
+                        dateFns.format(dateFns.subSeconds(
+                            pEnd,
+                            (pEnd.getTimezoneOffset() * 60),
+                        ), dispFmt)
+                    }</em>)`;
+                break;
+            }
+        }
+        if (! preempted) {
+            let sBgn = wBgn;
+            let sEnd = wEnd;
+
+            for (const v of Object.values(pData)) {
+                const pBgn = dateFns.startOfDay(v[0]);
+                const pEnd = dateFns.endOfDay(v[1]);
+
+                if (dateFns.isBefore(pEnd, now) && dateFns.isAfter(pEnd, sBgn)) {
+                    sBgn = dateFns.startOfDay(dateFns.addDays(pEnd, 1));
+                    preempted = true;
+                }
+                if (dateFns.isAfter(pBgn, now) && dateFns.isBefore(pBgn, sEnd)) {
+                    sEnd = dateFns.endOfDay(dateFns.subDays(pBgn, 1));
+                    preempted = true;
+                }
+            }
+
+            ownerDiv.innerHTML =
+                `Current ${
+                    preempted ? '' : 'Week '
+                }Access Owner: ${curTimeBtn.outerHTML}` +
+                ` <strong id=owner>${owner}</strong> (${
+                    preempted ? 'Partial ' : ''
+                }ISO Week ${wNum}: <em>${
+                    dateFns.format(dateFns.subSeconds(
+                        sBgn,
+                        (sBgn.getTimezoneOffset() * 60),
+                    ), dispFmt)
+                }</em> - <em>${
+                    dateFns.format(dateFns.subSeconds(
+                        sEnd,
+                        (sEnd.getTimezoneOffset() * 60),
+                    ), dispFmt)
+                }</em>)`;
+        }
+
+        curTimeBtn = document.getElementById('curTimeBtn');
+        //  Add Event listener for the manual refresh button.
+        curTimeBtn.addEventListener('click', UpdWeekOwner);
+
+        //  Dispatch complete Event notifier.
+        document.dispatchEvent(new CustomEvent('week-owner-updated', {
+            bubbles: true,
+            detail: {timestamp: now},
+        }));
+    }
+
+    //  --- Script Initialization ---
+    SetPreemptInfoFromURL().then(() => {
+        UpdWeekOwner();                     //  Run the update function immediately on load.
+        setInterval(UpdWeekOwner, 3600000); //  Set the script to auto-reload every hour.
+    });
+</script>
+</body>
+</html>

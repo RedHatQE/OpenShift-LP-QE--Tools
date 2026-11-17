@@ -1,0 +1,35 @@
+<ac:layout><ac:layout-section ac:type="single"><ac:layout-cell><p>Welcome to Integrity Engineering team from Hybrid Platform Multi-Product EXperience.</p></ac:layout-cell></ac:layout-section><ac:layout-section ac:type="single"><ac:layout-cell><ac:structured-macro ac:name="multiexcerpt" ac:schema-version="1" ac:macro-id="1868eaa9-4877-455c-8ba5-dc5850fdcba9"><ac:parameter ac:name="hidden">true</ac:parameter><ac:parameter ac:name="MultiExcerptName">Include--Global</ac:parameter><ac:parameter ac:name="atlassian-macro-output-type">INLINE</ac:parameter><ac:parameter ac:name="shouldDisplayInlineCommentsInIncludes">false</ac:parameter><ac:rich-text-body><ac:structured-macro ac:name="html" ac:schema-version="1" ac:macro-id="5eaab731-3706-4ff3-8584-161f362717f1"><ac:plain-text-body><![CDATA[<div>
+    <script>
+//  Pressing `Ctrl-A` select the closest `div` anchestor.
+//      The `div` need to have `tabindex="0"` attribute set, so it is focusable.
+function SetupKeyboardActions() {
+    function GetDeepActElem() {
+        let activeElement = document.activeElement;
+        while (activeElement?.shadowRoot?.activeElement)
+            activeElement = activeElement.shadowRoot.activeElement;
+        return activeElement;
+    }
+
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'a' && (event.ctrlKey || event.metaKey)) {
+            const fcsdElement = GetDeepActElem();                               //  Find the element that currently has focus.
+            switch (fcsdElement?.tagName) {
+              case undefined:
+              case null:
+              case 'INPUT':
+              case 'TEXTAREA':
+                break;
+              default:
+                const closestParentDiv = fcsdElement.closest('div');            //  Find the closest ancestor `div` to the focused element.
+                if (closestParentDiv) {                                         //  If a div was found, select its contents.
+                    event.preventDefault();                                     //  Prevent the default browser action (selecting everything).
+                    const selection = document.getSelection();
+                    selection.removeAllRanges();                                //  Clear any previous selection.
+                    selection.selectAllChildren(closestParentDiv);              //  Select all children.
+                };
+            };
+        };
+    });
+}; SetupKeyboardActions();
+    </script>
+</div>]]></ac:plain-text-body></ac:structured-macro></ac:rich-text-body></ac:structured-macro></ac:layout-cell></ac:layout-section><ac:layout-section ac:type="two_right_sidebar"><ac:layout-cell><h2>The team</h2><p style="text-align: center;"><br /></p><p style="text-align: left;"><ac:structured-macro ac:name="profile-picture" ac:schema-version="1" ac:macro-id="f2e8fe94-488d-437b-9ec4-f732c30bb97b"><ac:parameter ac:name="User"><ri:user ri:userkey="8a8a21ed42686f2b0142686f701600d1" /></ac:parameter></ac:structured-macro><strong><a href="mailto:oramraz@redhat.com">Oded Ramraz</a></strong></p><p style="text-align: left;"><ac:structured-macro ac:name="profile-picture" ac:schema-version="1" ac:macro-id="c67468e7-495a-4e5b-9ab8-78c06bb71a09"><ac:parameter ac:name="User"><ri:user ri:userkey="8a0184f09676f9b501967d6de2830001" /></ac:parameter></ac:structured-macro><strong><a href="mailto:etirtara@redhat.com">Edoardo Tirtarahardja</a></strong></p><p style="text-align: left;"><strong>Chaos &amp; G11N: </strong><ac:structured-macro ac:name="profile-picture" ac:schema-version="1" ac:macro-id="3492a56e-033e-4343-b3ac-2bd35a9eadaf"><ac:parameter ac:name="User"><ri:user ri:userkey="8a8a21ed4322573201439999a3f8001f" /></ac:parameter></ac:structured-macro><strong><a href="mailto:liliu@redhat.com">Libin Liu</a> <ac:structured-macro ac:name="profile-picture" ac:schema-version="1" ac:macro-id="c3140d8d-bb0a-45db-9207-7cb0ba456fbb"><ac:parameter ac:name="User"><ri:user ri:userkey="8a88d0b56941dad10169b45d59140061" /></ac:parameter></ac:structured-macro><a href="mailto:kkrothap@redhat.com">Krishna babu Krothapalli</a> <ac:structured-macro ac:name="profile-picture" ac:schema-version="1" ac:macro-id="1429b081-1669-4188-8a51-62aaf0184e43"><ac:parameter ac:name="User"><ri:user ri:userkey="8a88d0b464c4921101672ab72a5b027e" /></ac:parameter></ac:structured-macro><a href="mailto:weiliu@redhat.com">Wei Liu</a> <ac:structured-macro ac:name="profile-picture" ac:schema-version="1" ac:macro-id="815648b4-3097-4682-96fd-c3fbfc3597ff"><ac:parameter ac:name="User"><ri:user ri:userkey="8a8a21ed42686f2b0142686f70d101e0" /></ac:parameter></ac:structured-macro><a href="mailto:lijli@redhat.com">Lijun Li</a> <ac:structured-macro ac:name="profile-picture" ac:schema-version="1" ac:macro-id="2562b2ba-3b41-4913-bf22-836086f25f59"><ac:parameter ac:name="User"><ri:user ri:userkey="8a88d0b452f23e4c015474a11a6d0079" /></ac:parameter></ac:structured-macro><a href="mailto:lijli@redhat.com">Fengshuang Tan</a><a href="mailto:liliu@redhat.com"><span> </span></a></strong></p><p style="text-align: left;"><strong>Interop: </strong><ac:structured-macro ac:name="profile-picture" ac:schema-version="1" ac:macro-id="b7749aa0-3043-4828-87b4-ce13e804247c"><ac:parameter ac:name="User"><ri:user ri:userkey="8a88d0b460ed132a0161fc8870ef009e" /></ac:parameter></ac:structured-macro><strong><a href="mailto:dlane@redhat.com">Dana Lane</a></strong></p></ac:layout-cell><ac:layout-cell><h2>About us</h2><p>This space will be used for both common information to both Chaos &amp; G11N and Interop Teams.</p></ac:layout-cell></ac:layout-section><ac:layout-section ac:type="single"><ac:layout-cell><p><br /></p></ac:layout-cell></ac:layout-section><ac:layout-section ac:type="two_right_sidebar"><ac:layout-cell><h2>Blog stream</h2><p><ac:structured-macro ac:name="blog-posts" ac:schema-version="1" ac:macro-id="995d6911-d94f-4b33-9201-eace6a21a692"><ac:parameter ac:name="max">3</ac:parameter><ac:parameter ac:name="content">excerpts</ac:parameter></ac:structured-macro></p></ac:layout-cell><ac:layout-cell><h2>Recently updated</h2><p><ac:structured-macro ac:name="recently-updated" ac:schema-version="1" ac:macro-id="54b94726-b701-443b-824b-e69be2ca74c6"><ac:parameter ac:name="types">page, comment, blogpost, spacedesc</ac:parameter><ac:parameter ac:name="max">10</ac:parameter><ac:parameter ac:name="hideHeading">true</ac:parameter><ac:parameter ac:name="theme">concise</ac:parameter></ac:structured-macro></p></ac:layout-cell></ac:layout-section></ac:layout>

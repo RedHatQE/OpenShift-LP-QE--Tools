@@ -1,0 +1,117 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS SES - Setting Up</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../Scripts/js/code-widget.js"></script>
+    <script type="module" src="../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/html-include.js"></script>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/Cloud/AWS/SimpleEmailService_EmailVerification.html"
+    data-mod-js="
+        CodeWidget__UsrLib_OvrCfg(html, {
+            'aws-ses--verify-email': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vEV--_AWS__DNS_BASE_DOM&quot;:    &quot;chaos.lp.devcluster.openshift.com&quot;,
+                                    &quot;vEV--_AWS__ROLE_NAME_SFX&quot;:   [{&quot;val&quot;: &quot;admin&quot;, &quot;txt&quot;: &quot;admin&quot;}, [{&quot;val&quot;: &quot;poweruser&quot;, &quot;txt&quot;: &quot;poweruser&quot;}]],
+                                    &quot;vEV--AWS_ACCOUNT_ID&quot;:        [&quot;624914081466&quot;],
+                                    &quot;vEV--_AWS__SES__SNDR_DOM&quot;:   &quot;chaos.lp.devcluster.openshift.com&quot;
+                                }`
+                            },
+                        },
+                    ],
+                    'vEV--_AWS__DNS_BASE_DOM': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__ROLE_NAME_SFX': 'poweruser',
+                    'vEV--AWS_REGION': 'us-west-1',
+                    'vEV--AWS_ACCOUNT_ID': [['Please select Team.']],
+                    'vEV--_AWS__SES__SNDR_DOM': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__SES__RCPT_EMAIL': 'user@redhat.com',
+                },
+            },
+        });
+    "
+></div>
+<hr style="border:3px solid CanvasText;"/>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/Cloud/AWS/SimpleEmailService_SMTPcredential.html"
+    data-mod-js="
+        CodeWidget__UsrLib_OvrCfg(html, {
+            'aws-ses--smtp-credential': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vEV--_BW__NOTE_NAME&quot;:    &quot;note.AWS--IAMuser--SES--SMTP--Auth--Chaos&amp;G11n&quot;,
+                                    &quot;vEV--AWS_ACCOUNT_ID&quot;:    [&quot;624914081466&quot;]
+                                }`
+                            },
+                        },
+                    ],
+                    'vEV--_AWS__SES__IAM_USER': 'ses--smtp--auth',
+                    'vEV--_BW__NOTE_NAME': ['...PleaseSelectTeam...'],
+                    'vEV--AWS_REGION': 'us-west-1',
+                    'vEV--AWS_ACCOUNT_ID': [['Please select Team.']],
+                },
+                set: {
+                    'vEV--_AWS__ROLE_NAME_SFX': 'admin',
+                },
+            },
+        });
+    "
+></div>
+<hr style="border:3px solid CanvasText;"/>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/Cloud/AWS/SimpleEmailService_ProductionAccess.html"
+    data-mod-js="
+        CodeWidget__UsrLib_OvrCfg(html, {
+            'aws-ses--prod-access': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vEV--_AWS__ROLE_NAME_SFX&quot;:   [{&quot;val&quot;: &quot;admin&quot;, &quot;txt&quot;: &quot;admin&quot;}, [{&quot;val&quot;: &quot;poweruser&quot;, &quot;txt&quot;: &quot;poweruser&quot;}]],
+                                    &quot;vEV--AWS_ACCOUNT_ID&quot;:        [&quot;624914081466&quot;]
+                                }`
+                            },
+                        },
+                    ],
+                    'vEV--_AWS__SES__DAILY_QUOTA': '1200',
+                    'vEV--_AWS__ROLE_NAME_SFX': 'poweruser',
+                    'vEV--AWS_REGION': 'us-west-1',
+                    'vEV--AWS_ACCOUNT_ID': [['Please select Team.']],
+                },
+            },
+        });
+    "
+></div>
+</body>
+</html>

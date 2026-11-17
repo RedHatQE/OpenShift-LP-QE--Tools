@@ -1,0 +1,202 @@
+# Setting Up NGINX (Containerized)
+##  Installation.
+<details><summary>Preparing Host</summary>
+
+```shell
+__SHELL=0 __DBG=0 \
+    _SVC__OWN_CFG_DIR=/opt/web-app/nginx \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0<<'cmdEOF'
+        ((__SHELL)) && PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset ownUsr="$(id -un)"
+        typeset ownGrp=web-app
+        typeset ctrNet=net--web-app
+        typeset ctrDNS=
+        typeset rpxCtrName=svc--nginx
+        typeset rpxConfDir=/etc/nginx
+        typeset rpxDataDir=/var/www
+        typeset quadletUsrDir="${HOME}/.config/containers/systemd"
+        typeset systemdSvcName=container--nginx
+
+        ((__DBG)) && {
+            podman container run \
+                --name "${rpxCtrName}" \
+                --rm -it \
+                --network "${ctrNet}" \
+                -p 80:80 \
+                -p 443:443 \
+                -v "${_SVC__OWN_CFG_DIR}${rpxConfDir}/nginx.conf:${rpxConfDir}/nginx.conf:ro,Z" \
+                -v "${_SVC__OWN_CFG_DIR}${rpxConfDir}/conf.d:${rpxConfDir}/conf.d:ro,Z" \
+                -v "${_SVC__OWN_CFG_DIR}${rpxConfDir}/certs:${rpxConfDir}/certs:ro,Z" \
+                -v "${_SVC__OWN_CFG_DIR}${rpxDataDir}/certbot:${rpxDataDir}/certbot:ro,Z" \
+                docker.io/library/nginx:latest
+            exit 0
+        }
+
+        sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0<<sudoEOF
+            # Prepare Directories.
+            mkdir -p ${_SVC__OWN_CFG_DIR@Q}{${rpxConfDir@Q}/\
+{conf.d,certs},${rpxDataDir@Q}/certbot}
+            chown -R ${ownUsr@Q}:${ownGrp@Q} ${_SVC__OWN_CFG_DIR@Q}/
+            chmod -R 02775 ${_SVC__OWN_CFG_DIR@Q}/
+            setfacl \
+                -Rm g::rwx,m::rwx,d:g::rwx,d:m::rwx \
+                ${_SVC__OWN_CFG_DIR@Q}/
+
+            # Install \`certbot\` for Let's Encrypt certificate management.
+            dnf install -y certbot
+
+            true
+sudoEOF
+        )"
+
+        # Create Configuration File.
+        cat - 0<<'cfgEOF' 1> "${_SVC__OWN_CFG_DIR}${rpxConfDir}/nginx.conf"
+# NGINX Main Configuration File
+
+# This is the main NGINX configuration file.
+#   It sets up worker processes, logging, and includes all specific server
+#   configurations.
+
+# ==============================================================================
+# Global Settings
+# These settings apply to whole NGINX process.
+# ==============================================================================
+# Define the number of worker processes.
+#   The `auto` is generally recommended to match the number of CPU cores.
+worker_processes auto;
+
+# Set the global error log file.
+error_log /var/log/nginx/error.log warn;
+
+# The Process ID file location.
+pid /var/run/nginx.pid;
+
+events {
+    # Set the maximum number of simultaneous connections that can be opened by a
+    #   worker process.
+    worker_connections 1024;
+}
+
+# ==============================================================================
+# Default Settings
+# These settings apply to all `server` blocks unless overridden.
+# ==============================================================================
+http {
+    # Include MIME Types.
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    # Basic logging format.
+    log_format
+        main
+            '${remote_addr} - ${remote_user} [${time_local}] "${request}" '
+            '${status} ${body_bytes_sent} "${http_referer}" '
+            '"${http_user_agent}" "${http_x_forwarded_for}"'
+    ;
+
+    # Define the access log file and format.
+    access_log /var/log/nginx/access.log main;
+
+    # Performance optimization settings.
+    sendfile on;    # sendfile on: Copy data between two descriptors without reading it to user space.
+    tcp_nopush on;  # tcp_nopush on: NGINX sends headers in one packet, minimizing overhead.
+    tcp_nodelay on; # tcp_nodelay on: NGINX sends small chunks of data without delay (good for WebApps).
+
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    server_names_hash_bucket_size 128;  # Support long FQDNs.
+    client_max_body_size 10M;           # Default upload limit.
+
+    # Gzip Compression settings.
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_buffers 16 8k;
+    gzip_http_version 1.1;
+    gzip_types
+        text/css
+        text/javascript
+        text/plain
+        text/xml
+        application/javascript
+        application/json
+        application/xml
+        application/xml+rss
+    ;
+
+    # SSL Security settings.
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_tickets off;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+
+    # DNS Resolver for dynamic upstream resolution.
+    #   This allows NGINX to re-resolve container hostnames dynamically.
+    #   But this requires the host name to use var. instead of literal string.
+    include /etc/nginx/conf.d/resolver;
+
+    # --------------------------------------------------------------------------
+    # Virtual Host Configuration
+    # --------------------------------------------------------------------------
+    include /etc/nginx/conf.d/*.conf;
+}
+cfgEOF
+
+        # Create Podman Network.
+        podman network create "${ctrNet}" 2> /dev/null || true
+        # Get network gateway IP for DNS resolver.
+        ctrDNS="$(
+            podman network inspect "${ctrNet}" \
+                --format '{{range .Subnets}}{{.Gateway}}{{end}}'
+        )"; [ -n "${ctrDNS}" ]
+        # Create Resolver configuration file with actual DNS IP.
+        cat - 0<<cfgEOF 1> "${_SVC__OWN_CFG_DIR}${rpxConfDir}/conf.d/resolver"
+# DNS Resolver for dynamic upstream resolution.
+#   Configured with Podman Network Gateway IP.
+resolver ${ctrDNS} valid=10s;
+cfgEOF
+        # Create Quadlet container file.
+        mkdir -p "${quadletUsrDir}"
+        cat - 0<<cfgEOF 1> "${quadletUsrDir}/${systemdSvcName}.container"
+[Unit]
+Description=NGINX Reverse Proxy
+After=network-online.target
+
+[Container]
+Image=docker.io/library/nginx:latest
+ContainerName=${rpxCtrName}
+AutoUpdate=registry
+Network=${ctrNet}
+PublishPort=80:80
+PublishPort=443:443
+Volume=${_SVC__OWN_CFG_DIR}${rpxConfDir}/nginx.conf:${rpxConfDir}/nginx.conf:ro,Z
+Volume=${_SVC__OWN_CFG_DIR}${rpxConfDir}/conf.d:${rpxConfDir}/conf.d:ro,Z
+Volume=${_SVC__OWN_CFG_DIR}${rpxConfDir}/certs:${rpxConfDir}/certs:ro,Z
+Volume=${_SVC__OWN_CFG_DIR}${rpxDataDir}/certbot:${rpxDataDir}/certbot:ro,Z
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
+cfgEOF
+        # Reload and start the service.
+        systemctl --user daemon-reload  # Quadlet will generate unit file.
+        if systemctl --user is-active "${systemdSvcName}.service" &> /dev/null; then
+            podman container exec "${rpxCtrName}" nginx -t
+            podman container exec "${rpxCtrName}" nginx -s reload
+        else
+            systemctl --user start "${systemdSvcName}.service"
+        fi
+        systemctl --user is-enabled podman--auto-update.timer &> /dev/null ||
+            systemctl --user enable --now podman--auto-update.timer
+
+        true
+cmdEOF
+    )"; echo $?
+```
+</details>

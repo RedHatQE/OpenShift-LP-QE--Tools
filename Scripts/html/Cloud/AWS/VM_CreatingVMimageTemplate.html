@@ -1,0 +1,841 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS VM - Creating VM Image Template</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../js/global.js"></script>
+    <script type="module" src="../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="aws-vm--create-vm-image-template">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__NET_PFX\": \"...netPfx1...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__NET_PFX\": \"...netPfx2...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_AWS__NET_PFX": "...netPfx...",
+                "vEV--_AWS__APP_KIND": "...appKind...",
+                "vEV--_AWS__EC2__AMI_NAME": "...ec2AMIname...",
+                "vEV--_AWS__EC2__NAME_SFX--sfx": "ami--generator",
+                "vEV--_AWS__ROLE_NAME_SFX": "...roleNameSfx...",
+                "vEV--AWS_REGION": "...awsRegion...",
+                "vEV--AWS_ACCOUNT_ID": [
+                    ["Please select an AWS Account."],
+                    {
+                        "val": "...awsAccID1...",
+                        "txt": "...awsAccName1..."
+                    },
+                    {
+                        "val": "...awsAccID2...",
+                        "txt": "...awsAccName2..."
+                    }
+                ],
+                "vEV--_AWS__AZ_SFX": "a",
+                "vEV--_AWS__SN_SFX": "pub0",
+                "vEV--_AWS__SSH_KEY__NAME": "...sshKeyName...",
+                "vEV--_AWS__SSH_KEY__PUB--file": "...sshKeyPub...",
+                "vEV--_AWS__EC2__INST_TYPE": "t4g.micro",
+                "vEV--_JOB__SPARSE_IMG": "0",
+                "vEV--_AWS__EC2__TO_SHUTDOWN": "600s",
+                "vEV--_AWS__EC2__AMI_DESC": "OS Image for generic Server (Amazon Linux 2023 - ARM64)."
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_AWS__NET_PFX</span>                        <input type="text"          data-var="vEV--_AWS__NET_PFX" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__APP_KIND</span>                       <input type="text"          data-var="vEV--_AWS__APP_KIND" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__EC2__AMI_NAME</span>                  <input type="text"          data-var="vEV--_AWS__EC2__AMI_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__EC2__NAME_SFX (suffix only)</span>    <input type="text"          data-var="vEV--_AWS__EC2__NAME_SFX--sfx" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__RESET_PROFILE</span>                  <select class="cw-cls--opt" data-var="vEV--_AWS__RESET_PROFILE">
+            <option value="0"   selected="">0: Keep existing Profile.</option>
+            <option value="1"              >1: Reset Profile.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__ROLE_NAME_SFX</span>                  <input type="text"          data-var="vEV--_AWS__ROLE_NAME_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_REGION</span>                           <input type="text"          data-var="vEV--AWS_REGION" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_ACCOUNT_ID</span>                       <select class="cw-cls--opt" data-var="vEV--AWS_ACCOUNT_ID"></select></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">AMI Generator VM</p>
+        <label><span class="cw-cls--label-text">_AWS__AZ_SFX</span>                         <input type="text"          data-var="vEV--_AWS__AZ_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__SN_SFX</span>                         <input type="text"          data-var="vEV--_AWS__SN_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__SSH_KEY__NAME</span>                  <input type="text"          data-var="vEV--_AWS__SSH_KEY__NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__SSH_KEY__PUB (file only)</span>       <input type="text"          data-var="vEV--_AWS__SSH_KEY__PUB--file" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__EC2__INST_TYPE</span>                 <input type="text"          data-var="vEV--_AWS__EC2__INST_TYPE" value="" /></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">SysPrep</p>
+        <label><span class="cw-cls--label-text">_JOB__SPARSE_IMG</span>                     <select class="cw-cls--opt" data-var="vEV--_JOB__SPARSE_IMG">
+            <option value="0"   selected="">0: Image target is not sparsed (skip zerioing free space).</option>
+            <option value="1"              >1: Image target is sparsed (zeroing free space).</option>
+        </select></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">AMI Creation</p>
+        <label><span class="cw-cls--label-text">_AWS__EC2__TO_SHUTDOWN</span>               <input type="text"          data-var="vEV--_AWS__EC2__TO_SHUTDOWN" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__EC2__AMI_DESC</span>                  <input type="text"          data-var="vEV--_AWS__EC2__AMI_DESC" value="" /></label>
+    </div>
+    <p>
+        Some steps require running scripts on the VM. Connect to it via direct SSH
+        (if it has been set up accordingly) or any of the
+        <a href="./VM_InstanceAccess.html">VM Instance Access</a> methods.
+    </p>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <h4>Building AMI</h4>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Creating AMI Generator VM
+__SHELL=0 \
+    _AWS__NET_PFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__NET_PFX"></span>' \
+    _AWS__AZ_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__AZ_SFX"></span>' \
+    _AWS__SN_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__SN_SFX"></span>' \
+    _AWS__APP_KIND='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__APP_KIND"></span>' \
+    _AWS__SSH_KEY__NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__SSH_KEY__NAME"></span>' \
+    _AWS__SSH_KEY__PUB="${HOME}/.ssh/<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__SSH_KEY__PUB--file"></span>" \
+    _AWS__EC2__AMI_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__EC2__AMI_NAME"></span>' \
+    _AWS__EC2__NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__EC2__NAME_SFX--sfx"></span>' \
+    _AWS__EC2__INST_TYPE='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__EC2__INST_TYPE"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\\[DEBUG\\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this \`DEBUG\` session!!!
+
+        typeset awsAZ="${AWS_REGION}${_AWS__AZ_SFX}"
+        typeset iamRoleName="${_AWS__NET_PFX}--role--ssm"
+        typeset iamPolARN="arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        typeset awsTagSpec="$(cat - 0&lt;&lt;'cfgEOF'
+ResourceType: ''
+Tags:
+  - Key: Name
+    Value: ''
+cfgEOF
+        )"
+
+        # Import SSH Key Pair.
+        typeset sshKeyID="$(
+            typeset sshKeyID="$(
+                aws ec2 describe-key-pairs \
+                    --key-names "${_AWS__SSH_KEY__NAME}" \
+                    --output text \
+                    --query 'KeyPairs[0].KeyPairId' \
+                    2&gt; /dev/null || true
+            )"
+            if [ -z "${sshKeyID}" ]; then
+                aws ec2 import-key-pair \
+                    --key-name "${_AWS__SSH_KEY__NAME}" \
+                    --public-key-material "fileb://${_AWS__SSH_KEY__PUB}" \
+                    --tag-specifications "$({
+                        yq -o json eval . | jq -c \
+                            --arg resType 'key-pair' \
+                            --arg name "${_AWS__SSH_KEY__NAME}" \
+                            '
+                                .ResourceType=$resType |
+                                .Tags[0].Value=$name
+                            '
+                    } 0&lt;&lt;&lt;"${awsTagSpec}")" \
+                    --output text \
+                    --query 'KeyPairId'
+            else
+                echo "${sshKeyID}"
+            fi
+        )"
+
+        # Show SSH Key Pair.
+        aws ec2 describe-key-pairs \
+            --key-pair-ids "${sshKeyID}" \
+            --output table --no-cli-pager
+
+        # Get SubNet ID.
+        typeset snID="$(
+            aws ec2 describe-subnets \
+                --filters \
+                    "Name=tag:Name,Values=${_AWS__NET_PFX}--subnet-${_AWS__SN_SFX}--${awsAZ}" \
+                --output text \
+                --query 'Subnets[0].SubnetId'
+        )"; [ -n "${snID}" ]
+
+        # Get Security Group ID.
+        typeset sgID="$(
+            aws ec2 describe-security-groups \
+                --filters \
+                    "Name=tag:Name,Values=${_AWS__NET_PFX}--sg--${_AWS__APP_KIND}" \
+                --output text \
+                --query 'SecurityGroups[0].GroupId'
+        )"; [ -n "${sgID}" ]
+
+        # Get AMI ID.
+        typeset amiID="$(
+            aws ec2 describe-images \
+                --filters "Name=tag:Name,Values=${_AWS__EC2__AMI_NAME}" \
+                --output text \
+                --query 'Images[0].ImageId'
+        )"; [ -n "${amiID}" ]
+
+        # Create IAM Role for SSM.
+        {
+            aws iam get-role \
+                --role-name "${iamRoleName}" \
+                --output text \
+                --query 'Role.Arn' \
+                --no-cli-pager 2&gt; /dev/null ||
+            aws iam create-role \
+                --role-name "${iamRoleName}" \
+                --assume-role-policy-document '{
+                    "Version": "2012-10-17",
+                    "Statement": [{
+                        "Effect": "Allow",
+                        "Principal": {"Service": "ec2.amazonaws.com"},
+                        "Action": "sts:AssumeRole"
+                    }]
+                }' \
+                --tags "$(
+                    jq -cn \
+                        --arg name "${iamRoleName}" \
+                        '[{"Key": "Name", "Value": $name}]'
+                )" \
+                --no-cli-pager
+        }
+
+        # Show IAM Role.
+        aws iam get-role --role-name "${iamRoleName}" \
+            --output table --no-cli-pager
+
+        # Attach IAM Permission Policy for SSM to IAM Role.
+        [ -z "$(
+            aws iam list-attached-role-policies \
+                --role-name "${iamRoleName}" \
+                --output text \
+                --query "AttachedPolicies[?
+                    (PolicyArn == \`\"${iamPolARN}\"\`)
+                ].PolicyArn"
+        )" ] &amp;&amp; aws iam attach-role-policy \
+            --role-name "${iamRoleName}" \
+            --policy-arn "${iamPolARN}" \
+            --no-cli-pager
+
+        # Show IAM Role attached IAM Permission Policies.
+        aws iam list-attached-role-policies --role-name "${iamRoleName}" \
+            --output table --no-cli-pager
+
+        # Create IAM Instance Profile.
+        {
+            aws iam get-instance-profile \
+                --instance-profile-name "${iamRoleName}" \
+                --output text \
+                --query 'InstanceProfile.Arn' \
+                --no-cli-pager 2&gt; /dev/null ||
+            aws iam create-instance-profile \
+                --instance-profile-name "${iamRoleName}" \
+                --tags "$(
+                    jq -cn \
+                        --arg name "${iamRoleName}" \
+                        '[{"Key": "Name", "Value": $name}]'
+                )" \
+                --no-cli-pager
+        }
+
+        # Add IAM Role to IAM Instance Profile.
+        [ -z "$(
+            aws iam get-instance-profile \
+                --instance-profile-name "${iamRoleName}" \
+                --output text \
+                --query "InstanceProfile.Roles[?
+                    (RoleName == \`\"${iamRoleName}\"\`)
+                ].RoleName"
+        )" ] &amp;&amp; aws iam add-role-to-instance-profile \
+            --instance-profile-name "${iamRoleName}" \
+            --role-name "${iamRoleName}" \
+            --no-cli-pager
+
+        # Show IAM Instance Profile.
+        aws iam get-instance-profile \
+            --instance-profile-name "${iamRoleName}" \
+            --output table --no-cli-pager
+
+        # Create EC2 Instance.
+        typeset ec2ID="$(
+            typeset ec2Name="${_AWS__NET_PFX}--ec2--${_AWS__EC2__NAME_SFX}"
+            typeset ec2ID="$(
+                aws ec2 describe-instances \
+                    --filters \
+                        "Name=tag:Name,Values=${ec2Name}" \
+                        "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+                    --output text \
+                    --query 'Reservations[0].Instances[0].InstanceId'
+            )"
+            if [ "${ec2ID}" = None ]; then
+                aws ec2 run-instances \
+                    --block-device-mappings '[{
+                        "DeviceName": "/dev/xvda",
+                        "Ebs": {
+                            "DeleteOnTermination": true,
+                            "VolumeType": "gp3",
+                            "Encrypted": true,
+                            "KmsKeyId": "alias/aws/ebs"
+                        }
+                    }]' \
+                    --image-id "${amiID}" \
+                    --instance-type "${_AWS__EC2__INST_TYPE}" \
+                    --key-name "${_AWS__SSH_KEY__NAME}" \
+                    --monitoring '{"Enabled": false}' \
+                    --placement '{"Tenancy": "default"}' \
+                    --credit-specification '{"CpuCredits": "unlimited"}' \
+                    --hibernation-options '{"Configured": false}' \
+                    --metadata-options '{
+                        "HttpTokens": "required",
+                        "HttpEndpoint": "enabled"
+                    }' \
+                    --private-dns-name-options '{
+                        "HostnameType": "resource-name",
+                        "EnableResourceNameDnsARecord": true,
+                        "EnableResourceNameDnsAAAARecord": false
+                    }' \
+                    --maintenance-options '{"AutoRecovery": "default"}' \
+                    --network-performance-options '{
+                        "BandwidthWeighting": "default"
+                    }' \
+                    --instance-initiated-shutdown-behavior 'stop' \
+                    --network-interfaces "$(
+                        jq -cn \
+                            --arg snID "${snID}" \
+                            --arg sgID "${sgID}" \
+                            '{
+                                SubnetId: $snID,
+                                AssociatePublicIpAddress: true,
+                                DeviceIndex: 0,
+                                Groups: [$sgID]
+                            }'
+                    )" \
+                    --iam-instance-profile "Name=${iamRoleName}" \
+                    --ebs-optimized \
+                    --count 1 \
+                    --tag-specifications "$(
+                        yq -o json eval . 0&lt;&lt;&lt;"${awsTagSpec}" | jq -c \
+                            --arg ec2Name "${ec2Name}" \
+                            --arg hddName "${ec2Name}--hdd--root" \
+                            --arg nicName "${ec2Name}--nic--0" \
+                            '[(
+                                . |
+                                .ResourceType="instance" |
+                                .Tags[0].Value=$ec2Name
+                            ), (
+                                . |
+                                .ResourceType="volume" |
+                                .Tags[0].Value=$hddName
+                            ), (
+                                . |
+                                .ResourceType="network-interface" |
+                                .Tags[0].Value=$nicName
+                            )]'
+                    )" \
+                    --output text \
+                    --query 'Instances[0].InstanceId'
+            else
+                echo "${ec2ID}"
+            fi
+        )"; [ -n "${ec2ID}" ]
+
+        # Set EC2 Instance Settings.
+        aws ec2 modify-instance-attribute \
+            --instance-id "${ec2ID}" \
+            --disable-api-termination
+
+        # Show EC2 Instance.
+        aws ec2 describe-instances \
+            --instance-ids "${ec2ID}" \
+            --output table --no-cli-pager
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-size:initial;">Run on VM.</p>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Preparing OS as VM Image Template
+###     Common
+####        SSH Server
+sudo \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        typeset sshdCfg=/etc/ssh/sshd_config
+
+        # Disallow \`root\` login.
+        grep -q '^PermitRootLogin no' "${sshdCfg}" ||
+            sed -i '/^#PermitRootLogin /a\
+ PermitRootLogin no' "${sshdCfg}"
+
+        # Reload SSHD configuration.
+        systemctl reload sshd
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px dotted CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+####        Default Applications
+sudo \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        typeset binArch="$(uname -m)"
+
+        # Map \`uname\` architecture to Static release naming.
+        case "${binArch}" in
+          (x86_64)  binArch=amd64;;
+          (aarch64) binArch=arm64;;
+        esac
+
+        # 1.  Install default applications.
+        dnf install -y tmux tree
+
+        # 2.  Install the extra utilities and applications.
+        #   YAML Processor \`yq\`.
+        (
+            typeset binSrcName="yq_linux_${binArch}"
+            wget -qO - "https://github.com/mikefarah/yq/releases/latest/download/${binSrcName}.tar.gz" |
+                tar zvx -C /usr/local/bin/ --transform "s|^\\./${binSrcName}\$|yq|" "./${binSrcName}"
+        )
+
+        #   BitWarden CLI (requires \`node.js\` 20+).
+        dnf install -y nodejs24
+        npm install -g @bitwarden/cli
+
+        #   HashiCorp Vault CLI.
+        (
+            uid=992 gid="${uid}"
+            getent group vault  || groupadd --system --gid "${gid}" vault
+            getent passwd vault || useradd --system --uid "${uid}" --gid "${gid}" --home-dir / --no-create-home --shell /bin/false vault
+            dnf config-manager --add-repo 'https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo'
+            dnf config-manager --set-disabled hashicorp
+            dnf install -y --enablerepo=hashicorp vault
+            echo 'complete -C /usr/bin/vault vault' 1&gt; /etc/bash_completion.d/vault
+        )
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px dashed CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+###     WebApp
+####        Host FS
+sudo \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        typeset webAppDir=/opt/web-app
+
+        mkdir -p "${webAppDir}"
+        chmod 00755 "${webAppDir}"
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px dotted CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+####        podman
+__SHELL=0 \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\\[DEBUG\\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this \`DEBUG\` session!!!
+
+        sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'sudoEOF'
+            typeset binArch="$(uname -m)"
+
+            # Map \`uname\` architecture to Static release naming.
+            case "${binArch}" in
+              (x86_64)  binArch=amd64;;
+              (aarch64) binArch=arm64;;
+            esac
+
+            # Install required dependencies.
+            dnf install -y iptables-nft nftables
+
+            # Download and extract static Podman bundle.
+            wget -qO - "https://github.com/mgoltzsche/podman-static/releases/latest/download/podman-linux-${binArch}.tar.gz" |
+                tar zvx -C / --strip-components=1 --exclude='README.md'
+            mkdir -p /etc/bash_completion.d
+            podman completion bash 1&gt; /etc/bash_completion.d/podman
+
+            # Configure system to allow unprivileged port binding.
+            sysctl -w net.ipv4.ip_unprivileged_port_start=0
+            cat - 0&lt;&lt;'cfgEOF' 1&gt; /etc/sysctl.d/99-podman.conf
+# Allow unprivileged users to bind to privileged ports (&lt; 1024).
+#   Required for rootless Podman to bind to ports 80, 443, etc.
+net.ipv4.ip_unprivileged_port_start=0
+cfgEOF
+
+            # Create \`podman--auto-update\` timer for all users.
+            mkdir -p /etc/systemd/user
+            cat - 0&lt;&lt;'cfgEOF' 1&gt; /etc/systemd/user/podman--auto-update.timer
+[Unit]
+Description=Podman auto-update timer
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+cfgEOF
+            # Create \`podman--auto-update\` service for all users.
+            cat - 0&lt;&lt;'cfgEOF' 1&gt; /etc/systemd/user/podman--auto-update.service
+[Unit]
+Description=Podman auto-update service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/podman auto-update
+cfgEOF
+
+            true
+sudoEOF
+        )"
+
+        systemctl --user daemon-reload
+        systemctl --user enable podman--auto-update.timer
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px dotted CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+####        SQLite
+sudo \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        dnf install -y sqlite   # Install SQLite3 CLI tool.
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <h4>Generating AMI</h4>
+        <p style="font-size:initial;">Run on VM.</p>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  SysPrep
+sudo \
+    _JOB__SPARSE_IMG=<span style="color:red;font-weight:bold;" data-var="vEV--_JOB__SPARSE_IMG"></span> \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+: '--- Cleaning Package Manager. ---'
+dnf -y remove --oldinstallonly --setopt installonly_limit=2 || true
+dnf -y autoremove
+dnf clean all
+
+: '--- Removing `cloud-init` cache to force new instance to re-run it. ---'
+rm -rf /var/lib/cloud/*
+echo 'localhost' &gt; /etc/hostname
+
+: '--- Removing SSH Host Keys. ---'
+rm -f /etc/ssh/ssh_host_*_key
+rm -f /etc/ssh/ssh_host_*_key.pub
+
+: '--- Removing Root and Default User SSH directory. ---'
+rm -rf /root/.ssh/
+rm -rf "$(getent passwd 1000 | cut -d: -f6)/.ssh/"
+
+: '--- Removing non-Default Users. ---'
+awk -F: '(($3 &gt;= 1001) &amp;&amp; ($1 != "nobody")){print $1}' /etc/passwd | \
+    xargs -r userdel -r
+
+: '--- Removing non-Default Groups. ---'
+awk -F: '(($3 &gt;= 1001) &amp;&amp; ($1 != "nobody")){print $1}' /etc/group | \
+    xargs -r groupdel
+
+: '--- Removing Default User &amp; Group. ---'
+chown -R 1001:1001 {/home,/var/spool/mail}/"$(id -nu 1000)"
+sed -E -i 's/^(([^:]*:){2})1000:1000:/\11001:1001:/' /etc/passwd
+sed -E -i 's/^(([^:]*:){2})1000:/\11001:/' /etc/group
+userdel -r "$(id -nu 1001)"
+
+: '--- Clearing `machine-id` for unique Instance Identity. ---'
+truncate -s 0 /etc/machine-id
+rm -f /var/lib/dbus/machine-id
+
+: '--- Removing Random Seed. ---'
+rm -f /var/lib/systemd/random-seed
+
+: '--- Removing Temporary Files. ---'
+rm -rf /tmp/*
+rm -rf /var/tmp/*
+
+: '--- Cleaning up Log Files. ---'
+find /var/log -type f \( \
+    -name '*.log.*' -o \
+    -name '*.gz' -o \
+    -name '*.bz2' -o \
+    -name '*.xz' \
+\) -delete
+find /var/log -type f -name '*.log' -exec truncate -s 0 '{}' \;
+
+: '--- Turning off Swap. ---'
+swapoff -a || true
+
+: '--- Zeroing Swap Partitions. ---'
+((_JOB__SPARSE_IMG)) && (
+    # Zero only Disk-based Swap Partitions (skip RAM-based swap).
+    for sd in $(
+        blkid -t TYPE=swap -o device |
+        grep -vE '/dev/(zram|loop)'
+    ); do
+        echo "Zeroing Swap Partition ${sd@Q}..."
+        dd if=/dev/zero of="${sd}" bs=1M status=progress || true
+    done
+)
+
+: '--- Zeroing Volumes. ---'
+((_JOB__SPARSE_IMG)) && (
+    # Get only Block Dev. Mount Points (excluding tmpfs, devtmpfs, etc.).
+    while IFS= read -r mp; do
+        echo "Zeroing free space on ${mp@Q}..."
+        touch "${mp}/zerofile"
+        chattr +C "${mp}/zerofile" 2&gt; /dev/null || true
+        dd if=/dev/zero of="${mp}/zerofile" bs=1M conv=fsync status=progress || true
+        rm -f "${mp}/zerofile"
+    done 0&lt; &lt;(
+        # FS without sub-vol.
+        df -t ext4 -t xfs -t vfat --output=target |
+        tail -n +2
+        # B-Tree FS: pick the least quota-restricted sub-vol. per dev.
+        df -t btrfs --output=source,avail,target |
+        tail -n +2 |
+        sed -E 's/  */\t/; s/  */\t/' |
+        sort -t $'\t' -k 1,1 -k 2,2rn |
+        awk -F '\t' '!seen[$1]++ {print $3}'
+    )
+)
+
+: '--- Cleaning up `systemd journal` Logs. ---'
+journalctl --rotate
+journalctl --vacuum-time=1s
+
+: '--- Cleanup complete. Shutting down. ---'
+shutdown now
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Creating AMI
+__SHELL=0 \
+    _AWS__NET_PFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__NET_PFX"></span>' \
+    _AWS__APP_KIND='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__APP_KIND"></span>' \
+    _AWS__EC2__NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__EC2__NAME_SFX--sfx"></span>' \
+    _AWS__EC2__TO_SHUTDOWN='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__EC2__TO_SHUTDOWN"></span>' \
+    _AWS__EC2__AMI_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__EC2__AMI_NAME"></span>' \
+    _AWS__EC2__AMI_DESC='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__EC2__AMI_DESC"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\\[DEBUG\\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this \`DEBUG\` session!!!
+
+        typeset ec2Name="${_AWS__NET_PFX}--ec2--${_AWS__EC2__NAME_SFX}"
+
+        typeset ec2ID="$(
+            aws ec2 describe-instances \
+                --filters \
+                    "Name=tag:Name,Values=${ec2Name}" \
+                    "Name=instance-state-name,Values=stopped,stopping" \
+                --output text \
+                --query 'Reservations[0].Instances[0].InstanceId'
+        )"; [ -n "${ec2ID}" ]
+
+        # Ensure the EC2 Instance is completely stopped.
+        #   use \`bash\` wrapper to expand the \`aws()\` (because it is exported).
+        timeout "${_AWS__EC2__TO_SHUTDOWN}" \
+            bash -uxc "aws ec2 wait instance-stopped --instance-ids ${ec2ID@Q}"
+
+        # Create encrypted AMI from stopped instance.
+        typeset amiID="$(
+            aws ec2 create-image \
+                --instance-id "${ec2ID}" \
+                --name "${_AWS__EC2__AMI_NAME}" \
+                --description "${_AWS__EC2__AMI_DESC}" \
+                --no-reboot \
+                --block-device-mappings '[{
+                    "DeviceName": "/dev/xvda",
+                    "Ebs": {"Encrypted": true}
+                }]' \
+                --tag-specifications "$(
+                    jq -cn \
+                        --arg name "${_AWS__EC2__AMI_NAME}" \
+                        '[{
+                            ResourceType: "image",
+                            Tags: [{Key: "Name", Value: $name}]
+                        }]'
+                )" \
+                --output text \
+                --query 'ImageId'
+        )"; [ -n "${amiID}" ]
+
+        # Wait for AMI to become available.
+        aws ec2 wait image-available --image-ids "${amiID}"
+
+        # Show created AMI.
+        aws ec2 describe-images --image-ids "${amiID}" \
+            --output table --no-cli-pager
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Destroying AMI Generator VM
+__SHELL=0 \
+    _AWS__NET_PFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__NET_PFX"></span>' \
+    _AWS__EC2__NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__EC2__NAME_SFX--sfx"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\\[DEBUG\\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this \`DEBUG\` session!!!
+
+        typeset ec2Name="${_AWS__NET_PFX}--ec2--${_AWS__EC2__NAME_SFX}"
+
+        typeset ec2ID="$(
+            aws ec2 describe-instances \
+                --filters \
+                    "Name=tag:Name,Values=${ec2Name}" \
+                    "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+                --output text \
+                --query 'Reservations[0].Instances[0].InstanceId'
+        )"; [ -n "${ec2ID}" ]
+
+        # Disable stop protection.
+        aws ec2 modify-instance-attribute \
+            --instance-id "${ec2ID}" \
+            --no-disable-api-stop
+
+        # Stop EC2 Instance.
+        aws ec2 stop-instances --instance-ids "${ec2ID}" --no-cli-pager
+        aws ec2 wait instance-stopped --instance-ids "${ec2ID}"
+
+        # Disable termination protection.
+        aws ec2 modify-instance-attribute \
+            --instance-id "${ec2ID}" \
+            --no-disable-api-termination
+
+        # Terminate EC2 Instance.
+        aws ec2 terminate-instances --instance-ids "${ec2ID}" --no-cli-pager
+        aws ec2 wait instance-terminated --instance-ids "${ec2ID}"
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

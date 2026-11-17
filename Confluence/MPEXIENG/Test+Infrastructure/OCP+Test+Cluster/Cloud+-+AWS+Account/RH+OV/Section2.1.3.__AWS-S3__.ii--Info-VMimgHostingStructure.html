@@ -1,0 +1,41 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VM Image Hosting Structure</title>
+    <base href="{{site.url}}{{site.baseurl}}{{page.url}}" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../../Scripts/js/global.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+AWS S3 Bucket:
+  - ISO Image:
+    &lt;s3BucketName&gt;/
+     |- windows
+         |- &lt;osName&gt;/
+             |- &lt;osVer&gt;--&lt;osBuid&gt;.&lt;osRev&gt;.iso
+  - OS Image - Windows:
+    &lt;s3BucketName&gt;/&lt;osName&gt;/
+     |- build                                   # Specialized final version to build the template from.
+     |   |- &lt;osVer&gt;--std--&lt;YYmmdd&gt;.qcow2        # Standard Windows with basic Apps.
+     |   |- &lt;osVer&gt;--cbi--&lt;YYmmdd&gt;.qcow2        # With CloudBase-Init installed.
+     |- dist/
+     |   |- &lt;osVer&gt;--template--&lt;remarks&gt;.qcow2  # VM Image Template (generalized).
+     |- draft/
+         |- &lt;osVer&gt;--stage--&lt;remarks&gt;.qcow2     # Any temporary images.
+</pre>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,77 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CI Operator Emulator - Dummy PR</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;margin:0;">
+[user@host /ws/local/repo/openshift/release/pr-000]$ [CI Operator Emulator] make -C src/ -j 1 ci-operator-config update; echo $?
+</pre>
+<pre style="font-size:medium;margin:0;color:black;background-color:cyan;">
+make: Entering directory '/ws/local/repo/openshift/release/pr-000/src'
+ ...
+make: Leaving directory '/ws/local/repo/openshift/release/pr-000/src'
+0
+</pre>
+<pre style="font-size:medium;margin:0;">
+[user@host /ws/local/repo/openshift/release/pr-000]$ [CI Operator Emulator] git -C src/ switch -C ciOpEmul--jobs
+</pre>
+<pre style="font-size:medium;margin:0;color:black;background-color:cyan;">
+Switched to a new branch 'ciOpEmul--jobs'
+</pre>
+<pre style="font-size:medium;margin:0;">
+[user@host /ws/local/repo/openshift/release/pr-000]$ [CI Operator Emulator] git -C src/ add ci-operator/{config,jobs}/
+[user@host /ws/local/repo/openshift/release/pr-000]$ [CI Operator Emulator] git -C src/ commit -m 'CI Operator Emulator - Pre-Test and Image Retrieval Jobs.'
+</pre>
+<pre style="font-size:medium;margin:0;color:black;background-color:cyan;">
+[ciOpEmul--jobs 123456789] CI Operator Emulator - Pre-Test and Image Retrieval Jobs.
+ 3 files changed, 302 insertions(+)
+ create mode 100644 ci-operator/config/RedHatQE/interop-testing/RedHatQE-interop-testing-master__ciOpEmul--imgRetr.yaml
+ create mode 100644 ci-operator/config/RedHatQE/interop-testing/RedHatQE-interop-testing-master__ciOpEmul--preTest.yaml
+ create mode 100644 ci-operator/jobs/RedHatQE/interop-testing/RedHatQE-interop-testing-master-presubmits.yaml
+</pre>
+<pre style="font-size:medium;margin:0;">
+[user@host /ws/local/repo/openshift/release/pr-000]$ [CI Operator Emulator] git -C src/ push --force origin HEAD:ciOpEmul--jobs
+</pre>
+<pre style="font-size:medium;margin:0;color:black;background-color:cyan;">
+Warning: Permanently added 'github.com' (ED25519) to the list of known hosts.
+Enumerating objects: 18, done.
+Counting objects: 100% (18/18), done.
+Delta compression using up to 4 threads
+Compressing objects: 100% (7/7), done.
+Writing objects: 100% (7/7), 786 bytes | 786.00 KiB/s, done.
+Total 7 (delta 5), reused 0 (delta 0), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (5/5), completed with 5 local objects.
+remote:
+remote: Create a pull request for 'ciOpEmul--jobs' on GitHub by visiting:
+remote:      https://github.com/redhat-employee/openshift___release/pull/new/ciOpEmul--jobs
+remote:
+To github.com:redhat-employee/openshift___release.git
+ * [new branch]          HEAD -&gt; ciOpEmul--jobs
+</pre>
+<pre style="font-size:medium;margin:0;">
+[user@host /ws/local/repo/openshift/release/pr-000]$ [CI Operator Emulator] git -C src/ switch -
+</pre>
+<pre style="font-size:medium;margin:0;color:black;background-color:cyan;">
+Switched to branch 'pr-branch'
+Your branch is up to date with 'origin/pr-branch'.
+</pre>
+    </div>
+</div>
+</body>
+</html>
