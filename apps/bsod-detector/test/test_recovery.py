@@ -405,7 +405,7 @@ class RecoveryTests(unittest.TestCase):
             self.assertEqual(call[1:4], deletes[0][1:4])
             self.assertEqual(call[4:], ['--for=delete', '--timeout=60s'])
 
-    def TestContainerNameMatchesExecutableHelperCalls(self):
+    def test_Extractor_ContainerNameMatchesHelperCalls(self):
         self.assertIn("helperPodCtr='libguestfs'", recovery.read_text())
         result = self.RunRecovery()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -415,7 +415,7 @@ class RecoveryTests(unittest.TestCase):
             self.assertEqual(call[call.index('-c') + 1], 'libguestfs')
         self.AssertDeleted()
 
-    def TestImageEnvironmentIsMarshaledLiterallyInExecutable(self):
+    def test_Extractor_PassesImageEnvironmentLiterally(self):
         image = 'registry.test/guestfs:"quote"\n$(touch injected) `touch injected` \\ end'
         self.env['BSOD_DET__GUEST_FS__CTR_IMG'] = image
         self.env['BSOD_DET__GUESTFS__NTFS_IMAGE'] = 'registry.test/legacy:ignored'
@@ -427,10 +427,10 @@ class RecoveryTests(unittest.TestCase):
         self.assertFalse((self.root / 'injected').exists())
         self.AssertDeleted()
 
-    def TestUnsetOrEmptyImageEnvironmentDefaultsWithoutLegacyOverride(self):
+    def test_Extractor_UnsetOrEmptyImageUsesDefaultWithoutLegacyOverride(self):
         for value, legacy in ((None, False), ('', False), (None, True), ('', True)):
             with self.subTest(value=value, legacy=legacy):
-                case = RecoveryTests('TestSuccessContract')
+                case = RecoveryTests('test_Extractor_SuccessFollowsRecoveryContract')
                 case.setUp()
                 self.addCleanup(case.doCleanups)
                 del case.env['BSOD_DET__GUEST_FS__CTR_IMG']
@@ -447,7 +447,7 @@ class RecoveryTests(unittest.TestCase):
                 self.assertTrue((case.out / 'extraction-summary.json').exists())
                 case.AssertDeleted()
 
-    def TestSuccessContract(self):
+    def test_Extractor_SuccessFollowsRecoveryContract(self):
         result = self.RunRecovery()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.AssertDeleted()
@@ -471,13 +471,13 @@ class RecoveryTests(unittest.TestCase):
                                text=True, capture_output=True, timeout=5)
         self.assertEqual(check.returncode, 0, check.stderr)
 
-    def TestPartialBatchKeepsSystemLog(self):
+    def test_Extractor_PartialBatchKeepsSystemLog(self):
         result = self.RunRecovery('partial-batch')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(len(list(self.out.glob('guestFS_sda3/**/*.evtx'))), 1)
         self.AssertDeleted()
 
-    def TestDirectOcPreservesOnlyScopedDeadlines(self):
+    def test_Extractor_DirectOcPreservesOnlyScopedDeadlines(self):
         realTimeout = shutil.which('timeout', path=os.environ['PATH'])
         self.assertIsNotNone(realTimeout)
         timeoutMock = self.bin / 'timeout'
@@ -520,7 +520,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertNotIn('unset -n varRef', source)
         self.AssertDeleted()
 
-    def TestReadyWaitFailurePreventsHelperExecution(self):
+    def test_Extractor_ReadyWaitFailurePreventsHelperExecution(self):
         result = self.RunRecovery('wait-error')
         self.assertEqual(result.returncode, 19, result.stderr)
         self.assertIn('mock startup timeout', result.stderr)
@@ -528,7 +528,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertFalse((self.out / 'extraction-summary.json').exists())
         self.AssertDeleted()
 
-    def TestDirectFailureBreadcrumbsReplaceDie(self):
+    def test_Extractor_DirectFailureBreadcrumbsReplaceDie(self):
         source = recovery.read_text()
         self.assertNotRegex(source, r'\bDie\b')
         messages = re.findall(r'(?:^|\{)[ \t]*: ([\'"])(.*?)\1', source, re.MULTILINE)
@@ -541,13 +541,13 @@ class RecoveryTests(unittest.TestCase):
         self.assertIn(('"', 'Required tool missing: ${tool}'), messages)
         self.assertIn(('"', r'Missing \`${fldChk[${k}]}\` in metadata.'), messages)
 
-    def TestRelativeHostPathResolvesHelpers(self):
+    def test_Extractor_RelativeHostPathResolvesHelpers(self):
         result = self.RunRecovery(script=f'./{recovery.name}', cwd=hostDir)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(json.loads((self.out / 'extraction-summary.json').read_text())['ok'])
         self.AssertDeleted()
 
-    def TestMetadataOnlyOutputContract(self):
+    def test_Extractor_TakesOutputOnlyFromMetadata(self):
         source = recovery.read_text()
         self.assertNotIn('--out', source[:source.index('typeset tool=')])
         self.assertNotIn('expectedOut', source)
@@ -563,10 +563,10 @@ class RecoveryTests(unittest.TestCase):
         self.assertTrue((self.out / 'checksums.sha256').is_file())
         self.AssertDeleted()
 
-    def TestMetadataOutputSpellingAndIndependentRunId(self):
+    def test_Extractor_PreservesOutputSpellingAndIndependentRunId(self):
         for pathKind in ('parent-alias', 'leaf-alias', 'relative-alias', 'arbitrary-directory'):
             with self.subTest(pathKind=pathKind):
-                case = RecoveryTests('TestSuccessContract')
+                case = RecoveryTests('test_Extractor_SuccessFollowsRecoveryContract')
                 case.setUp()
                 self.addCleanup(case.doCleanups)
                 alias = case.root / 'different alias'
@@ -600,11 +600,11 @@ class RecoveryTests(unittest.TestCase):
                 self.assertEqual(summaryCall[summaryCall.index('--out') + 1], providedOut)
                 case.AssertDeleted()
 
-    def TestDirectoryAliasExistingOutputsReachExtraction(self):
+    def test_Extractor_DirectoryAliasWithExistingOutputsReachesExtraction(self):
         for staleName in ('MEMORY.DMP', 'Minidump', 'guestFS_sda3', 'events.json',
                           'extraction-summary.json', 'checksums.sha256'):
             with self.subTest(staleName=staleName):
-                case = ArchiveRecoveryTests('TestArchiveContainsOnlyRequestedFilesAndValidatorRemainsDeferred')
+                case = ArchiveRecoveryTests('test_Extractor_ArchiveContainsOnlyRequestedFilesAndValidatorRemainsDeferred')
                 case.setUp()
                 self.addCleanup(case.doCleanups)
                 alias = case.root / 'directory alias'
@@ -631,7 +631,7 @@ class RecoveryTests(unittest.TestCase):
                 self.assertFalse(summary['ok'])
                 self.assertFalse((case.out / 'extraction.log').exists())
 
-    def TestApiFailurePreservesDescendantDirectoryAlias(self):
+    def test_Extractor_ApiFailurePreservesDescendantDirectoryAlias(self):
         external = self.root / 'external'
         external.mkdir()
         (external / 'events.json').write_text('external-stale')
@@ -643,10 +643,10 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual([call[0] for call in self.Calls()], ['get'])
         self.assertEqual((external / 'events.json').read_text(), 'external-stale')
 
-    def TestInvalidMetadataOutputRejectedBeforeOcOrWrites(self):
+    def test_Extractor_RejectsInvalidMetadataOutputBeforeOcOrWrites(self):
         for scenario in ('missing', 'null', 'empty', 'non-string', 'file'):
             with self.subTest(scenario=scenario):
-                case = RecoveryTests('TestSuccessContract')
+                case = RecoveryTests('test_Extractor_SuccessFollowsRecoveryContract')
                 case.setUp()
                 self.addCleanup(case.doCleanups)
                 if scenario == 'missing':
@@ -663,7 +663,7 @@ class RecoveryTests(unittest.TestCase):
                 self.assertFalse(case.Calls())
                 self.assertEqual({path.name: path.read_bytes() for path in case.out.iterdir()}, before)
 
-    def TestMissingOutputDirectoryIsCreatedLiterally(self):
+    def test_Extractor_CreatesMissingOutputDirectoryLiterally(self):
         target = self.root / 'new output' / 'nested'
         self.metadata['outputDir'] = str(target) + '/.'
         result = self.RunRecovery()
@@ -678,7 +678,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.AssertDeleted(count=2)
 
-    def TestOutputCreationFailurePrecedesApiAndLogs(self):
+    def test_Extractor_OutputCreationFailurePrecedesApiCalls(self):
         target = self.root / 'denied output'
         self.metadata['outputDir'] = str(target)
         mock = self.bin / 'mkdir'
@@ -690,7 +690,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertFalse(target.exists())
         self.assertFalse(self.Calls())
 
-    def TestStoppedTargetStatusAllowsExtractionWithoutVmiQuery(self):
+    def test_Extractor_StoppedTargetAllowsExtractionWithoutVmiQuery(self):
         result = self.RunRecovery()
         self.assertEqual(result.returncode, 0, result.stderr)
         reads = [call for call in self.Calls() if call[0] == 'get']
@@ -706,7 +706,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(rawReads[1:], [podRead])
         self.AssertDeleted()
 
-    def TestVmStatusPartialOutputDoesNotPropagateProducerFailure(self):
+    def test_Extractor_VmStatusPartialOutputDoesNotPropagateProducerFailure(self):
         result = self.RunRecovery('vm-api-partial')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('mock VM API unavailable', result.stderr)
@@ -721,7 +721,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(producer.returncode, 17, producer.stderr)
         self.assertEqual(json.loads(producer.stdout)['status']['printableStatus'], 'Stopped')
 
-    def TestPoweredOffGuardRejectsBeforeHelperMutation(self):
+    def test_Extractor_PoweredOffGuardRejectsBeforeHelperMutation(self):
         scenarios = (
             'vm-status-Running', 'vm-status-Starting', 'vm-status-Stopping',
             'vm-status-Unknown', 'vm-status-', 'vm-status-missing', 'vm-status-null',
@@ -730,7 +730,7 @@ class RecoveryTests(unittest.TestCase):
         )
         for scenario in scenarios:
             with self.subTest(scenario=scenario):
-                case = RecoveryTests('TestSuccessContract')
+                case = RecoveryTests('test_Extractor_SuccessFollowsRecoveryContract')
                 case.setUp()
                 self.addCleanup(case.doCleanups)
                 before = {path.name: path.read_bytes() for path in case.out.iterdir()}
@@ -744,10 +744,10 @@ class RecoveryTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 1, result.stderr)
                     self.assertIn('mock API unavailable', result.stderr)
 
-    def TestUnsafeFailuresStopExecutedScript(self):
+    def test_Extractor_UnsafeFailuresStopScript(self):
         for scenario in ('api-error', 'bad-json', 'vm-status-Running', 'vm-status-Starting', 'metadata-error'):
             with self.subTest(scenario=scenario):
-                case = RecoveryTests('TestSuccessContract')
+                case = RecoveryTests('test_Extractor_SuccessFollowsRecoveryContract')
                 case.setUp()
                 self.addCleanup(case.doCleanups)
                 if scenario == 'metadata-error':
@@ -759,12 +759,12 @@ class RecoveryTests(unittest.TestCase):
                 self.assertFalse((case.root / 'helper-pod').exists())
                 self.assertFalse((case.out / 'extraction-summary.json').exists())
 
-    def TestCleanupAbsentHelperIsIdempotentWithBlockingDelete(self):
+    def test_Cleanup_AbsentHelperIsIdempotentWithBlockingDelete(self):
         result = self.RunRecovery('helper-absent')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.AssertDeleted()
 
-    def TestEmptyHelperExitTrapMakesNoCleanupCalls(self):
+    def test_Cleanup_EmptyHelperExitTrapMakesNoCleanupCalls(self):
         result = self.RunRecovery('api-error')
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertEqual([call[0] for call in self.Calls()], ['get'])
@@ -772,7 +772,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertNotIn('parameter null or not set', result.stderr)
         self.assertFalse((self.root / 'helper-pod').exists())
 
-    def TestCleanupErrorReplacesOriginalFailureOnExit(self):
+    def test_Cleanup_ErrorReplacesOriginalFailureOnExit(self):
         mock = self.bin / 'oc'
         mock.write_text(mock.read_text().replace("scenario == 'cleanup-error'", "scenario == 'wait-error'"))
         result = self.RunRecovery('wait-error')
@@ -784,7 +784,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertTrue((self.root / 'helper-pod').exists())
         self.assertFalse((self.out / 'extraction-summary.json').exists())
 
-    def TestEmptyCleanupArgumentReplacesMalformedVmJsonStatus(self):
+    def test_Cleanup_EmptyArgumentReplacesMalformedVmJsonStatus(self):
         result = self.RunRecovery('bad-json')
         self.assertEqual(result.returncode, 1, result.stderr)
         self.assertIn('parse error', result.stderr)
@@ -793,7 +793,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertFalse((self.out / 'parse-dump-header.json').exists())
         self.assertFalse((self.out / 'extraction-summary.json').exists())
 
-    def TestCleanupHasOnlyExitTrapAndSuppliedCommands(self):
+    def test_Cleanup_HasOnlyExitTrapAndSuppliedCommands(self):
         source = recovery.read_text()
         self.assertNotIn('hasPod', source)
         self.assertNotIn("trap 'exit 130' INT", source)
@@ -806,7 +806,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertNotIn('--wait=false', cleanup)
         self.assertNotIn('--request-timeout', cleanup)
 
-    def TestParameterizedHelperArgumentsAndNativeCalls(self):
+    def test_CleanupAndFindNTFS_ValidateAndUseArgumentsOverGlobals(self):
         source = recovery.read_text()
         for name, arguments, expected in (
             ('Cleanup', [], 1), ('Cleanup', ['0', '0', '0'], 1),
@@ -859,7 +859,7 @@ class RecoveryTests(unittest.TestCase):
                     ]])
                     self.assertEqual(result.stdout, '/dev/sda2\n/dev/sda3\n/dev/sda4\n')
 
-    def TestParameterizedHelpersHaveDirectMainAndExitCallers(self):
+    def test_CleanupAndFindNTFS_HaveDirectMainAndExitCallers(self):
         source = recovery.read_text()
         self.assertIn('done 0< <(FindNTFS "${hlprPod}" "${helperPodCtr}")',
                       source)
@@ -868,10 +868,10 @@ class RecoveryTests(unittest.TestCase):
         self.assertNotRegex(source, r'\bcontainer=|\$\{container\}|\bdevice=|\$\{device\}')
         self.assertNotIn('Cleanup ||', source)
 
-    def TestCleanupWaitAndDeleteFailuresRemainVisible(self):
+    def test_Cleanup_WaitAndDeleteFailuresRemainVisible(self):
         for scenario in ('cleanup-error', 'cleanup-wait-error', 'cleanup-wait-timeout'):
             with self.subTest(scenario=scenario):
-                case = RecoveryTests('TestSuccessContract')
+                case = RecoveryTests('test_Extractor_SuccessFollowsRecoveryContract')
                 case.setUp()
                 self.addCleanup(case.doCleanups)
                 result = case.RunRecovery(scenario)
@@ -883,13 +883,13 @@ class RecoveryTests(unittest.TestCase):
                 self.assertIn('mock delete failure' if scenario == 'cleanup-error' else
                               'mock deletion wait failed', result.stderr)
 
-    def TestSigintWithoutCustomTrapCanContinue(self):
+    def test_Extractor_SigintWithoutCustomTrapCanContinue(self):
         result = self.RunRecovery('signal-int')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((self.out / 'extraction-summary.json').exists())
         self.AssertDeleted()
 
-    def TestObsoleteStorageAndImagePolicyIsNotConsulted(self):
+    def test_Extractor_IgnoresObsoleteStorageAndImagePolicy(self):
         identity = self.root / 'identity'
         self.marker.rename(identity)
         self.marker.symlink_to(identity)
@@ -903,7 +903,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.AssertDeleted()
 
-    def TestWatcherRecoveryUsesMetadataOnly(self):
+    def test_Recover_UsesMetadataOnly(self):
         self.env.pop('BSOD_DET__GUEST_FS__CTR_IMG', None)
         self.env['BSOD_DET__GUESTFS__NTFS_IMAGE'] = 'registry.test/legacy:ignored'
         watcher = (hostDir / 'watch-crash.sh').read_text()
@@ -923,7 +923,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(argv[argv.index('--image') + 1], dfltImg)
         self.AssertDeleted()
 
-    def TestWatcherReportsTransientCleanupFailure(self):
+    def test_Recover_ReportsTransientCleanupFailure(self):
         watcher = (hostDir / 'watch-crash.sh').read_text()
         runTimed = re.search(r'^function RunTimed \(\) \{.*\}$', watcher, re.MULTILINE).group()
         recover = re.search(r'^function Recover \(\) \{\n.*?^\}', watcher, re.MULTILINE | re.DOTALL).group()
@@ -932,7 +932,7 @@ class RecoveryTests(unittest.TestCase):
                    + runTimed + '\n' + recover + '\nRecover\n')
         for scenario, expected in (('transient-delete', 25), ('transient-wait', 28)):
             with self.subTest(scenario=scenario):
-                case = RecoveryTests('TestSuccessContract')
+                case = RecoveryTests('test_Extractor_SuccessFollowsRecoveryContract')
                 case.setUp()
                 self.addCleanup(case.doCleanups)
                 case.meta.write_text(json.dumps(case.metadata))
@@ -948,10 +948,10 @@ class RecoveryTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0, log)
                 self.assertEqual(result.returncode, expected, log)
 
-    def TestExecutableReportsTransientCleanupFailure(self):
+    def test_Extractor_ReportsTransientCleanupFailure(self):
         for scenario, expected in (('transient-delete', 25), ('transient-wait', 28)):
             with self.subTest(scenario=scenario):
-                case = RecoveryTests('TestSuccessContract')
+                case = RecoveryTests('test_Extractor_SuccessFollowsRecoveryContract')
                 case.setUp()
                 self.addCleanup(case.doCleanups)
                 result = case.RunRecovery(scenario)
@@ -961,20 +961,20 @@ class RecoveryTests(unittest.TestCase):
                 self.assertFalse((case.root / 'helper-pod').exists())
                 self.assertFalse((case.out / 'extraction-summary.json').exists())
 
-    def TestRelativeRepositoryPathResolvesHelpers(self):
+    def test_Extractor_RelativeRepositoryPathResolvesHelpers(self):
         repoRoot = Path(__file__).resolve().parents[3]
         result = self.RunRecovery(script=os.path.relpath(recovery, repoRoot), cwd=repoRoot)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(json.loads((self.out / 'extraction-summary.json').read_text())['ok'])
         self.AssertDeleted()
 
-    def TestAbsolutePathFromUnrelatedDirectoryResolvesHelpers(self):
+    def test_Extractor_AbsolutePathFromUnrelatedDirectoryResolvesHelpers(self):
         result = self.RunRecovery(cwd=self.root)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(json.loads((self.out / 'extraction-summary.json').read_text())['ok'])
         self.AssertDeleted()
 
-    def TestDiagnosticsFollowInvokedName(self):
+    def test_Extractor_DiagnosticsFollowInvokedName(self):
         alias = self.root / 'fixture-extractor.sh'
         alias.symlink_to(recovery)
         for args, expected, message in (
@@ -992,7 +992,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertIn('Missing `.guestPvc` in metadata.', result.stderr)
         self.assertFalse(self.Calls())
 
-    def TestMetadataGuardRejectsMissingOrUnreadableInputs(self):
+    def test_Extractor_RejectsMissingOrUnreadableMetadata(self):
         unreadable = self.root / 'unreadable.json'
         unreadable.write_text('{}')
         unreadable.chmod(0o000)
@@ -1010,7 +1010,7 @@ class RecoveryTests(unittest.TestCase):
                 self.assertEqual(result.stdout, '')
         self.assertFalse(self.Calls())
 
-    def TestPreservesWatcherParser(self):
+    def test_Extractor_PreservesWatcherParserOutput(self):
         parser = self.out / 'parse-dump-header.json'
         content = '{"ok":true,"totalDumps":0,"dumps":[],"fixture":"watcher"}\n'
         parser.write_text(content)
@@ -1018,7 +1018,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(parser.read_text(), content)
 
-    def TestInvalidParserFailsAndCleans(self):
+    def test_Extractor_InvalidParserFailsAndCleans(self):
         (self.out / 'parse-dump-header.json').write_text('{"ok":false}')
         result = self.RunRecovery()
         self.assertEqual(result.returncode, 1)
@@ -1026,11 +1026,11 @@ class RecoveryTests(unittest.TestCase):
         self.assertIn("jq -e '.ok == true'", result.stderr)
         self.assertFalse((self.out / 'stage-errors.jsonl').exists())
 
-    def TestFailureStages(self):
+    def test_Extractor_FailureStagesFailAndCleanUp(self):
         for scenario in ('wait-error', 'no-guestfish', 'discovery-error', 'exec-error', 'copy-error',
                          'empty-copy', 'no-ntfs', 'cleanup-error'):
             with self.subTest(scenario=scenario):
-                case = RecoveryTests('TestSuccessContract')
+                case = RecoveryTests('test_Extractor_SuccessFollowsRecoveryContract')
                 case.setUp()
                 self.addCleanup(case.doCleanups)
                 result = case.RunRecovery(scenario)
@@ -1041,10 +1041,10 @@ class RecoveryTests(unittest.TestCase):
                 if scenario != 'cleanup-error':
                     self.assertFalse(list(case.out.glob('**/*.evtx')))
 
-    def TestDiscoveryFailureOrEmptyResultStopsAndCleans(self):
+    def test_Extractor_DiscoveryFailureOrEmptyResultStopsAndCleans(self):
         for scenario in ('discovery-error', 'discovery-partial-error', 'no-ntfs', 'empty-filesystems'):
             with self.subTest(scenario=scenario):
-                case = RecoveryTests('TestSuccessContract')
+                case = RecoveryTests('test_Extractor_SuccessFollowsRecoveryContract')
                 case.setUp()
                 self.addCleanup(case.doCleanups)
                 result = case.RunRecovery(scenario)
@@ -1057,7 +1057,7 @@ class RecoveryTests(unittest.TestCase):
                 if scenario.startswith('discovery-'):
                     self.assertIn('mock discovery failure', result.stderr)
 
-    def TestFindNtfsStatusInConditionalContext(self):
+    def test_FindNTFS_StatusEvaluatedInConditionalContext(self):
         helper = re.search(r'^function FindNTFS \(\) \{\n.*?^\}', recovery.read_text(), re.MULTILINE | re.DOTALL).group()
         self.assertIn('done 0< <(\n        oc -n "${ns}" exec', helper)
         self.assertNotIn('output=', helper)
@@ -1076,10 +1076,10 @@ class RecoveryTests(unittest.TestCase):
                 if scenario.startswith('discovery-'):
                     self.assertIn('mock discovery failure', result.stderr)
 
-    def TestUnsafeInputsNeverApply(self):
+    def test_Extractor_UnsafeInputsNeverLaunchHelper(self):
         for scenario in ('api-error', 'bad-json', 'vm-status-Running', 'vm-status-Starting'):
             with self.subTest(scenario=scenario):
-                case = RecoveryTests('TestSuccessContract')
+                case = RecoveryTests('test_Extractor_SuccessFollowsRecoveryContract')
                 case.setUp()
                 self.addCleanup(case.doCleanups)
                 result = case.RunRecovery(scenario)
@@ -1090,7 +1090,7 @@ class RecoveryTests(unittest.TestCase):
                 if scenario == 'bad-json':
                     self.assertIn('parse error', result.stderr)
 
-    def TestOnlyConsumedMetadataFieldsAreRequired(self):
+    def test_Extractor_RequiresOnlyConsumedMetadataFields(self):
         self.metadata = {key: self.metadata[key] for key in
                          ('runId', 'outputDir', 'namespace', 'vm', 'guestPvc')}
         self.marker.unlink()
@@ -1099,11 +1099,11 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.AssertDeleted()
 
-    def TestMalformedRequiredFieldsFailBeforeMutation(self):
+    def test_Extractor_MalformedRequiredFieldsFailBeforeMutation(self):
         for field in ('runId', 'outputDir', 'namespace', 'vm', 'guestPvc'):
             for value in ('missing', None, '', 42, [], {}, False, True):
                 with self.subTest(field=field, value=value):
-                    case = RecoveryTests('TestSuccessContract')
+                    case = RecoveryTests('test_Extractor_SuccessFollowsRecoveryContract')
                     case.setUp()
                     self.addCleanup(case.doCleanups)
                     if value == 'missing':
@@ -1118,7 +1118,7 @@ class RecoveryTests(unittest.TestCase):
                     self.assertFalse(case.Calls())
                     self.assertEqual({path.name: path.read_bytes() for path in case.out.iterdir()}, before)
 
-    def TestMetadataMappingPreservesSchemaAndTreatsValuesAsData(self):
+    def test_Extractor_MetadataMappingPreservesSchemaAndTreatsValuesAsData(self):
         source = recovery.read_text()
         self.assertIn('[guestPVC]=.guestPvc', source)
         self.assertIn('typeset -n varRef="${k}"', source)
@@ -1140,7 +1140,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(summary['vm'], self.metadata['vm'])
         self.AssertDeleted()
 
-    def TestMetadataLoopPreservesAllFiveLiteralValues(self):
+    def test_Extractor_MetadataLoopPreservesAllFiveLiteralValues(self):
         source = recovery.read_text()
         loop = source[source.index("typeset k=''"):source.index('mkdir -p "${outDir}"')]
         mappings = {'runId': 'runId', 'outDir': 'outputDir', 'ns': 'namespace',
@@ -1160,13 +1160,13 @@ class RecoveryTests(unittest.TestCase):
         self.assertFalse(sentinel.exists())
         self.assertFalse(self.Calls())
 
-    def TestSigtermUsesDefaultSignalAndExitCleanup(self):
+    def test_Extractor_SigtermUsesDefaultSignalAndExitCleanup(self):
         result = self.RunRecovery('signal')
         self.assertEqual(result.returncode, -15, result.stderr)
         self.AssertDeleted()
         self.assertFalse((self.out / 'stage-errors.jsonl').exists())
 
-    def TestExtractorInheritsStreamsWithoutLogArtifacts(self):
+    def test_Extractor_InheritsStreamsWithoutLogArtifacts(self):
         source = recovery.read_text()
         for obsolete in ('RecordError', 'extractLog', 'stageErrors', 'extraction.log'):
             self.assertNotIn(obsolete, source)
@@ -1184,7 +1184,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertFalse((self.out / 'stage-errors.jsonl').exists())
         self.AssertDeleted()
 
-    def TestWatcherStageErrorsAreReadWithoutModification(self):
+    def test_Extractor_ReadsWatcherStageErrorsWithoutModification(self):
         errors = self.out / 'stage-errors.jsonl'
         content = '{"stage":"watcher","error":"prior watcher failure","at":"fixture"}\n'
         errors.write_text(content)
@@ -1198,7 +1198,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertFalse(summary['ok'])
         self.AssertDeleted()
 
-    def TestCliStatuses(self):
+    def test_Extractor_HelpSucceedsAndRejectsUnknownOrRemovedOptions(self):
         for args, expected in ((('--help',), 0), (('--unknown',), 2), (('--out', str(self.out)), 2)):
             with self.subTest(args=args):
                 result = self.RunRecovery('', *args)
@@ -1253,7 +1253,7 @@ class ArchiveRecoveryTests(unittest.TestCase):
         self.assertEqual(check.returncode, 0, check.stderr)
         self.AssertDeleted()
 
-    def TestArchiveContainsOnlyRequestedFilesAndValidatorRemainsDeferred(self):
+    def test_Extractor_ArchiveContainsOnlyRequestedFilesAndValidatorRemainsDeferred(self):
         result = self.RunRecovery()
         self.AssertSummaryBypassed(result)
         content = self.ArchiveContents()
@@ -1261,7 +1261,7 @@ class ArchiveRecoveryTests(unittest.TestCase):
                     for name in ('System', 'Application')}
         self.assertEqual(content, expected)
 
-    def TestExistingSummaryAndStageErrorsAreNotRevalidatedOrModified(self):
+    def test_Extractor_ExistingSummaryAndStageErrorsAreNotRevalidatedOrModified(self):
         summary = self.out / 'extraction-summary.json'
         stageErrors = self.out / 'stage-errors.jsonl'
         summary.write_bytes(b'preexisting summary sentinel')
@@ -1274,7 +1274,7 @@ class ArchiveRecoveryTests(unittest.TestCase):
         self.assertEqual(len(self.ArchiveContents()), 2)
         self.AssertDeleted(count=1)
 
-    def TestJsonStubsAndChecksumManifestContents(self):
+    def test_Extractor_WritesJsonStubsAndChecksumManifest(self):
         (self.out / 'extra data.dat').write_bytes(b'include this file')
         (self.out / 'nested').mkdir()
         (self.out / 'nested' / 'data.dat').write_bytes(b'nested data')
@@ -1301,10 +1301,10 @@ class ArchiveRecoveryTests(unittest.TestCase):
             self.assertEqual((self.out / name).stat().st_mode & 0o777, 0o600)
         self.assertFalse((self.out / 'checksums.sha256.tmp').exists())
 
-    def TestExistingJsonModesAndChecksumReplacement(self):
+    def test_Extractor_KeepsExistingJsonModesAndReplacesChecksum(self):
         for content in ('', '{"ok":true,"totalDumps":0,"dumps":[],"watcher":"preserve"}\n'):
             with self.subTest(parser=content):
-                case = ArchiveRecoveryTests('TestArchiveContainsOnlyRequestedFilesAndValidatorRemainsDeferred')
+                case = ArchiveRecoveryTests('test_Extractor_ArchiveContainsOnlyRequestedFilesAndValidatorRemainsDeferred')
                 case.setUp()
                 self.addCleanup(case.doCleanups)
                 parser = case.out / 'parse-dump-header.json'
@@ -1329,7 +1329,7 @@ class ArchiveRecoveryTests(unittest.TestCase):
                 self.assertNotIn('overwrite existing checksum', checksum.read_text())
                 self.assertFalse((case.out / 'checksums.sha256.tmp').exists())
 
-    def TestExistingArchiveIsReplacedNotAppended(self):
+    def test_Extractor_ReplacesExistingArchiveInsteadOfAppending(self):
         archive = self.out / 'guest-fs--crash-info.tgz'
         original = b'preexisting archive sentinel' * 4096
         archive.write_bytes(original)
@@ -1344,7 +1344,7 @@ class ArchiveRecoveryTests(unittest.TestCase):
         self.assertTrue(payload.eof)
         self.assertEqual(payload.unused_data, b'')
 
-    def TestExistingWatcherFilesAreNotDeletedOrModified(self):
+    def test_Extractor_KeepsExistingWatcherFilesUnmodified(self):
         parser = self.out / 'parse-dump-header.json'
         parser.write_text('{"ok":true,"totalDumps":0,"dumps":[],"watcher":"preserve"}\n')
         note = self.out / 'watcher.log'
@@ -1356,7 +1356,7 @@ class ArchiveRecoveryTests(unittest.TestCase):
         self.assertEqual(len(self.ArchiveContents()), 2)
         self.assertEqual({path: path.read_bytes() for path in watched}, before)
 
-    def TestHelperFilesystemMkdirTestAndTimestampPath(self):
+    def test_Extractor_CreatesTimestampedDirectoryInHelperFilesystem(self):
         result = self.RunRecovery()
         self.AssertSummaryBypassed(result)
         calls = self.Calls()
@@ -1381,7 +1381,7 @@ class ArchiveRecoveryTests(unittest.TestCase):
             self.assertEqual(command[-1], directories[0])
         self.assertEqual(len(self.ArchiveContents()), 2)
 
-    def TestGuestfishProbeAndEachCopyAreReadonly(self):
+    def test_Extractor_GuestfishProbeAndEachCopyAreReadonly(self):
         result = self.RunRecovery()
         self.AssertSummaryBypassed(result)
         commands = [call[call.index('--') + 1:] for call in self.Calls() if call[0] == 'exec']
@@ -1401,48 +1401,48 @@ class ArchiveRecoveryTests(unittest.TestCase):
         self.assertEqual(tar[0][1:3], ['zc', '-C'])
         self.assertEqual(tar[0][-1], './')
 
-    def TestEachMissingFileDoesNotDiscardTheOther(self):
+    def test_Extractor_EachMissingFileDoesNotDiscardTheOther(self):
         for scenario, expected in (('system-missing', 'Application.evtx'), ('partial-batch', 'System.evtx')):
             with self.subTest(scenario=scenario):
-                case = ArchiveRecoveryTests('TestArchiveContainsOnlyRequestedFilesAndValidatorRemainsDeferred')
+                case = ArchiveRecoveryTests('test_Extractor_ArchiveContainsOnlyRequestedFilesAndValidatorRemainsDeferred')
                 case.setUp()
                 self.addCleanup(case.doCleanups)
                 result = case.RunRecovery(scenario)
                 case.AssertSummaryBypassed(result)
                 self.assertEqual(list(case.ArchiveContents()), ['Windows/System32/winevt/Logs/' + expected])
 
-    def TestFailedCopiesCanReturnZeroWithEmptyArchive(self):
+    def test_Extractor_FailedCopiesCanReturnZeroWithEmptyArchive(self):
         result = self.RunRecovery('copy-error')
         self.AssertSummaryBypassed(result)
         self.assertEqual(self.ArchiveContents(), {})
 
-    def TestRemoteMkdirFailureDoesNotCreateRunnerDestination(self):
+    def test_Extractor_RemoteMkdirFailureDoesNotCreateRunnerDestination(self):
         result = self.RunRecovery('mkdir-error')
         self.AssertSummaryBypassed(result)
         self.assertFalse((self.out / 'guest-fs--crash-info.tgz').exists())
         self.assertFalse(any('tar' in call for call in self.Calls()))
         self.assertFalse(list((self.root / 'helper-fs').rglob('*.evtx')))
 
-    def TestHelperDirectoryTestFailurePreventsTar(self):
+    def test_Extractor_HelperDirectoryTestFailurePreventsTar(self):
         result = self.RunRecovery('helper-test-error')
         self.AssertSummaryBypassed(result)
         self.assertFalse((self.out / 'guest-fs--crash-info.tgz').exists())
         self.assertFalse(any('tar' in call for call in self.Calls()))
 
-    def TestTarFailureKeepsStatusPartialArchiveAndCleansHelper(self):
+    def test_Extractor_TarFailureKeepsStatusPartialArchiveAndCleansHelper(self):
         result = self.RunRecovery('tar-error')
         self.assertEqual(result.returncode, 35, result.stderr)
         self.assertEqual((self.out / 'guest-fs--crash-info.tgz').read_bytes(), b'partial archive')
         self.assertFalse((self.out / 'extraction-summary.json').exists())
         self.AssertDeleted()
 
-    def TestNativeWaitApplyAndCleanupFailuresRemainNonzero(self):
+    def test_Extractor_NativeWaitVirtctlAndCleanupFailuresReturnTheirStatus(self):
         for scenario, expected in (('wait-error', 19), ('virtctl-error', 41),
                                    ('cleanup-error', 25),
                                    ('cleanup-wait-error', 28),
                                    ('transient-delete', 25), ('transient-wait', 28)):
             with self.subTest(scenario=scenario):
-                case = ArchiveRecoveryTests('TestArchiveContainsOnlyRequestedFilesAndValidatorRemainsDeferred')
+                case = ArchiveRecoveryTests('test_Extractor_ArchiveContainsOnlyRequestedFilesAndValidatorRemainsDeferred')
                 case.setUp()
                 self.addCleanup(case.doCleanups)
                 result = case.RunRecovery(scenario)
@@ -1457,13 +1457,13 @@ class ArchiveRecoveryTests(unittest.TestCase):
                     self.assertFalse(any(call[0] == 'exec' for call in case.Calls()))
                     self.assertFalse((case.out / 'guest-fs--crash-info.tgz').exists())
 
-    def TestFailedDiscoveryStillCleansWithoutCopyOrArchive(self):
+    def test_Extractor_FailedDiscoveryStillCleansWithoutCopyOrArchive(self):
         result = self.RunRecovery('discovery-error')
         self.AssertSummaryBypassed(result)
         self.assertFalse((self.out / 'guest-fs--crash-info.tgz').exists())
         self.assertFalse(any(call[0] == 'exec' and 'bash' in call for call in self.Calls()))
 
-    def TestActualWatcherConsumerReturnsArchiveWithoutSummaryValidation(self):
+    def test_Recover_ReturnsArchiveWithoutSummaryValidation(self):
         watcher = (hostDir / 'watch-crash.sh').read_text()
         runTimed = re.search(r'^function RunTimed \(\) \{.*\}$', watcher, re.MULTILINE).group()
         recover = re.search(r'^function Recover \(\) \{\n.*?^\}', watcher, re.MULTILINE | re.DOTALL).group()
@@ -1477,14 +1477,14 @@ class ArchiveRecoveryTests(unittest.TestCase):
         self.AssertSummaryBypassed(result)
         self.assertEqual(len(self.ArchiveContents()), 2)
 
-    def TestEarlyVmFailuresSkipHelperInActualConsumers(self):
+    def test_ExtractorAndRecover_EarlyVmFailuresSkipHelper(self):
         watcher = (hostDir / 'watch-crash.sh').read_text()
         runTimed = re.search(r'^function RunTimed \(\) \{.*\}$', watcher, re.MULTILINE).group()
         recover = re.search(r'^function Recover \(\) \{\n.*?^\}', watcher, re.MULTILINE | re.DOTALL).group()
         for consumer in ('executable', 'watcher'):
             for scenario in ('vm-status-Running', 'api-error'):
                 with self.subTest(consumer=consumer, scenario=scenario):
-                    case = RecoveryTests('TestSuccessContract')
+                    case = RecoveryTests('test_Extractor_SuccessFollowsRecoveryContract')
                     case.setUp()
                     self.addCleanup(case.doCleanups)
                     case.meta.write_text(json.dumps(case.metadata))
@@ -1511,25 +1511,6 @@ class ArchiveRecoveryTests(unittest.TestCase):
                     self.assertFalse(case.VirtctlArgv())
                     self.assertFalse((case.root / 'helper-pod').exists())
                     self.assertFalse((case.out / 'guest-fs--crash-info.tgz').exists())
-
-
-def load_tests(loader, standardTests, pattern):
-    # unittest load_tests protocol hook: the function name and its positional parameters are framework-required.
-    # Test methods follow the team PascalCase convention (Test...), which the default 'test' method prefix does not
-    # match, so collect them with a module-local loader. The shared loader passed in is left unchanged; its -k name
-    # patterns, method ordering and suite class are copied so filtering keeps working. Naming a whole class
-    # (module.Class) bypasses this hook and selects nothing; select module.Class.TestName or use -k '.Class.'.
-    pascalLoader = unittest.TestLoader()
-    pascalLoader.testMethodPrefix = 'Test'
-    pascalLoader.suiteClass = loader.suiteClass
-    pascalLoader.testNamePatterns = loader.testNamePatterns
-    pascalLoader.sortTestMethodsUsing = loader.sortTestMethodsUsing
-    suite = loader.suiteClass(standardTests)
-    for name in sorted(globals()):
-        value = globals()[name]
-        if isinstance(value, type) and issubclass(value, unittest.TestCase):
-            suite.addTests(pascalLoader.loadTestsFromTestCase(value))
-    return suite
 
 
 if __name__ == '__main__':
