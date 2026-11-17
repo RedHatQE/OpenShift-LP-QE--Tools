@@ -1,0 +1,6 @@
+baseURL: "https://edttjredhat.github.io"                    # Jekyll: site.url
+mainPath: "/RHP-Wiki"                                       # Jekyll: site.baseurl
+
+# Exclude directories from Jekyll processing.
+exclude:
+  - Docs/

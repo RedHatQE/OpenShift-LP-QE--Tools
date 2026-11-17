@@ -1,0 +1,58 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Manual Destruction</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../../Scripts/js/code-widget.js"></script>
+    <script type="module" src="../../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/html-include.js"></script>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/OCP/Cluster--Info--Installation/AWS/Uninstallation/AWS_IPI_ManualDesctruction.html"
+    data-mod-js="
+        CodeWidget__UsrLib_OvrCfg(html, {
+            'OCP--aws--Manual-Uninstall': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vSV--mainDNSdomArr&quot;: &quot;\\n{\\&quot;rows\\&quot;: 4}\\n'chaos.lp.devcluster.openshift.com'\\n'g11n.lp.devcluster.openshift.com'\\n'test.lp.devcluster.openshift.com'&quot;
+                                }`
+                            },
+                        },
+                        {
+                            val: 'cspi-ocp-lp',
+                            txt: 'Interop (cspi-ocp-lp)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vSV--mainDNSdomArr&quot;: &quot;\\n{\\&quot;rows\\&quot;: 2}\\n'cspilp.interop.ccitredhat.com'&quot;
+                                }`
+                            },
+                        },
+                    ],
+                    'vSV--ocpClsDir': '.',
+                    'vSV--mainDNSdomArr': ['{&quot;rows&quot;: 1}\n...PleaseSelectTeam...'],
+                },
+            },
+        });
+    "
+></div>
+</body>
+</html>

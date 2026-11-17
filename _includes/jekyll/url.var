@@ -1,0 +1,5 @@
+{%- comment -%}
+    Calculates the parent directory of the current page and assigns it to the
+    `url_parentPath` variable.
+{%- endcomment -%}
+{%- assign url_parentPath = page.url | split: '/' | pop | join: '/' -%}

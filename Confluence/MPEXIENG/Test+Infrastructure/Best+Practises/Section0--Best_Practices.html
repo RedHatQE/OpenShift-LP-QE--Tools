@@ -1,0 +1,1376 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Best Practices</title>
+    <base href="{{site.url}}{{site.baseurl}}{{page.url}}" />
+    <link rel="stylesheet" href="../../../../Scripts/css/wiki/Confluence/confluence.css">
+    <link rel="stylesheet" href="../../../../Scripts/css/wiki/Confluence/toc.css">
+    <link rel="stylesheet" href="../../../../Scripts/css/wiki/Confluence/code-block.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../Scripts/js/wiki/Confluence/toc.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/wiki/Confluence/confluence.css">
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/wiki/Confluence/toc.css">
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/wiki/Confluence/code-block.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/wiki/Confluence/toc.js"></script>
+<article>
+    <nav id="toc" aria-label="Table of Contents"></nav>
+    <p id="abstract">
+        Collection of Best Practices for MPEX Integrity Team.
+        <br><br>
+        Direct AI Agents to read this at <code>{{site.url}}{{site.baseurl}}{{page.url}}</code> periodically (add this instruction into
+        <code>Key Constraints</code> section of <code>.AI_README.md</code> in the Project Root Directory, see below for details).
+    </p>
+    <section>
+        <h1>AI Agent</h1>
+        <p>
+            Most AI Agents read a designated file under root project directory, e.g. Claude Code reads <code>CLAUDE.md</code>. To make our projects work with
+            different AI Agents, rather than creating multiple files for different agents, we can create a single file and create symbolic links to it from
+            different agent-specific files. For example, we can create a <code>.AI_INIT.md</code> file and <code>CLAUDE.md</code> as symbolic link to it,
+            <code>.continuerules</code>, <code>.cursorrules</code>, etc.
+            <br><br>
+            This way, we only need to maintain one file for all AI Agents.
+            <br><br>
+            Note: It is expected that everyone has identical and consistent content of <code>.AI_INIT.md</code> as specified below (periodically synchronizing
+            it with this document is advised to ensure the latest updates are reflected). For any personal modifications, please put them in
+            <code>.AI_README.md</code> files, which may contain individual custom rules or reference external custom rule files.
+        </p>
+        <ol style="margin-top:0;">
+            <li>
+                <div class="code-block">
+                    <div class="code-block-title">&lt;prjRootDir&gt;/.AI_INIT.md</div>
+                    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                        <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+# Project Instructions
+## Mandatory First Action
+Upon first interaction in this directory:
+ 1. Check if `.AI_README.md` exists. If it does not exist, create it using the detailed templates below.
+ 2. Check if `.AI_HISTORY.md` exists. If it does not exist, create it with the history template below.
+
+## .AI_README.md
+### Root Directory Template
+```markdown
+# AI Agent Instructions
+## Project Overview
+[Brief description of what this project contains, its purpose, and main technologies used.]
+
+## Key Constraints
+### Common Settings.
+[Any limitations, requirements, or rules to follow - e.g., coding standards, dependencies to avoid, performance requirements.]
+**Best Practices**:
+  - Re-read (when fetching, use the prompt: "Extract verbatim the full content of all code blocks, preserving all formatting exactly.")
+    https://edttjredhat.github.io/RHP-Wiki/Confluence/MPEXIENG/Test+Infrastructure/Best+Practises/Section0--Best_Practices.html at:
+      - Start of new sessions.
+      - Session resume (when continuing from a previous conversation).
+      - Before writing NEW bash scripts or functions (not minor edits to existing code).
+      - After a context is compacted.
+      - When user explicitly requests best practices review.
+  - After updating the Best Practices, perform self-update, by performing **all** steps below:
+      - The actual used root level `.AI_INIT.md` with the suggested `.AI_INIT.md` (the code block titled `&lt;prjRootDir&gt;/.AI_INIT.md` under the `AI Agent`
+        section). Do not ask user to update this as there should not be any discrepancy for this file. This file **MUST** be 100% match. Do hard
+        synchronization by full override. Then AI Agent **MUST** update its memory with the updated `.AI_INIT.md`.
+      - Merge the suggested root level, i.e., the root of AI Agent Project Directory, `.AI_README.md` template into the actual used root level `.AI_README.md`
+        **without** destroying any of user added information. If there is potential conflict with any of user added information, ask user to approve the merge.
+      - Similarly, merge the suggested sub-directories level `.AI_README.md` template as well into the corresponding sub-directories within the AI Agent
+        Project Directory.
+  - After self-updates are completed, re-read the root level `.AI_INIT.md` into the current context and follows as if read for the first time.
+
+Scope:
+  - When another `.AI_INIT.md` file is found under sub-directories of AI Agent Project Directory, treat its directory as sub-project and all its instruction
+    should only scoped within that sub-project. For example, if user has a `git` local Working Tree under their AI Agent Project Directory.
+  - Unless explicitly instructed by user to change the AI Agent Project Directory, user may ask AI Agent to work on files or directories outside AI Agent
+    Project Directory. In this case, it should be treated as sub-project extension of the current AI Agent Project Directory.
+
+Extra AI Agent instruction files:
+  - Additional AI Agent instruction files may be found in any directory being worked on, such as within a `git` local Working Tree:
+      - AGENTS.md
+      - CONTRIBUTING.md
+  - If those files are not symbolic links to already-read files (to avoid circular reading), read them and treat them as supplementary `.AI_INIT.md` or
+    root / sub-directories level `.AI_README.md` instructions scoped to their corresponding directory and its sub-directories. In case of conflict with the
+    lowest-scoped `.AI_README.md` governing the same directory, inform the user of the conflicting instructions and defer to the user's decision before
+    proceeding.
+
+**General Conduct**:
+  - When not certain about a fact, explicitly say so ("I'm not sure", "I don't know") before attempting an answer. Never present a guess as a fact. Research
+    first if needed.
+
+### User Settings.
+[User custom settings.]
+
+
+## Architectural Notes
+[Important structural or design decisions - e.g., folder structure, design patterns, data flow.]
+
+## Common Tasks
+[Frequent operations or workflows - e.g., how to build, test, deploy, or common debugging steps.]
+
+## Dependencies and Setup
+[Key dependencies, environment variables, setup instructions.]
+
+## References
+[Links to relevant documentation, APIs, or resources.]
+```
+
+### Sub-Directories Template (Optional)
+For sub-directories with significantly different context, create a simpler `.AI_README.md` using this template:
+```markdown
+# AI Agent Instructions
+## Purpose
+[What this sub-directory contains and why it exists.]
+
+## Local Conventions
+[Any patterns, rules, or approaches specific to this area.]
+
+## Notes
+[Important context that differs from root]
+```
+
+Use sub-directory AI.md files when:
+  - Different tech stacks are used.
+  - Different teams own the code.
+  - Domain-specific knowledge is required.
+  - Conventions differ significantly from root.
+  - Explicitly desired for modular approach.
+
+
+## .AI_HISTORY.md
+### Template
+```markdown
+# AI History Log
+This file tracks important changes and decisions in this directory and its sub-directories (when sensible).
+
+## YYYY-MM-DD
+### Initial Setup
+- Project initialized
+```
+
+### Maintaining .AI_HISTORY.md
+**Automatically update `.AI_HISTORY.md` immediately after each qualifying change, without being asked.** Do not defer to end of session (sessions may span
+weeks or crash unexpectedly). Entries are grouped by date (one `##` per calendar day, sorted newest-first). For each qualifying change, add a new `###` entry.
+If today's `## YYYY-MM-DD` already exists, append the `###` to it (no empty line between `###` sections, chronological order within the day), otherwise prepend
+a new `## YYYY-MM-DD` as the first `##` section. Always separate `##` date sections from each other with one empty line.
+
+Add an entry whenever any of the following occur:
+  - Significant architectural changes are made.
+  - Major refactoring occurs.
+  - Important dependencies are added/removed/updated.
+  - Critical bugs are fixed.
+  - New patterns or conventions are established.
+  - Breaking changes are introduced.
+  - Major features are added.
+
+Entry format:
+```markdown
+## YYYY-MM-DD
+### Brief Title 1
+- Bullet point description of change.
+- Why the change was made (if relevant).
+- Any important context or decisions.
+### Brief Title 2
+- ...
+ .
+ .
+ .
+### Brief Title N
+- ...
+```
+
+Scope: Each `.AI_HISTORY.md` tracks changes in its directory and sub-directories. For changes that also involve sub-directories with their own
+`.AI_HISTORY.md`, record at the level that best fits the context of the change.
+</pre>
+                        </div>
+                    </div>
+                </div>
+            </li>
+            <li>
+                <div class="code-block">
+                    <div class="code-block-title">Project Directory Structure</div>
+                    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                        <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+...prjRootDir.../
+ |- .AI_INIT.md         # Main AI instructions.
+ |- .AI_README.md       # Project overview and guidelines (skeleton is auto-generated by `.AI_INIT.md`).
+ |- .AI_HISTORY.md      # Change log for this directory (skeleton is auto-generated by `.AI_INIT.md`).
+ |- AGENTS.md           # Symbolic link to `.AI_INIT.md` for generic AI Agents.
+ |- CLAUDE.md           # Symbolic link to `.AI_INIT.md` for Claude Code.
+ |- .continuerules      # Symbolic link to `.AI_INIT.md` for Continue.dev.
+ |- .cursorrules        # Symbolic link to `.AI_INIT.md` for Cursor IDE.
+ |   ...
+ |- app/                # Application code and other project files.
+ |   |- appFoo/
+ |   |   |- .AI_README.md       # (Optional) Sub-directory AI instructions if context differs significantly.
+ |   |   |- .AI_HISTORY.md      # (Optional) Sub-directory change log if needed.
+ |   |   |-  ...
+ |   |   |- appFooDir1/
+ |   |   |   |- appFooDir1.2/
+ |   |   |   |   |- .AI_HISTORY.md      # (Optional) Further nested sub-directory change log if needed.
+ |   |   |   |   |-  ...
+ |   |   |   |-  ...
+ |   |   |-  ...
+ |   |-  ...
+ |-  ...
+</pre>
+                        </div>
+                    </div>
+                </div>
+            </li>
+        </ol>
+    </section>
+    <section>
+        <h1>Coding Style</h1>
+        <section>
+            <h2>Naming Convention</h2>
+            <p>Naming conventions across different Programming / Scripting Languages should adhere to the following common rules:</p>
+            <ol>
+                <li>
+                    Use <code>PascalCase</code>: Type, Class, Function.
+<pre style="margin:0">
+Ex:
+  - ClassFoo
+  - ConnectSSH
+  - SSHkeyRotation
+  - GetAWSiamSSOuser    # When abbreviations are consecutive, alternate their casing.
+</pre>
+                </li>
+                <li>
+                    Use <code>camelCase</code>: Variable.
+<pre style="margin:0">
+Ex:
+  - useSSH
+  - sshKey
+  - awsIAMssoKey        # When abbreviations are consecutive, alternate their casing.
+</pre>
+                </li>
+                <li>
+                    Use <code>CAPITAL_CASE</code>: Environment Variable.
+                    <br>
+                    Note: To avoid name collision, use a prefix (e.g. <code>PFX__</code>) for grouping / namespacing.
+                </li>
+                <li>
+                    Use <code>--</code> as component separator, unless <code>-</code> is not allowed per language specification (in that case use
+                    <code>__</code>).
+                </li>
+            </ol>
+            <p>
+                Note: While these conventions may diverge slightly from language-specific idioms (such as Python PEP 8), maintaining a unified style across
+                multi-language code-bases and tooling outweighs strict adherence to individual conventions, provided no hard technical requirements are
+                violated.
+            </p>
+        </section>
+        <section>
+            <h2>String Handling</h2>
+            <p>
+                Use <code>'</code> (single-quote) instead of <code>"</code> (double-quote) when a string can be represented in either quote type. Otherwise,
+                choose the quote type that requires the fewest escape sequences or produces the shortest source code representation. Use string concatenation
+                to alternate quote types, if necessary.
+            </p>
+            <div class="code-block">
+                <div class="code-block-title">Bash Shell Script</div>
+                <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+ ...
+echo 'Hello world.'
+echo "There's an error."                    # Avoid escape sequence.
+echo "Check user's "'`${HOME}` directory'   # Alternate quote type via concatenation.
+ ...
+</pre>
+                    </div>
+                </div>
+            </div>
+            <div class="code-block">
+                <div class="code-block-title">Python Script</div>
+                <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+ ...
+print('Hello world.')
+print("There's an error.")          # Avoid escape sequence.
+print('He said, "It\'s an error."') # Least escape sequence (1 vs 2).
+ ...
+</pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </section>
+    <section>
+        <h1>Bash Shell Script</h1>
+        <ol>
+            <li>
+                <p>
+                    When writing <code>bash</code> shell scripts, always enable shell options <code>errexit</code>, <code>pipefail</code>,
+                    <code>nounset</code>, and <code>shopt</code> options <code>inherit_errexit</code>. This ensures that the script exits immediately if any
+                    command fails, including any command in a pipeline and in sub-shell.
+                    <br><br>
+                    If the script is intended for CI, it is very important to also enable shell option <code>xtrace</code>. This helps the post-mortem
+                    analysis by printing each command (to STDERR) before executing it. Together with <code>errexit</code> being enabled, it helps identify
+                    the exact statement that caused the script to error out.
+                    <br><br>
+                    It also helps catch errors early by treating unset variables as errors, by enabling shell option <code>nounset</code>.
+                </p>
+                <div class="code-block">
+                    <div class="code-block-title">Inline Script</div>
+                    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                        <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+    ...inlineScriptContent...
+    true
+cmdEOF
+)"
+</pre>
+<hr style="border:1px solid CanvasText;"/>
+<pre style="font-size:medium;">
+( set -euxo pipefail; shopt -s inherit_errexit
+    ...inlineScriptContent...
+true )
+</pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="code-block">
+                    <div class="code-block-title">Script File</div>
+                    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                        <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+#!/bin/bash
+set -euxo pipefail; shopt -s inherit_errexit
+...scriptFileContent...
+true
+</pre>
+                        </div>
+                    </div>
+                </div>
+            </li>
+            <li>
+                <p>
+                    When <code>errexit</code> is enabled, the script execution works as follows:
+                </p>
+                <ul>
+                    <li>Any command that returns a non-zero exit code will cause the script to exit immediately.</li>
+                    <li>
+                        In logical compound statement, e.g. <code>cmd1 &amp;&amp; cmd2</code>, <code>cmd1 || cmd2</code>, etc.:
+                        <ul>
+                            <li>
+                                If a command failure causes short-circuiting, the script will NOT exit, even though the exit status of this statement is non-0.
+                                This is because <code>cmd1 &amp;&amp; cmd2</code> is equivalent to statement <code>if cmd1; then cmd2; fi</code>. In this
+                                conditional statement it is not an error if <code>cmd1</code> yields non-0 exit status. It is a valid branching decision and
+                                simply cause <code>cmd2</code> to be skipped.
+                            </li>
+                            <li> If the last command in chain fails, the script WILL exit.</li>
+                        </ul>
+                    </li>
+                    <li>Only the last command in pipelines will cause the script to exit, unless the <code>pipefail</code> is enabled.</li>
+                    <li>Sub-shells and functions inherit the <code>errexit</code> behavior when <code>inherit_errexit</code> is enabled.</li>
+                    <li>
+                        Command substitutions, i.e. <code>$(command)</code>, also inherit the <code>errexit</code> behavior when <code>inherit_errexit</code>
+                        is enabled, BUT it does not cause the script to exit if it's a part of variable declaration or command argument. It ONLY causes error
+                        if it is a part of variable assignment.
+                    </li>
+                    <li>
+                        The final exit status of the script, or any sub-shell or function inside, is determined by the last statement executed, before the
+                        script, sub-shell, or function exits.
+                        <br><br>
+                        So if this last executed command is a short-circuited logical compound statement that yield non-0 exit status, then the final exit
+                        status will also be non-0. This is a false negative as it is a valid branching decision. To mitigate this, ALWAYS have explicit exit or
+                        return statement with proper exit status at the end of script, sub-shell, or function. Or simply add a <code>true</code> command at the
+                        end to ensure the final exit status is 0.
+                    </li>
+                </ul>
+                <p>
+                    These can be annoying, but the benefits of catching errors early outweigh the inconvenience. So when writing the script, always account for
+                    these behaviors to avoid unexpected script exits.
+                    <br><br>
+                    See below for an example script that demonstrates these behaviors, and how to mitigate them.
+                </p>
+                <div class="code-block">
+                    <div class="code-block-title">Script File</div>
+                    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                        <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+#!/bin/bash
+set -euxo pipefail; shopt -s inherit_errexit
+
+function MayFailFuncBad () {
+    # Any command failure inside this function will cause the script to exit immediately.
+
+    # If the `external-command` exit status is non-0, it does NOT cause the script to exit, because it is a part of variable declaration.
+    typeset cmdPrintout="$(external-command)"
+
+    # If the `external-command` exit status is non-0, it does NOT cause the script to exit, because it is a part of command argument.
+    echo "$(external-command)"
+
+    # If the `external-command` exit status is non-0, this function execution stops here and this function yield non-0 exit status as well.
+    cmdPrintout="$(external-command)"
+
+    case $cmdPrintout in
+      (OK)  echo 'Success';;
+      (*)
+        (
+            # Enabling `inherit_errexit` causes the sub-shell to inherit the `errexit` behavior from the shell / parent process.
+
+            # Any command failure that cause logical compound statement to short-circuit with non-0 exit status, will not cause the script to exit.
+            false &amp;&amp; true   # The exit status of this statement is 1, but the script continues in this case.
+
+            # But if the last command in logical compound statement fails, the script will still exit.
+            true &amp;&amp; false  # The exit status of this statement is 1, and the script exits with failure.
+        ) || true   # Prevent the function from exiting due to the sub-shell or prev. command failure.
+
+        # If `cmd1` exit status is non-0, this logical compound statement yields non-0 exit status. BUT since there is no more commands in this function after
+        #   this, the function will still exit with exit status of the last executed statement, which is non-0. Hence the caller will see this function as
+        #   failed and depending on the composition of the caller statement, this may cause the script exits with failure too.
+        # And this is very hard to catch, because this is inside `case` statement, hence it is NOT apparent that this can actually be the last executed
+        #   statement in this function.
+        cmd1 &amp;&amp; cmd2
+        ;;
+    esac
+}
+
+function MayFailFuncGood () {
+    if cmdA; then
+        # If `cmdB` fails, the function does NOT exit with failure, even though this logical compound statement yields non-0 exit status. Because by having
+        #   `true` command at the end, that means there is more statement to be executed after this. And the function will continue executing, hence ensuring
+        #   that the function does not exit with failure due to short-circuiting.
+        cmdB &amp;&amp; cmdC
+    else
+        cmdD
+    fi
+
+    true
+}
+
+MayFailFuncBad || MayFailFuncGood
+
+true
+</pre>
+                        </div>
+                    </div>
+                </div>
+            </li>
+            <li>
+                <p>
+                    When <code>nounset</code> is enabled, it is very important to always declare shell variables (both global and local) before using them. For
+                    variables that are defined outside the script, such as environment variables, it is best to provide default values using parameter
+                    expansion syntax, e.g. <code>${ENV_VAR:-defaultValue}</code>, to avoid unexpected script exits due to unset variables being used.
+                    <br><br>
+                    For system environment variables that are guaranteed to be set, such as <code>HOME</code>, <code>PATH</code>, <code>PWD</code>, etc., it is
+                    safe to use them directly without default values.
+                    <br><br>
+                    Or if the execution environment is well-controlled, such as in CI, and certain environment variables are always set, then it is also safe
+                    to use them directly.
+                </p>
+                <div class="code-block">
+                    <div class="code-block-title">Script File</div>
+                    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                        <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+#!/bin/bash
+set -euxo pipefail; shopt -s inherit_errexit
+
+typeset shellVar="${ENV_VAR:-defaultValue}"
+echo "${shellVar}"
+
+true
+</pre>
+                        </div>
+                    </div>
+                </div>
+            </li>
+            <li>
+                <p>
+                    Use functions to encapsulate logic and improve readability. This makes it easier to understand and maintain the script.
+                    <br><br>
+                    But avoid overusing functions for very simple tasks that can be accomplished with a single command or a small block of code and ONLY used
+                    once. Overusing functions can make the script harder to read and understand.
+                    <br><br>
+                    Use consistent naming convention (stick with one convention throughout the script), that is DIFFERENT than variable naming convention:
+                </p>
+                <ul>
+                    <li>Use <code>PascalCase</code> (preferred, it is shorter) or <code>Capital_Snake_Case</code>.</li>
+                </ul>
+            </li>
+            <li>
+                <p>
+                    When <code>xtrace</code> is enabled, avoid using commands like <code>echo</code>, <code>printf</code>, etc. for regular output, as it will
+                    clutter the log with redundant information. Generally speaking, since <code>xtrace</code> will print the processed statement, just before
+                    it got executed, to STDERR, the script execution flow would have been apparent.
+                    <br><br>
+                    For source-code documentation only, use a <code>#</code> comment - it has zero runtime effect and does not appear in
+                    <code>xtrace</code> output at all, keeping the log clean.
+                    <br><br>
+                    If a genuine runtime marker in the log is truly needed (e.g., to label a block whose individual commands are opaque at the
+                    <code>xtrace</code> level), use dummy commands like <code>:</code> as no-op operations. But try to avoid it if not strictly
+                    necessary, as it still produces a trace line that clutters the log.
+                </p>
+                <div class="code-block">
+                    <div class="code-block-title">Script File</div>
+                    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                        <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+#!/bin/bash
+set -euxo pipefail; shopt -s inherit_errexit
+
+# Preferred: `#` comment documents intent; zero runtime effect, invisible in xtrace.
+# Starting operation XYZ...
+...operationXYZ...
+
+if [ someCondition ]; then
+    # Only use `: "..."` when a runtime marker in the log genuinely adds value.
+    : "Starting operation XYZ..."   # Appears in xtrace as: + : Starting operation XYZ...
+    ...operationXYZ...
+    : "Completed operation XYZ."
+fi
+
+true
+</pre>
+                        </div>
+                    </div>
+                </div>
+            </li>
+            <li>
+                <p>
+                    Add comments to explain the purpose of the script, the parameters it accepts, and any non-obvious logic within the script.
+                </p>
+            </li>
+            <li>
+                <p>
+                    Validate input parameters to ensure they meet expected criteria before proceeding with the script's logic.
+                </p>
+                <div class="code-block">
+                    <div class="code-block-title">Script File</div>
+                    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                        <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+#!/bin/bash
+typeset _useMsg=; read -rd '' _useMsg 0&lt;&lt;'_useMsg-EOF'
+Sample Script.
+
+Usage:
+    sample-script &lt;manStrPar&gt; &lt;manIntPar&gt; [&lt;optStrPar&gt;]
+
+Where:
+    manStrPar   Mandatory string parameter.
+    manIntPar   Mandatory integer parameter.
+                Range: 0 - 100
+    optStrPar   Optional string parameter.
+_useMsg-EOF
+set -euxo pipefail; shopt -s inherit_errexit
+
+typeset strPar="${1:-}"; (($#)) &amp;&amp; shift
+typeset -i intPar="${1:-}"; (($#)) &amp;&amp; shift
+typeset optStrPar="${1:-}"; (($#)) &amp;&amp; shift
+
+[ -z "${strPar}" ] &amp;&amp; { echo "${_useMsg}" 1&gt;&amp;2; exit 1; }
+(((intPar &lt; 0) || (intPar &gt; 100))) &amp;&amp; { echo "${_useMsg}" 1&gt;&amp;2; exit 1; }
+
+function HelperNoUseMsg () {
+    typeset mandStrParNoEmpty="${1:?}"; (($#)) &amp;&amp; shift
+    typeset mandStrParEmptyAllowed="${1?}"; (($#)) &amp;&amp; shift
+    typeset optStrPar="${1:-}"; (($#)) &amp;&amp; shift
+
+    ...functionLogic...
+
+    true
+}
+
+...scriptLogic...
+
+true
+</pre>
+                        </div>
+                    </div>
+                </div>
+            </li>
+            <li>
+                <p>
+                    Handling and using variables properly is crucial for writing robust shell scripts:
+                </p>
+                <ul>
+                    <li>
+                        Always declare variables (for both global and local variables) with proper type and initialize its value before using it. Use common
+                        variable declaration keyword, such as <code>typeset</code>, for better compatibility with different shell interpreters, or
+                        <code>declare</code> if the script is guaranteed to run in <code>bash</code>. Avoid using <code>local</code> for local variable
+                        declaration as it is not supported in all shell interpreters.
+                    </li>
+                    <li>
+                        Prefer to use Shell Variables instead of Environment Variables. Environment Variables are more easily exposed (as they are inherited by
+                        child processes and in some CI environments, debugging information may include process Environment Variables) and have limited storage
+                        in the Process Context.
+                    </li>
+                    <li>
+                        Use meaningful variable names to improve code clarity, but not overly long. Re-use commonly used variable names across scripts for
+                        consistency. Re-use generic variable names, such as loop variables.
+                    </li>
+                    <li>
+                        Use consistent naming convention (stick with one convention throughout the script), that is DIFFERENT than function naming convention:
+                        <ul>
+                            <li>Use <code>camelCase</code> (preferred, it is shorter) or <code>snake_case</code> for shell variables.</li>
+                            <li>Use <code>UPPER_CASE</code> for environment variable names.</li>
+                            <li>Prefix boolean variables with <code>is</code>, <code>has</code>, <code>should</code>, etc.</li>
+                            <li>Suffix (associative) array variables with <code>Arr</code> or at least have this tag as part of variable name.</li>
+                        </ul>
+                    </li>
+                    <li>
+                        Always use formal var. syntax inside a pair of double-quote, e.g. <code>"${shellVar}"</code>, for safer handling in case the variable's
+                        value contains whitespace or special characters that need to be escaped.
+                    </li>
+                    <li>Assign function arguments to local variables within the function for better readability.</li>
+                    <li>
+                        Always use local variables within a function, to improve code modularity and avoid unintended side effects on global or outer scope
+                        variables. Pass them as parameters to the function, if needed.
+                    </li>
+                    <li>
+                        Assign function return values to variables rather than modifying global or outer scope variables within functions (or use
+                        <code>nameref</code>).
+                    </li>
+                    <li>Prefer using (associative) arrays for collections of related data instead of concatenated strings.</li>
+                    <li>
+                        Prefer using inline Environment Variable assignment method, if it is only used by a single child process (e.g., <code>VAR=value
+                        command</code>). However, if the Environment Variable contains a secret, use normal assignment while temporarily disabling
+                        <code>xtrace</code> to avoid exposing the secret, then unset it after being used.
+                    </li>
+                </ul>
+                <div class="code-block">
+                    <div class="code-block-title">Script File</div>
+                    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                        <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+#!/bin/bash
+set -euxo pipefail; shopt -s inherit_errexit
+
+typeset optStrPar="${1:-}"; (($#)) &amp;&amp; shift
+typeset -i optIntPar="${1:-0}"; (($#)) &amp;&amp; shift
+
+typeset globalStrVar='Global String'
+typeset -i globalIntVar=0
+typeset -a globalArrVar=()
+typeset -A globalAssocArrVar=()
+
+function FooFunc () {
+    typeset localStrVar='Local String'
+    typeset -i localIntVar=1
+    typeset -a localArrVar=()
+    typeset -A localAssocArrVar=()
+
+    BarFunc "${localStrVar}" "${localIntVar}" localArrVar
+
+    true
+}
+
+function BarFunc () {
+    typeset manStrPar="${1}"; (($#)) &amp;&amp; shift
+    typeset -i manIntPar="${1}"; (($#)) &amp;&amp; shift
+    typeset -n nameRefPar="${1}"; (($#)) &amp;&amp; shift
+
+    nameRefPar+=("${manStrPar}-Item${manIntPar}")   # Update outer scope array via name reference.
+    echo "${manIntPar}"
+
+    true
+}
+
+globalIntVar="$(BarFunc "${globalStrVar}" 0 globalArrVar)"
+FooFunc
+
+set +x; export ONE_TIME_ENV_SECRET_VAR='secret-value'; set -x
+ONE_TIME_ENV_VAR_1='some-value' \
+    ONE_TIME_ENV_VAR_2="${optStrPar}" \
+    external-command
+unset ONE_TIME_ENV_SECRET_VAR
+
+true
+</pre>
+                        </div>
+                    </div>
+                </div>
+            </li>
+            <li>
+                <p>
+                    If the STDOUT of a command is not needed, redirect it to <code>/dev/null</code> to avoid cluttering the output and improve performance.
+                    This is especially important in CI environments where excessive output can lead to timeouts or log size limits.
+                    <br><br>
+                    But NEVER redirect STDERR to <code>/dev/null</code>, as it may hide important error messages that may be crucial for post-mortem analysis.
+                </p>
+            </li>
+            <li>
+                <p>
+                    Handling sensitive data (secrets), such as passwords, API keys, tokens, etc., require special care to avoid accidental exposure:
+                </p>
+                <ul>
+                    <li>Store secrets in an ephemeral storage and ensure they will not linger after the session is completed.</li>
+                    <li>Avoid hard-coding secrets directly in the script. Instead, read them from secure storage or environment variables at runtime.</li>
+                    <li>
+                        Some execution environments, such as CI, have a good secret masking. But if this is not the case, ensure the secrets in logs and
+                        outputs (STDOUT, etc.) are not printed to prevent accidental exposure during debugging or monitoring.
+                        <ul>
+                            <li>
+                                Execution environment WITH masking capability:
+                                <ul>
+                                    <li>
+                                        Preferred to store the secret in the smallest unit. Say split to <code>crdUsr</code> and <code>crdPwd</code>, instead
+                                        of a combined <code>crdUsrPwd</code>. This allows flexibility to use in different syntax such as
+                                        <code>--cred "${crdUsr}:${crdPwd}"</code> or <code>--user "${crdUsr}" --pass "${crdPwd}"</code>.
+                                    </li>
+                                    <li>
+                                        If the credential is available in a temporary (provided by some kind of secret manager) file form, do NOT parse them
+                                        then store them in variables. Because the system secret masking may not be able to detect and mask them. Instead, use
+                                        Shell Process Substitution to pass them directly to the command that needs it.
+                                        <div class="code-block">
+                                            <div class="code-block-title">Script File</div>
+                                            <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                                                <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+ ...
+oc -n "${ns}" create secret generic aws-secret \
+    --type Opaque \
+    --from-file aws_access_key_id=&lt;(
+        set +x
+        printf '%s' "$(sed -nE 's/^\s*aws_access_key_id\s*=\s*//p;T;q' "${CLUSTER_PROFILE_DIR}/.awscred")"
+    ) \
+    --from-file aws_secret_access_key=&lt;(
+        set +x
+        printf '%s' "$(sed -nE 's/^\s*aws_secret_access_key\s*=\s*//p;T;q' "${CLUSTER_PROFILE_DIR}/.awscred")"
+    ) \
+    --dry-run=client -o yaml --save-config | oc apply -f -
+ ...
+</pre>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </li>
+                            <li>
+                                Execution environment WITHOUT masking capability:
+                                <ul>
+                                    <li>
+                                        Extra caution MUST be taken when <code>xtrace</code> is enabled. If the setting of the secrets is done within the
+                                        script, then we MUST disable <code>xtrace</code> temporarily (do NOT forget to re-enable afterwards) during the setting
+                                        to avoid exposing the secret. It is preferred to handle this temporarily disabled <code>xtrace</code> in a sub-shell
+                                        (to avoid explicit need to re-enable it), unless a change in the parent's context (e.g. updating Environment or Shell
+                                        Variable value) is required for later in the code.
+                                        <div class="code-block">
+                                            <div class="code-block-title">Script File</div>
+                                            <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                                                <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+ ...
+set +x  # Disable `xtrace` temporarily when setting secrets.
+typeset awsAccKeyID="$(sed -nE 's/^\s*aws_access_key_id\s*=\s*//p;T;q' "${CLUSTER_PROFILE_DIR}/.awscred")"
+typeset awsAccKeyToken="$(sed -nE 's/^\s*aws_secret_access_key\s*=\s*//p;T;q' "${CLUSTER_PROFILE_DIR}/.awscred")"
+set -x  # Re-enable `xtrace`.
+ ...
+( set +x
+    typeset credSecret="$(printf '%s' "$(0&lt; /tmp/credSecret)")" # Format: "&lt;usr&gt;:&lt;pwd&gt;"
+    jq -cnr \
+        --arg awsAccKeyID "${awsAccKeyID}" \
+        --arg awsAccKeyToken "${awsAccKeyToken}" \
+        --arg usrCred "${credSecret%:*}" \
+        --arg pwdCred "${credSecret#*:}" \
+        '
+            .awsAccessKeyID=$awsAccKeyID |
+            .awsSecretAccessKey=$awsAccKeyToken |
+            .user=$usrCred |
+            .pass=$pwdCred
+        ' 1&gt; /tmp/secretFile
+true )
+ ...
+  ...otherCodeUsingAWSsecrets...
+ ...
+</pre>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        Prefer to use files to store secrets (including using process substitution, so the <code>xtrace</code> can be turned
+                                        off in the sub-shell context), rather than storing them in variables. This reduces the risk of accidental exposure in
+                                        logs or outputs, while maintaining the <code>xtrace</code> active in the main shell.
+                                        <div class="code-block">
+                                            <div class="code-block-title">Script File</div>
+                                            <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                                                <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+ ...
+typeset regPwdFile=/path/to/credSecret
+ ...
+function RESTapiCall () {
+    typeset apiBaseURL="${1:-}"; (($#)) && shift
+    typeset apiMethod="${1:-}"; (($#)) && shift
+    typeset apiEP="${1:-}"; (($#)) && shift
+
+    curl -fsSL -X "${apiMethod}" \
+        --fail-with-body \
+        -K &lt;(
+            set +x
+            cat - 0&lt;&lt;cfgEOF
+-u ${OCP__ABI__BMC_USR@Q}:${OCP__ABI__BMC_PWD@Q}
+cfgEOF
+        ) \
+        -H 'Content-Type: application/json' \
+        -H 'Accept: application/json' \
+        "$@" \
+        "https://${apiBaseURL}/${apiEP#/}"
+
+    true
+}
+ ...
+oc create secret docker-registry pull-secret \
+    --from-file &lt;(
+        jq -cnr \
+            --arg regHost quay.io \
+            --rawfile regUsr &lt;(set +x; printf '%s' "${SECRET_USER_NAME}") \
+            --rawfile pwd "${regPwdFile}" \
+            '
+                {auths: {($regHost): {
+                    auth: (
+                        "\($regUsr):\($pwd | rtrimstr("\n"))" |
+                        @base64
+                    )
+                }}}
+            '
+    ) \
+    --dry-run=client -o yaml --save-config | oc apply -f -
+ ...
+</pre>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        If secrets must be stored in variables, avoid using them in commands that produce output, such as <code>echo</code>,
+                                        <code>printf</code>, etc. Also ALWAYS disable the <code>xtrace</code> temporarily (do NOT forget to re-enable
+                                        afterwards), when used in the command. For example:
+                                        <code>set +x; curl -fsSL -H "Authorization: Bearer ${SECRET_TOKEN}" https://api.example.com; set -x</code>.
+                                    </li>
+                                    <li>Avoid passing secrets as command arguments, as they may be visible in process lists.</li>
+
+                                </ul>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+            </li>
+        </ol>
+    </section>
+    <section>
+        <h1>GitHub</h1>
+        <section>
+            <h2>Working With Fork Repository</h2>
+            <section>
+                <h3>General Guidance</h3>
+                <ol>
+                    <li>
+                        Write clear and concise Pull Request (PR) Description that accurately describe the PR. This will become Merge Commit Message, so other
+                        can easily understand the changes implemented by the PR without need to navigate to the PR itself.
+                    </li>
+                    <li>
+                        Write clear and concise Commit Messages that accurately describe the changes made. This helps reviewers understand the purpose of each
+                        Commit and makes it easier to track changes over time.
+                    </li>
+                    <li>
+                        Break down large changes into smaller, manageable Commits. This makes it easier for reviewers to review the changes and provides a
+                        clearer history of the development process.
+                    </li>
+                    <li>
+                        Avoid adding new files using <code>git add .</code> or <code>git add -A</code>. Instead, use <code>git add ...filePaths...</code> to
+                        add only the relevant files. This prevents accidental inclusion of unwanted files in the Commit. Definitely do NOT use those 2 commands
+                        to add updated tracked files. Instead, use <code>git add -u</code>.
+                    </li>
+                </ol>
+            </section>
+            <section>
+                <h3 id="GitHub--ForkRepo--RebasingOntoUpstream">Rebasing onto Upstream Repository Main Branch</h3>
+                <p>
+                    To keep the Fork Repository up-to-date with the Upstream Repository, it is best to rebase the Fork Repository Main Branch onto the Upstream
+                    Repository Main Branch, rather than merging the other way around. This keeps the Commit History clean, linear, and reduces the risk of
+                    merge conflicts.
+                    <br><br>
+                    Rebase often and/or periodically on longer-lived Pull Requests (PRs) to reduce the risk of conflicts and makes the process smoother.
+                    <br><br>
+                    Follow these steps to rebase the Fork Repository PR / working Branch onto the Upstream Repository Main Branch:
+                </p>
+                <div id="GitHub--ForkRepo--RebasingOntoUpstream--CodeBlock" class="code-block">
+                    <div class="code-block-title">Terminal</div>
+                    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                        <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+#   From GitHub Web UI, synchronize the Fork Repository Main Branch with the Upstream Repository Main Branch.
+#   WARNING:
+#       NEVER synchronize the Fork Repository PR / working Branch directly with the Upstream Repository Main Branch using the GitHub Web UI, as it will merge
+#       new changes from the Upstream Repository Main Branch into the PR / working Branch, which complicates the Commit History and may cause issue later if
+#       we want to squash the intermediary Commits.
+git switch main &amp;&amp; { { git pull -p --rebase || { git rebase --abort 2&gt; /dev/null; git switch -; false; }; } &amp;&amp; git switch - &amp;&amp; { git rebase main || echo '^^^ Rebase FAIL!!!'; }; } || echo 'Working Tree is NOT clean!!!'
+make update                                 # If this is CI Operator PR.
+git commit --amend --reset-author --no-edit # If this is CI Operator PR.
+git push --force-with-lease origin HEAD
+</pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section>
+                <h3>Squashing PR Commits Before Merging To Upstream Repository Main Branch</h3>
+                <p>
+                    Inside a Pull Request (PR), often there are a significant number of Commits that are made during development and testing. Before merging
+                    the PR to the Upstream Repository Main Branch, it is best to squash these Commits into a single Commit that represents the entire PR
+                    change set. This is only needed if the Upstream Repository does not enforce <code>Allow squash merging</code> as the sole PR merge
+                    strategy. If the Repository already enforces it, this step can be skipped.
+                    <br><br>
+                    The advantages of doing this are:
+                </p>
+                <ul>
+                    <li>Keeps the Upstream Repository Main Branch Commit History clean and easy to understand.</li>
+                    <li>Makes it easier to revert the entire PR change set if needed.</li>
+                    <li>Keeps the Upstream Repository size small.</li>
+                </ul>
+                <p>
+                    Follow the <a href="#GitHub--ForkRepo--RebasingOntoUpstream"><code>git</code> rebasing steps</a>, with one additional step before the final push, to
+                    rebase the Fork Repository PR / working Branch onto the Upstream Repository Main Branch and squash the PR Commits:
+                </p>
+                <div class="code-block">
+                    <div class="code-block-title">Terminal</div>
+                    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                        <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+ <a href="#GitHub--ForkRepo--RebasingOntoUpstream--CodeBlock">...FollowGitRebasingOntoUpstreamUpToGitCommit...</a>
+git rebase -i main  # Squash ALL Commits to generate a single Commit.
+git push --force-with-lease origin HEAD
+</pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section>
+                <h3>Pull Request Workflow</h3>
+                The core GitHub Repositories uses CodeRabbit AI Code Reviewer. However, not all are part of Red Hat Enterprise Organization, so it only gets
+                the free tier. This means, there is rate limit on PR Reviews (note: the exact limits below may change; verify at
+                <a href="https://docs.coderabbit.ai/management/plans#rate-limits">CodeRabbit - Plans and pricing</a>):
+                <ul>
+                    <li>3 reviews /hour /user</li>
+                    <li>150 files /hour /user</li>
+                </ul>
+                If any of those limits are met, your push to the PR will not be reviewed.
+
+                Please follow below workflow to minimize the hitting the free tier limits and also to reduce the no. of Commits in the PR.
+                <ol>
+                    <li>
+                        Do not open the main PR (towards Upstream Branch) until it is considered ready. Keep pushing to the Fork Feature Branch only without
+                        creating PR. CodeRabbit only review pushes on PR.
+                    </li>
+                    <li>
+                        Perform local review (beware that CodeRabbit also has (separate) rate limit for local review) first using
+                        <a href="https://docs.coderabbit.ai/cli">CodeRabbit CLI</a>.
+                    </li>
+                    <li>
+                        If collaboration with other is needed, open auxiliary PR on the Fork Repository instead (from Fork Feature Branch towards Fork Branch
+                        that is synchronized with the Upstream Branch) and collaborate on this aux. PR. Do not install CodeRabbit in the Fork Repository. Close
+                        this aux. PR at the end of collaboration.
+                    </li>
+                    <li>
+                        When the work is ready, or at least mature enough, create the main PR. Once this main PR created, any push to Fork Feature Branch will
+                        be visible on the main PR and it may trigger CodeRabbit Review on the Upstream Repository and will consume the user free bucket.
+                        <br><br>
+                        Below are the alternatives to mitigate CodeRabbit draining the user free bucket unnecessarily:
+                        <ol>
+                            <li>
+                                Tell CodeRabbit not to do Review on the main PR. Do one of the following:
+                                <ol>
+                                    <li>Mark the main PR as Draft.</li>
+                                    <li>Put word <code>WIP</code> on the main PR.</li>
+                                    <li>Put statement <code>@coderabbitai ignore</code> in the main PR Description.</li>
+                                </ol>
+                            </li>
+                            <li>
+                                Be mindful on pushing Commits to Fork Feature Branch. Keep small Commits as local Commits only. Squash
+                                <strong>UN-PUSHED</strong> Commits into single Commit, before pushing it to Fork Feature Branch.
+                                <br><br>
+                                Tip: Prefix the 1st line of Commit Message for all local Commits with a consistent identifier, e.g. <code>lcl--</code>, for
+                                easy identification when squashing the un-pushed local Commits.
+                            </li>
+                            <li>
+                                Set the Fork Repository to have linear history (GitHub Repository: ONLY select "Allow squash merging" on PR Settings).
+                                <br><br>
+                                Create a separate incremental Fork Feature Branch to receive further Commits from local Repositories. Create aux. PR on the
+                                Fork Repository (from incremental Fork Feature Branch towards actual Fork Feature Branch). Merge the aux. PR to actual Fork
+                                Feature Branch (a single Commit on Fork Feature Branch should be created if the PR Settings is set as per above).
+                            </li>
+                        </ol>
+                    </li>
+                    <li>
+                        <strong>Specific to <code>openshift/release</code> Repository:</strong>
+                        <ol>
+                            <li>Avoid using Job Rehearsal during development work. It is very slow and meant to validate the PR before merging.</li>
+                            <li>Use CI Operator Emulator as much as possible to test development work on CI Operator Step.</li>
+                        </ol>
+                    </li>
+                </ol>
+            </section>
+        </section>
+    </section>
+    <section>
+        <h1>Container Image</h1>
+            <section>
+                <h2>Creation</h2>
+                <p>
+                    For each directive in the Container Build File (<code>Dockerfile</code>, <code>Containerfile</code>, etc), it creates a layer. Instead of
+                    having multiple <code>RUN</code> directive, using a single directive with heredoc is preferred in order to produce a single layer.
+                </p>
+                <div class="code-block">
+                    <div class="code-block-title">Container Build File</div>
+                    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                        <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+ ...
+RUN &lt;&lt;run-EOF
+set -exo pipefail; shopt -s inherit_errexit
+ ...updateImageTasks...
+run-EOF
+ ...
+</pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+    </section>
+    <section>
+        <h1>CI Operator</h1>
+            <section>
+                <h2>Developing <code>Step</code> Script</h2>
+                <p>
+                    When developing <code>Step</code> script for CI Operator, it is best to test the script locally first before pushing to the remote
+                    repository and triggering the CI Operator Job. This helps catch errors early and speeds up the development process.
+                    <br><br>
+                    Once you are confident that your script works correctly in the local environment, push it to the remote repository and trigger the CI
+                    Operator Job for final validation.
+                    <br><br>
+                    Follow these guidelines:
+                </p>
+                <ol>
+                    <li>
+                        Use CI Operator Emulator to generate <code>CI</code> configurations (<code>ci-operator/config/**/*.yaml</code>) that generate the
+                        actual Container Image used to execute the <code>Step</code> script (<code>ci-operator/step-registry/**/*-command.sh</code>), so it can
+                        be downloaded and used to start a local Container for testing. This ensures that the local testing environment closely resembles the
+                        actual CI Operator environment and make the development &amp; testing cycle / iteration faster.
+                        <br><br>
+                        If the <code>Step</code> script requires secrets, ensure to populate them into the appropriate Container File System location, as
+                        listed by the <code>ci--start--ctr</code>, before executing the script. NEVER use CI owned secrets in local testing, as it may lead to
+                        accidental exposure. Instead, obtain individual owned test secrets accordingly. To help facilitate this, having appropriate README.md,
+                        with the information about the used secrets (what they are and how to obtain them), in the <code>Step</code> Registry is very helpful.
+                    </li>
+                    <li id="CIoperator--StepScriptDev--DataMarshalling">
+                        When there is a need to create or modify YAML / JSON document, use proper data marshalling, because there is difference between shell
+                        and YAML / JSON character escape method. Highly recommend to use <code>jq</code> as data marshalling method, because it supports
+                        assignment from Shell / Env. Var. or file (where Process Substitution method can be used to protect secret).<br><br>
+                        For template, the YAML format is recommended, due to its clarity for readability.
+                        <div class="code-block">
+                            <div class="code-block-title"><code>Step</code> Script</div>
+                            <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                                <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+ ...
+ {
+    yq -o json eval . |
+    jq -c \
+        --arg argName1 '...literalValue...' \
+        --argjson argName2 '...valueInValidJSONstring...' \
+        --rawfile argName3 '...filePathContainingValidJSONstring...' \
+         ... \
+        '
+            ...updateScript...
+        ' |
+    yq -p json -o yaml eval .   # Optional if the final doc. need to be in YAML.
+} 0&lt;&lt;'yamlEOF' 1&gt; ...finalDoc...
+ ...resourceYAMLtemplate...
+yamlEOF
+ ...
+</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        For faster iteration, develop <code>Step</code> script in idempotent manner, so that the script can be re-executed multiple times
+                        without causing unintended side effects. This allows you to test changes quickly without needing to reset the entire environment each
+                        time.
+                        <br><br>
+                        NOTE: Use <code>jq</code> for <a href="#CIoperator--StepScriptDev--DataMarshalling">data marshalling</a>.
+                        <ul>
+                            <li>
+                                For resources that has corresponding <code>oc create ...</code>:
+                                <div class="code-block">
+                                    <div class="code-block-title"><code>Step</code> Script</div>
+                                    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                                        <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+ ...
+#   The `jq -c ...` is optional, only if update the resource spec. is needed and can not be done via any of `oc create` parameters.
+#   Using `oc create` gives backward / forward compatibility, as it will generate the appropriate API Version.
+#   #   Data marshalling is not needed.
+{
+    oc ...commonArgs... create ...resType... \
+        ...contextSpecificArgs... \
+         ...
+        --dry-run=client -o yaml --save-config
+} | oc apply -f -
+#   #   Data marshalling is needed.
+{
+    oc ...commonArgs... create ...resType... \
+        ...contextSpecificArgs... \
+         ...
+        --dry-run=client -o json --save-config |
+    jq -c \
+        --arg argName1 '...literalValue...' \
+        --argjson argName2 '...valueInValidJSONstring...' \
+        --rawfile argName3 '...filePathContainingValidJSONstring...' \
+         ... \
+        '
+            ...updateScript...
+        ' |
+    yq -p json -o yaml eval .
+} | oc apply -f -
+ ...
+</pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                            <li>
+                                For resources that do not have corresponding <code>oc create ...</code>:
+                                <div class="code-block">
+                                    <div class="code-block-title"><code>Step</code> Script</div>
+                                    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                                        <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+ ...
+#   The `jq -c ...` is optional, only if update the resource spec. is needed.
+#   #   Data marshalling is not needed.
+{
+    oc create -f - --dry-run=client -o yaml --save-config
+} 0&lt;&lt;'ocEOF' | oc apply -f -
+ ...resourceYAMLtemplate...
+ocEOF
+#   #   Data marshalling is needed.
+{
+    oc create -f - --dry-run=client -o json --save-config |
+    jq -c \
+        --arg argName1 '...literalValue...' \
+        --argjson argName2 '...valueInValidJSONstring...' \
+        --rawfile argName3 '...filePathContainingValidJSONstring...' \
+         ... \
+        '
+            ...updateScript...
+        ' |
+    yq -p json -o yaml eval .
+} 0&lt;&lt;'ocEOF' | oc apply -f -
+ ...resourceYAMLtemplate...
+ocEOF
+ ...
+</pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                        </ul>
+                    </li>
+                    <li>
+                        Some CLI tools, e.g. commands such as <code>oc</code>, <code>aws</code>, etc., may not be blocking, i.e. they may return before the
+                        resource and/or task is fully ready / completed. In this situations, ensure the proper wait logic after creating, updating, or deleting
+                        the relevant resources and/or initiating task to ensure they are in the desired state before proceeding further.
+                        <br><br>
+                        Prefer the simpler form in CI (see "<code>Step</code> Script"), a single blocking <code>oc wait</code> with a sufficient timeout is
+                        clean and sufficient. For interactive use or long-running waits where progress feedback is useful, use the loop form instead (see
+                        "Interactive Script"). When using the loop form for a long-running operation that is blocking by default, use <code>--wait false</code>
+                        first to make it non-blocking, then use <code>oc wait</code> in the loop for progress feedback.
+                        <div class="code-block">
+                            <div class="code-block-title"><code>Step</code> Script (simpler)</div>
+                            <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                                <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+ ...
+    oc create namespace "${ns}" --dry-run=client -o json --save-config | oc apply -f -
+    oc wait "Namespace/${ns}" --for jsonpath='{.status.phase}'=Active --timeout 1m 1&gt; /dev/null
+ ...
+</pre>
+                                </div>
+                            </div>
+                            <div class="code-block-title">Interactive Script (informational)</div>
+                            <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                                <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+ ...
+    #  ACM Managed Cluster.
+    oc delete ManagedCluster "${mcName}" --ignore-not-found --wait false
+
+    # Monitor ACM Managed Cluster detachment.
+    (   # Isolate `SECONDS` reset.
+        # Cluster detachment.
+        SECONDS=0 wInt=10 wMax=300      # 5 Min. Max.
+        while ((SECONDS &lt; wMax)); do
+            oc wait "ManagedCluster/${mcName}" \
+                --for delete \
+                --timeout ${wInt}s 1&gt; /dev/null &amp;&amp; break
+            echo "Waited ${SECONDS}/${wMax} sec.: "\
+'Detaching ACM Managed Cluster...' 1&gt;&amp;2
+        done
+        ((SECONDS &gt;= wMax)) &amp;&amp; { echo 'Timed out waiting for '\
+'ACM Managed Cluster detachment.' 1&gt;&amp;2; exit 2; }
+        true
+    )
+ ...
+</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        The environment variables used by <code>Step</code> script can be set in the <code>CI</code> configuration. However, this also means
+                        the set value will be applicable for ALL <code>Step</code> scripts executed in the same CI Operator Job. This means, there is potential
+                        for conflict if multiple <code>Step</code> scripts use the same environment variable names but for different purposes, hence requires
+                        different values. The risk of collision increases when a test executes <code>Step</code> scripts from different functional areas and/or
+                        Layered Products, as those are maintained by different teams and may not be aware of each other's environment variable usage.
+                        <br><br>
+                        To avoid this, use unique environment variable names for each <code>Step</code> script. A good practice is to prefix the variable names
+                        with unique identifier. This reduces the risk of conflicts and makes it easier to understand which <code>Step</code> script the
+                        variable is associated with.
+                        <br><br>
+                        The prefix may be based on the <code>Step</code> script functional area, Layered Product (LP), etc. Multiple levels of prefix (please
+                        USE DOUBLE underscore, <code>__</code> as sub-prefix separator, for easy identification of each component, as each component may
+                        contain underscore to improve readability),  may be used if more granularity is needed to ensure uniqueness.
+                        <br><br>
+                        The preferred naming convention is:
+                        <div class="code-block">
+                            <div class="code-block-title">Environment Variable Naming Convention</div>
+                            <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                                <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+[&lt;GenericFunctionalArea&gt;__][&lt;LayeredProduct&gt;__][&lt;SpecificPurposes...&gt;__]&lt;VariableName&gt;
+
+Where:
+    GenericFunctionalArea:  Broad functional area for common `Step` script.
+                            Use this ONLY if the `Step` script is shared across multiple Layered Products.
+                            Examples: OCP_IPI, BM, AWS, etc.
+    LayeredProduct:         Name of Layered Product this `Step` script belongs to.
+                            Examples: ACM, CNV, etc.
+    SpecificPurpose:        Further categorization of the variable's purpose within the functional area of a Layered Product.
+                            There may be multiple levels of this sub-prefixes, if needed.
+                            Examples: DEPL, TEST, etc.
+    VariableName:           Actual variable name describing its purpose.
+                            Examples: API_URL, TIMEOUT, etc.
+Note:
+  - Components in `[]` are optional. BUT at least one sub-prefix component MUST be used.
+  - Use DOUBLE underscore `__` as sub-prefix separator.
+  - All components should use `UPPER_CASE` naming convention.
+Examples:
+    OCP_ABI__BM__DEPL_TIMEOUT:  Deployment timeout for OCP ABI Bare Metal.
+                                Note: No LP sub-prefix, as this is common for all LPs.
+    LPC_LP_CNV__VM__NS:         Namespace for LP Chaos LP CNV Virtual Machine.
+    FA__SCALE__CLUSTER_NAME:    IBM Storage Scale Cluster name for LP IBM Fusion Access.
+</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        The environment variables set via <code>Step</code> configuration (<code>ci-operator/step-registry/**/*-ref.yaml</code>), are
+                        guaranteed their existence. Inside the <code>Step</code> script there is no need to use default value assignment, such as
+                        <code>${ENV_VAR:-}</code>. It will just create a maintenance burden that if there is a need to update the default value, it need to be
+                        done in multiple places, instead of a single source of truth in the <code>Step</code> configuration.
+                    </li>
+                    <li>
+                        When counting Kubernetes / OpenShift resources (e.g. Nodes, Pods, etc.), avoid relying on text-formatted output (e.g.
+                        <code>--no-headers | wc -l</code>). Text output formatting is subject to change between <code>kubectl</code> / <code>oc</code> versions
+                        (e.g. column layout, multi-line entries), making the count unreliable.
+                        <br><br>
+                        Instead, use the internal JSON data structure via <code>jq</code>. The top-level <code>.items</code> array is a guaranteed part of the
+                        Kubernetes API list response and is stable across versions. As a bonus, the result is always a non-negative integer, simplifying the
+                        subsequent check to a simple zero / non-zero test.
+                        <br><br>
+                        Additionally, use <code>-o jsonpath-as-json</code> to minimize the data transfer through the pipe to <code>jq</code>. It applies the
+                        JSONPath expression filter and outputs the result as JSON, so <code>jq</code> receives only what it needs to count.
+                        <div class="code-block">
+                            <div class="code-block-title"><code>Step</code> Script - Counting Resources</div>
+                            <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                                <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+ ...
+wrkCnt=$(
+    oc get nodes \
+        -l node-role.kubernetes.io/worker= \
+        -o jsonpath-as-json='{.items[*].metadata.name}' |
+    jq 'length'
+)
+((wrkCnt))  # Optional test as needed.
+ ...
+</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        Use mock data (if necessary) and configurations that resemble the actual data used in the CI Operator environment to ensure your script
+                        behaves as expected.
+                    </li>
+                    <li>
+                        Test various scenarios, including edge cases, to ensure your script handles all possible situations gracefully.
+                    </li>
+<!--
+                    <li>
+                        Use the <code>ci-operator-test</code> tool to run the CI Operator Job locally. This tool simulates the CI Operator environment and
+                        allows you to test your <code>Step</code> script without pushing to the remote repository.
+                    </li>
+                    <li>
+                        Set up a local OpenShift cluster using tools like <code>minishift</code> or <code>crc</code> to mimic the CI Operator environment as
+                        closely as possible.
+                    </li>
+-->
+                </ol>
+            </section>
+            <section>
+                <h2>Handling <code>OWNERS</code> File</h2>
+                <ol>
+                    <li>
+                        <p>
+                            The <code>OWNERS</code> file, contains information who are the owners of a sub-directory for review and approval of GitHub Pull
+                            Request. For most cases, the <code>approvers</code> and <code>reviewers</code> are identical list. Therefore instead of explicitly
+                            duplicate the list, the YAML Anchor &amp; Alias should be used.
+                        </p>
+                        <div class="code-block">
+                            <div class="code-block-title"><code>OWNERS</code></div>
+                            <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                                <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+approvers:  &amp;owners
+- cspi-qe-ocp-lp
+reviewers: *owners
+</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li>
+                        <p>
+                            If the <code>OWNERS</code> file of a sub-directory is identical with its parent's directory's <code>OWNERS</code> file, then create
+                            a symbolic link to the parent's instead of copying it (ONLY link to 1 level up). This reduces the maintenance burden significantly
+                            on a multi-level <code>Step</code> directory.
+                        </p>
+                    </li>
+                </ol>
+            </section>
+    </section>
+</article>
+</body>
+</html>

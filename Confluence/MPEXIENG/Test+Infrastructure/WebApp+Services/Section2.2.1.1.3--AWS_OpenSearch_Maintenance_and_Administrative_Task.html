@@ -1,0 +1,117 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS OpenSearch Maintenance and Administrative Task</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../Scripts/js/code-widget.js"></script>
+    <script type="module" src="../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/html-include.js"></script>
+<h2>Maintenance Tasks</h2>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/Cloud/AWS/OpenSearch_Maintenance.html"
+    data-mod-js="
+        CodeWidget__UsrLib_OvrCfg(html, {
+            'aws-opensearch--maintenance--domain': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vEV--_AWS__ROLE_NAME_SFX&quot;:   [{&quot;val&quot;: &quot;admin&quot;, &quot;txt&quot;: &quot;admin&quot;}, [{&quot;val&quot;: &quot;poweruser&quot;, &quot;txt&quot;: &quot;poweruser&quot;}]],
+                                    &quot;vEV--AWS_ACCOUNT_ID&quot;:        [&quot;624914081466&quot;],
+                                    &quot;vEV--_AWS__OS__DOM_NAME&quot;:    &quot;open-search&quot;,
+                                    &quot;vEV--_AWS__OS__FQDN&quot;:        &quot;open-search.lp-chaos--svc--web-app.chaos.lp.devcluster.openshift.com&quot;
+                                }`  ,
+                            },
+                        },
+                    ],
+                    'vEV--_AWS__ROLE_NAME_SFX': 'poweruser',
+                    'vEV--AWS_REGION': 'us-west-1',
+                    'vEV--AWS_ACCOUNT_ID': [['Please select Team.']],
+                    'vEV--_AWS__OS__DOM_NAME': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__OS__FQDN': ['...PleaseSelectTeam...'],
+                },
+            },
+        });
+    "
+></div>
+<hr style="border:3px solid CanvasText;"/>
+<h2>Administrative Tasks</h2>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/Cloud/AWS/OpenSearch_AdministrativeTasks.html"
+    data-mod-js="
+        CodeWidget__UsrLib_OvrCfg(html, {
+            'aws-opensearch--admin-tasks': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vEV--_AWS__OS__FQDN&quot;:            &quot;open-search.lp-chaos--svc--web-app.chaos.lp.devcluster.openshift.com&quot;,
+                                    &quot;vEV--AWS_ACCOUNT_ID&quot;:            [&quot;624914081466&quot;],
+                                    &quot;vEV--_AWS__OS__IDX__PFX&quot;:        &quot;krkn-...subIdx...&quot;,
+                                    &quot;vEV--_AWS__OS__TEN__NAME&quot;:       &quot;redhat.hp-mpex-ieng.chaos&quot;,
+                                    &quot;vEV--_AWS__OS__TEN__DESC&quot;:       &quot;Red Hat HP MPEX Integrity Engineering - LP Chaos.&quot;,
+                                    &quot;vEV--_AWS__OS__IDX__PAT&quot;:        &quot;krkn-*&quot;,
+                                    &quot;vEV--_AWS__OS__TEN__PAT&quot;:        &quot;redhat.hp-mpex-ieng.chaos&quot;,
+                                    &quot;vEV--_AWS__OS__CRD_USR&quot;:         &quot;bot--lp-chaos--krkn--...accMode...&quot;,
+                                    &quot;vEV--_BW__NOTE_NAME&quot;:            [[{&quot;val&quot;: &quot;&quot;, &quot;txt&quot;: &quot;None&quot;}], {&quot;val&quot;: &quot;note.OpenSearch--Chaos&amp;G11N&quot;, &quot;txt&quot;: &quot;note.OpenSearch--Chaos&amp;G11N&quot;}],
+                                    &quot;vEV--_GSM__SEC_COL&quot;:             [[{&quot;val&quot;: &quot;&quot;, &quot;txt&quot;: &quot;None&quot;}], {&quot;val&quot;: &quot;ieng--chaos-g11n--ci-operator&quot;, &quot;txt&quot;: &quot;ieng--chaos-g11n--ci-operator&quot;}],
+                                    &quot;vEV--_GSM__SEC_PATH__GRP&quot;:       &quot;open-search&quot;,
+                                    &quot;vEV--_GSM__SEC_PATH__FLD__USR&quot;:  &quot;es-username--lp-chaos&quot;,
+                                    &quot;vEV--_GSM__SEC_PATH__FLD__PWD&quot;:  &quot;es-password--lp-chaos&quot;,
+                                    &quot;vEV--_VAULT_KEY_PATH&quot;:           &quot;selfservice/ieng--chaos-g11n--ci-operator/open-search&quot;,
+                                    &quot;vEV--_VAULT_KEY_USR&quot;:            &quot;es-username--lp-chaos&quot;,
+                                    &quot;vEV--_VAULT_KEY_PWD&quot;:            &quot;es-password--lp-chaos&quot;,
+                                    &quot;vEV--_AWS__COG__IDP_NAME&quot;:       &quot;RedHat--LP-Chaos--svc--web-app&quot;
+                                }`  ,
+                            },
+                        },
+                    ],
+                    'vEV--_AWS__OS__FQDN': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__ROLE_NAME_SFX': 'poweruser',
+                    'vEV--AWS_REGION': 'us-west-1',
+                    'vEV--AWS_ACCOUNT_ID': [['Please select Team.']],
+                    'vEV--_AWS__OS__IDX__PFX': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__OS__ISM__KEEP_DAYS': '365',
+                    'vEV--_AWS__OS__TEN__NAME': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__OS__TEN__DESC': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__OS__IDX__PAT': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__OS__TEN__PAT': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__OS__CRD_USR': ['...PleaseSelectTeam...'],
+                    'vEV--_BW__NOTE_NAME': [['Please select Team.']],
+                    'vEV--_GSM__CTR_IMG': 'quay.io/openshift/ci-public:ci_secret-manager_latest',
+                    'vEV--_GSM__SEC_COL': ['...PleaseSelectTeam...'],
+                    'vEV--_GSM__SEC_PATH__GRP': ['...PleaseSelectTeam...'],
+                    'vEV--_VAULT_MOUNT': [[{val: '', txt: 'None'}], {val: 'kv', txt: 'kv'}],
+                    'vEV--_VAULT_KEY_PATH': ['...PleaseSelectTeam...'],
+                    'vEV--VAULT_ADDR': 'https://vault.ci.openshift.org',
+                    'vEV--_AWS__OS__USR_EML': 'user@redhat.com',
+                    'vEV--_AWS__COG__IDP_NAME': [['Please select Team.']],
+                },
+            },
+        });
+    "
+></div>
+</body>
+</html>

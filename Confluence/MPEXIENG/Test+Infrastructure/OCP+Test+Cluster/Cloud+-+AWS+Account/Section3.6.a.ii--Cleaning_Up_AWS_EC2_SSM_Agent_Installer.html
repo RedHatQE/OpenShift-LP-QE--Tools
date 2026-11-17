@@ -1,0 +1,29 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cleaning Up AWS EC2 SSM Agent Installer</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/html-include.js"></script>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/OCP/Cluster--Info--Installation/AWS/Post_Installation/AWS_EC2_SSM_Agent_Removal.html"
+></div>
+<hr style="border:3px solid CanvasText;"/>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/OCP/Cluster--OCP--01-Cluster--00-MCP/MCP_Deployment_Monitoring.html"
+></div>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<p>OCP Test Cluster on Bare Metal with Goldman Sachs HW configuration.</p><ac:structured-macro ac:name="panel" ac:schema-version="1" ac:macro-id="45d93f63-2780-48ad-afd4-01048ce96f8e"><ac:parameter ac:name="borderWidth">0</ac:parameter><ac:parameter ac:name="borderStyle">none</ac:parameter><ac:rich-text-body><p><ac:structured-macro ac:name="toc" ac:schema-version="1" ac:macro-id="67e107a6-e747-4181-b931-e299202c302b"><ac:parameter ac:name="outline">true</ac:parameter></ac:structured-macro><ac:structured-macro ac:name="multiexcerpt-include" ac:schema-version="1" ac:macro-id="7c6da25c-b7f8-4b60-9944-81984c186f61"><ac:parameter ac:name="MultiExcerptName">Include--Global</ac:parameter><ac:parameter ac:name="DisableCaching">true</ac:parameter><ac:parameter ac:name="PageWithExcerpt"><ac:link><ri:page ri:content-title="MPEX Integrity Engineering" /></ac:link></ac:parameter><ac:parameter ac:name="shouldDisplayInlineCommentsInIncludes">false</ac:parameter></ac:structured-macro></p></ac:rich-text-body></ac:structured-macro><h1>Infrastructure</h1><p>The <a href="https://docs.google.com/spreadsheets/d/1WjvN3FdfMdcLsdXcrJ4ZLkfNGY9zpLjdHOHnI8K4nMM/edit?gid=0#gid=0">Bare Metal HWs</a> are hosted in RDU 2 lab.</p><h1>OCP Cluster</h1><h2>Ownership Schedule</h2><ac:structured-macro ac:name="panel" ac:schema-version="1" ac:macro-id="5b6f2d31-35db-4b9a-93e8-543f9505dee7"><ac:parameter ac:name="borderStyle">solid</ac:parameter><ac:parameter ac:name="title">Weekly Owner</ac:parameter><ac:rich-text-body><ac:structured-macro ac:name="expand" ac:schema-version="1" ac:macro-id="44580232-ee91-4f58-ad77-bc90a939ae1b"><ac:parameter ac:name="title">Preemption Data</ac:parameter><ac:rich-text-body><p><ac:structured-macro ac:name="attachments" ac:schema-version="1" ac:macro-id="68b035fb-1962-47b2-b682-41e8e528798d"><ac:parameter ac:name="preview">false</ac:parameter><ac:parameter ac:name="upload">false</ac:parameter><ac:parameter ac:name="old">false</ac:parameter><ac:parameter ac:name="patterns">preemption.json</ac:parameter></ac:structured-macro></p><ac:structured-macro ac:name="html" ac:schema-version="1" ac:macro-id="db88fc42-d9f9-4b68-a3d9-524c20c5dda4"><ac:plain-text-body><![CDATA[<div id="data--bm-gs-hw-cluster--preemption" style="display: none;"></div>
+<div>
+    <script>
+        (async () => {
+            try {
+                const rsp = await fetch('/download/attachments/661160649/preemption.json?api=v2');
+                if (rsp.ok) {
+                    const dataStor = document.getElementById('data--bm-gs-hw-cluster--preemption');
+                    if (dataStor)
+                        dataStor.textContent = JSON.stringify((await rsp.json()), null, 2);
+                } else
+                    console.log('Failed to fetch attachment `preemption.json`: ', response.status);
+            } catch (err) {
+                console.log('Error fetching attachement `preemption.json`:', err);
+            }
+            document.getElementById('curTimeBtn').dispatchEvent(new Event('click'));
+        })();
+    </script>
+</div>]]></ac:plain-text-body></ac:structured-macro></ac:rich-text-body></ac:structured-macro><p><ac:structured-macro ac:name="html-include" ac:schema-version="1" ac:macro-id="82826885-d5f2-47c8-b35b-d653f1b23876"><ac:parameter ac:name="url"><ri:url ri:value="https://edttjredhat.github.io/RHP-Wiki/Confluence/MPEXIENG/Test%2BInfrastructure/OCP%2BTest%2BCluster/Bare%2BMetal%2B-%2BGoldman%2BSachs%2BHW%2BCluster/Section2.2.1.html" /></ac:parameter></ac:structured-macro></p></ac:rich-text-body></ac:structured-macro><p>To request pre-emption from the scheduled weekly owner, please start a <a href="https://redhat.enterprise.slack.com/archives/C08Q6GU8T2R">thread</a> and tag at least <code>@liliu</code> , <code>@dana</code> , <code>@Edo</code> , and <code>@oramraz</code>.</p><h2>Current Information</h2><p>Information on the installed OCP Cluster can be retrieved from BitWarden Note.</p><ac:structured-macro ac:name="panel" ac:schema-version="1" ac:macro-id="cd7d9eed-be70-46ce-bbf7-01b297041095"><ac:parameter ac:name="borderStyle">solid</ac:parameter><ac:parameter ac:name="title">OCP Cluster Information</ac:parameter><ac:rich-text-body><ac:structured-macro ac:name="html" ac:schema-version="1" ac:macro-id="408b832f-0c14-42f3-92e3-3f4639e544ed"><ac:plain-text-body><![CDATA[<div style="font-family:monospace;font-size:large;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+( set -euo pipefail; shopt -s inherit_errexit
+    bwNoteName='note.HWcluster--GoldmanSachs'
+    export BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)"
+    [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+        echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+        exit 1
+    }
+    bwData="$(bw get item "${bwNoteName}")" || {
+        echo "You may NOT have access to BitWarden Note \`${bwNoteName}\`." 1&gt;&amp;2
+        exit 1
+    }
+    trap 'tput cnorm; tput rmcup' EXIT
+    tput smcup; tput civis
+    i=4 t=10
+    while ((i--)); do
+        clear
+        case $i in
+          (3)
+            echo 'General Information.'
+            echo "${bwData}" | jq -r '.notes'
+            ;;
+          (2)
+            echo 'Accessing BMCs.'
+            echo "${bwData}" | jq -r '.fields[]? | select(.name == "BMC").value'
+            ;;
+          (1)
+            echo 'Serial Console Credential.'
+            echo "${bwData}" | jq -r '.fields[]? | select(.name == "SerialConsole").value'
+            ;;
+          (0)
+            echo 'Accessing Nodes.'
+            echo "${bwData}" | jq -r '.fields[]? | select(.name == "NodeAccess").value'
+            ;;
+        esac
+        REPLY=' ' j=t
+        while ((j)); do
+            tput cr; tput el
+            printf '%s %s %s' \
+                'Press [SPACE] key to stay on this page' \
+                "(timeout in $((j--)) sec.)" \
+                'or any OTHER key to continue now...'
+            read -srn 1 -t 1 || continue
+            [ "${REPLY}" = ' ' ] &amp;&amp; j=t || break
+        done
+    done
+true )
+
+</pre>
+    </div>
+</div>]]></ac:plain-text-body></ac:structured-macro></ac:rich-text-body></ac:structured-macro><h2>Current KUBECONFIG</h2><p>The KUBECONFIG file can be downloaded from BitWarden Note.</p><ac:structured-macro ac:name="panel" ac:schema-version="1" ac:macro-id="93d1ae5c-9172-4979-b2fd-72f44ce76147"><ac:parameter ac:name="borderStyle">solid</ac:parameter><ac:parameter ac:name="title">OCP Cluster KUBECONFIG</ac:parameter><ac:rich-text-body><ac:structured-macro ac:name="html" ac:schema-version="1" ac:macro-id="773f3bf0-7be8-4b66-8e38-923abdc96543"><ac:plain-text-body><![CDATA[<div style="font-family:monospace;font-size:large;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+( set -euo pipefail; shopt -s inherit_errexit
+    bwNoteName='note.HWcluster--GoldmanSachs'
+    export BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)"
+    [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+        echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+        exit 1
+    }
+    bw get --itemid "${bwNoteName}" attachment "$(
+        bw get item "${bwNoteName}" |
+        jq -r '(.attachments // [])[] | select(.fileName == "kubeconfig") | .id'
+    )" || {
+        echo "You may NOT have access to BitWarden Note \`${bwNoteName}\`." 1&gt;&amp;2
+        exit 1
+    }
+true ); echo $?
+
+</pre>
+    </div>
+</div>]]></ac:plain-text-body></ac:structured-macro></ac:rich-text-body></ac:structured-macro><h2>Updating KUBECONFIG</h2><ac:structured-macro ac:name="panel" ac:schema-version="1" ac:macro-id="b2c84697-b0e6-4085-88b9-caad2092be0c"><ac:parameter ac:name="borderStyle">solid</ac:parameter><ac:parameter ac:name="title">OCP Cluster KUBECONFIG</ac:parameter><ac:rich-text-body><ac:structured-macro ac:name="html" ac:schema-version="1" ac:macro-id="099fd4e7-d7d4-4916-8542-8e133dbce2d6"><ac:plain-text-body><![CDATA[<div style="font-family:monospace;font-size:large;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+( set -euo pipefail; shopt -s inherit_errexit
+    bwAttFilePath='&lt;span style="color:red;font-weight:bold;"&gt;...pathToKubeConfigFile...&lt;/span&gt;'
+    bwNoteName='note.HWcluster--GoldmanSachs'
+    export BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)"
+    [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+        echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+        exit 1
+    }
+    bwItemID="$(bw get item "${bwNoteName}" | jq -r '.id')" || {
+        echo "You may NOT have access to BitWarden Note \`${bwNoteName}\`." 1&gt;&amp;2
+        exit 1
+    }
+    while IFS='' read -r e; do
+        bw delete --itemid "${bwItemID}" attachment "${e}" || {
+            echo "You do NOT have R/W access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+            exit 1
+        }
+    done 0&lt; &lt;(
+        bw get item "${bwNoteName}" |
+        jq -r '(.attachments // [])[] | select(.fileName == "kubeconfig") | .id'
+    )
+    bw create --file "${bwAttFilePath}" --itemid "${bwItemID}" attachment 1&gt; /dev/null
+true ); echo $?
+
+</pre>
+    </div>
+</div>]]></ac:plain-text-body></ac:structured-macro></ac:rich-text-body></ac:structured-macro><h1>Test Platform Integration</h1><h2>CI Operator</h2><h3>Cluster Profile</h3><p>The Cluster Profile <code>metal-redhat-gs</code> has been registered via PRs on <a href="https://github.com/openshift/ci-tools/pull/4699/files">openshift/ci-tools</a> repo. and <a href="https://github.com/openshift/release/pull/69339/files">openshift/release</a> repo.</p><p>The <a href="https://issues.redhat.com/browse/DPTP-4530">firewall</a> and <a href="https://github.com/openshift/release/pull/69645">DNS Zone</a> has been configured to allow connection from <code>CI Operator</code> Test Pod to the cluster.</p><p>To use this Cluster Profile in the CI Operator Job, it need to run on Build Cluster that has <code>intranet</code> Capatility. This can be done by setting <code><a href="https://docs.ci.openshift.org/docs/how-tos/capabilities/">capabilities</a></code> key accordingly in the CI Operator config file.</p><ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="621f6906-b7d2-4bb3-9189-63b834a67962"><ac:parameter ac:name="language">yaml</ac:parameter><ac:parameter ac:name="title">ci-operator/config/&lt;GitHubOrg&gt;/&lt;GitHubRepo&gt;/&lt;GitHubOrg&gt;-&lt;GitHubRepo&gt;-&lt;GitHubBranch&gt;__&lt;JobVariantDescription&gt;.yaml</ac:parameter><ac:plain-text-body><![CDATA[ ...
+tests:
+ ...
+- as: test-1
+  capabilities:
+  - intranet
+   ...
+ ...]]></ac:plain-text-body></ac:structured-macro><p><br /></p>

@@ -1,0 +1,63 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS S3 - Preparing Bucket</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../../Scripts/js/code-widget.js"></script>
+    <script type="module" src="../../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/html-include.js"></script>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/Cloud/AWS/SimpleStorageService_BucketManagement.html"
+    data-mod-js="
+        CodeWidget__UsrLib_OvrCfg(html, {
+            'aws-s3--bucket-mgmt': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': JSON.stringify({
+                                    'vEV--_BW__NOTE_NAME':      'note.AWS--IAMuser--S3vmImgWin--Chaos',
+                                    'vEV--AWS_ACCOUNT_ID':      ['624914081466'],
+                                    'vEV--_GSM__SEC_COL':       'ieng--chaos-g11n--ci-operator',
+                                    'vEV--_GSM__SEC_PATH__GRP': 'vm-img--windows',
+                                    'vEV--_VAULT_KEY_PATH':     'selfservice/ieng--chaos-g11n--ci-operator/vm-img--windows',
+                                }),
+                            },
+                        },
+                    ],
+                    'vEV--_AWS__S3__BUCKET_NAME__PFX': 'ieng--vm-image--windows',
+                    'vEV--_AWS__ROLE_NAME_SFX': 'poweruser',
+                    'vEV--_BW__NOTE_NAME': ['...PleaseSelectTeam...'],
+                    'vEV--AWS_REGION': 'us-east-1',
+                    'vEV--AWS_ACCOUNT_ID': [['Please select Team.']],
+                    'vEV--_AWS__S3__BUCKET_ACL__IAM_USR__PFX': 'u-ieng--s3--vm-img--windows',
+                    'vEV--_GSM__CTR_IMG': 'quay.io/openshift/ci-public:ci_secret-manager_latest',
+                    'vEV--_GSM__SEC_COL': ['...PleaseSelectTeam...'],
+                    'vEV--_GSM__SEC_PATH__GRP': ['...PleaseSelectTeam...'],
+                    'vEV--_VAULT_MOUNT': 'kv',
+                    'vEV--_VAULT_KEY_PATH': ['...PleaseSelectTeam...'],
+                    'vEV--VAULT_ADDR': 'https://vault.ci.openshift.org',
+                },
+            },
+        });
+    "
+></div>
+</body>
+</html>

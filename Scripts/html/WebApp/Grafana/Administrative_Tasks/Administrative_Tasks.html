@@ -1,0 +1,339 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grafana - Administrative Tasks</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../js/global.js"></script>
+    <script type="module" src="../../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="grafana--admin-tasks">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vSV--apiBaseURL\": \"https://...svcHost1.../api\", \"vSV--orgNames\": \"\\n{\\\"rows\\\": 2}\\n'...orgName1_1...'\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vSV--apiBaseURL\": \"https://...svcHost2.../api\", \"vSV--orgNames\": \"\\n{\\\"rows\\\": 2}\\n'...orgName2_1...'\"}"
+                        }
+                    }
+                ],
+                "vEV--_GF__CRD_ADM": "...gfAdm...:...lclAdmPwd...",
+                "vSV--apiBaseURL": "https://...svcHost.../api",
+                "vSV--orgNames": "'...orgName_1...'"
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_GF__CRD_ADM</span> <input type="text"  data-var="vEV--_GF__CRD_ADM" value="" /></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Shell Variables</p>
+        <label><span class="cw-cls--label-text">apiBaseURL</span>   <input type="text"  data-var="vSV--apiBaseURL" value="" /></label>
+        <label><span class="cw-cls--label-text">orgNames</span>     <textarea           data-var="vSV--orgNames" rows="2"></textarea></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Reset Administrator Password (Emergency Access)
+( set -euo pipefail; shopt -s inherit_errexit
+    typeset svcCtrName=svc--grafana
+
+    # Reset password for the default Administrator Account.
+    podman exec -it "${svcCtrName}" \
+        grafana-cli admin reset-admin-password '...newPwd...'
+true ); echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Disable/Enable Administrator Account via CLI
+( set -euo pipefail; shopt -s inherit_errexit
+    typeset crdAdm="${_GF__CRD_ADM-$(echo '<span style="color:red;font-weight:bold;" data-var="vEV--_GF__CRD_ADM"></span>')}"
+    typeset usrName=redhat
+    typeset apiBaseURL='http://localhost:3000/api'
+    typeset svcCtrName=svc--grafana
+    typeset usrID=
+
+    # Handle credential input.
+    [ -z "${crdAdm}" ] &amp;&amp; read -p 'Grafana Administrator Username: ' crdAdm
+    [[ "${crdAdm}" =~ : ]] || {
+        read -sp 'Grafana Administrator Password: ' &amp;&amp; echo
+        crdAdm+=":${REPLY}"; unset REPLY
+    }
+
+    # Get the User ID for the Administrator Account.
+    usrID=$(
+        podman exec "${svcCtrName}" \
+            curl -fsSL\
+                -u "${crdAdm}" \
+                "${apiBaseURL}/users/lookup?loginOrEmail=${usrName}" |
+        jq -r '.id'
+    )
+
+    # Disable the Administrator Account.
+    podman exec "${svcCtrName}" \
+        curl -fsSL \
+            -X PUT \
+            -u "${crdAdm}" \
+            -H "Content-Type: application/json" \
+            "${apiBaseURL}/admin/users/${usrID}/disable"
+
+    # Enable the Administrator Account.
+    podman exec "${svcCtrName}" \
+        curl -fsSL \
+            -X PUT \
+            -u "${crdAdm}" \
+            -H "Content-Type: application/json" \
+            "${apiBaseURL}/admin/users/${usrID}/enable"
+true ); echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Install Plugins
+( set -euo pipefail; shopt -s inherit_errexit
+    typeset crdAdm="${_GF__CRD_ADM-$(echo '<span style="color:red;font-weight:bold;" data-var="vEV--_GF__CRD_ADM"></span>')}"
+    typeset apiBaseURL='<span style="color:red;font-weight:bold;" data-var="vSV--apiBaseURL"></span>'
+    typeset svcCtrName=svc--grafana
+    typeset systemdSvcName=container--grafana
+    typeset e=
+    typeset -i wInt=0 wMax=0
+    typeset -a pluginIDs=(
+        # List of PlugIn IDs to install.
+        grafana-opensearch-datasource
+    )
+
+    # Handle credential input.
+    [ -z "${crdAdm}" ] &amp;&amp; read -p 'Grafana Administrator Username: ' crdAdm
+    [[ "${crdAdm}" =~ : ]] || {
+        read -sp 'Grafana Administrator Password: ' &amp;&amp; echo
+        crdAdm+=":${REPLY}"; unset REPLY
+    }
+
+    typeset enaPlugins="$(
+        curl -fsSL \
+            -u "${crdAdm}" \
+            "${apiBaseURL}/plugins?enabled=true" |
+        jq -c '[.[].id]'
+    )"
+
+    # Install PlugIns.
+    for e in "${pluginIDs[@]}"; do
+        if \
+            jq -e \
+                --arg id "${e}" \
+                '. | index($id)' \
+                0&lt;&lt;&lt;"${enaPlugins}" \
+                &amp;&gt; /dev/null
+        then
+            echo "PlugIn \`${e}\` is already installed."
+        else
+            echo "Installing PlugIn \`${e}\`..."
+            podman exec "${svcCtrName}" grafana cli plugins install "${e}"
+        fi
+    done
+
+    # Restart Grafana to load newly installed PlugIns.
+    echo 'Restarting Grafana...'
+    systemctl --user restart "${systemdSvcName}.service"
+
+    # Monitor Grafana startup.
+    (   # Isolate \`SECONDS\` reset.
+        # Grafana startup.
+        SECONDS=0 wInt=15 wMax=300      # 5 min. Max.
+        while ((SECONDS &lt; wMax)); do
+            curl -fsSL \
+                -u "${crdAdm}" \
+                --max-time "${wInt}" \
+                "${apiBaseURL}/health" \
+                &amp;&gt; /dev/null &amp;&amp; break
+            echo "Waited ${SECONDS}/${wMax} sec.: "\
+'Starting up Grafana...' 1&gt;&amp;2
+        done
+        ((SECONDS &gt;= wMax)) &amp;&amp; { echo 'Timed out waiting for '\
+'Grafana startup.' 1&gt;&amp;2; exit 2; }
+        true
+    )
+
+    # List all installed PlugIns.
+    {
+        echo -e 'ID\tNAME\t(TYPE)'
+        curl -fsSL \
+            -u "${crdAdm}" \
+            "${apiBaseURL}/plugins?enabled=true" |
+        jq -r '.[] | [.id, .name, "(\(.type))"] | @tsv' |
+        sort -k 1,1 -t $'\t'
+    } | column -ts $'\t'
+true ); echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Create Organizations
+( set -euo pipefail; shopt -s inherit_errexit
+    typeset crdAdm="${_GF__CRD_ADM-$(echo '<span style="color:red;font-weight:bold;" data-var="vEV--_GF__CRD_ADM"></span>')}"
+    typeset apiBaseURL='<span style="color:red;font-weight:bold;" data-var="vSV--apiBaseURL"></span>'
+    typeset -i i=0
+    typeset -a orgNames=(
+        # Organization names indexed by \`id\` (index 0 = id 1).\`
+<span style="color:red;font-weight:bold;" data-var="vSV--orgNames" data-left-pad="        "></span>
+    )
+
+    # Handle credential input.
+    [ -z "${crdAdm}" ] &amp;&amp; read -p 'Grafana Administrator Username: ' crdAdm
+    [[ "${crdAdm}" =~ : ]] || {
+        read -sp 'Grafana Administrator Password: ' &amp;&amp; echo
+        crdAdm+=":${REPLY}"; unset REPLY
+    }
+
+    # Create/update Organizations.
+    for i in "${!orgNames[@]}"; do
+        if \
+            curl -fsSL \
+                -u "${crdAdm}" \
+                "${apiBaseURL}/orgs/$((i+1))" \
+                &amp;&gt; /dev/null
+        then
+            curl -fsSL \
+                -X PUT \
+                -u "${crdAdm}" \
+                -H "Content-Type: application/json" \
+                -d "$(
+                    jq -cn --arg oName "${orgNames[${i}]}" '{name: $oName}'
+                )" \
+                "${apiBaseURL}/orgs/$((i+1))" \
+                1&gt; /dev/null
+        else
+            curl -fsSL \
+                -X POST \
+                -u "${crdAdm}" \
+                -H "Content-Type: application/json" \
+                -d "$(
+                    jq -cn --arg oName "${orgNames[${i}]}" '{name: $oName}'
+                )" \
+                "${apiBaseURL}/orgs" \
+                1&gt; /dev/null
+        fi
+    done
+
+    # List all Organizations.
+    {
+        echo -e 'ID\tNAME'
+        curl -fsSL \
+            -u "${crdAdm}" \
+            "${apiBaseURL}/orgs" |
+        jq -r '.[] | [.id, .name] | @tsv' |
+        sort -nk 1,1 -t $'\t'
+    } | column -ts $'\t'
+true ); echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Compacting DataBase
+( set -euo pipefail; shopt -s inherit_errexit
+    typeset systemdSvcName=container--grafana
+    typeset svcOwnDataDir=/opt/web-app/grafana
+    typeset svcDataDir=/var/lib/grafana
+    typeset dbPath="${svcOwnDataDir}${svcDataDir}/grafana.db"
+    typeset bkPath="${svcOwnDataDir}${svcDataDir}/backups/grafana.db.$(
+        date -u +%Y%m%d-%H%M%S
+    ).bak"
+    typeset e= oTbl= nTbl=
+
+    export _GF__DB__RST="${_GF__DB__RST:-}"
+    export _GF__DB__BAK_KEEP="${_GF__DB__BAK_KEEP:-5}"
+
+    # Stop Grafana service.
+    systemctl --user stop "${systemdSvcName}.service"
+
+    # Create BackUp with timestamp.
+    mkdir -p "${bkPath%/*}"
+    # Atomic BackUp using VACUUM INTO (SQLite 3.27.0+).
+    sqlite3 "${dbPath}" "VACUUM INTO '${bkPath}';" ||
+        cp -pf "${dbPath}" "${bkPath}"
+
+    # Verify BackUp was created.
+    [ -f "${bkPath}" ]
+    echo "Created BackUp: ${bkPath}"
+
+    # Clean up old BackUps (keep the last N).
+    ((_GF__DB__BAK_KEEP &gt; 0)) &amp;&amp; {
+        ls -t "${bkPath%.*.*}".*.bak 2&gt;/dev/null |
+        tail -n +$((_GF__DB__BAK_KEEP + 1)) |
+        xargs -r rm -f
+    }
+
+    # Reset Table Sequence Numbers if requested.
+    ((_GF__DB__RST)) &amp;&amp; {
+        oTbl="$(sqlite3 "${dbPath}" "
+            SELECT name,seq FROM sqlite_sequence ORDER BY name;
+        ")"
+        while IFS= read -r e; do
+            sqlite3 "${dbPath}" "
+                UPDATE sqlite_sequence
+                SET seq = (
+                    SELECT COALESCE(MAX(id), 0) FROM \"${e}\"
+                )
+                WHERE name = '${e}';
+            "
+        done 0&lt; &lt;(sqlite3 "${dbPath}" "SELECT name FROM sqlite_sequence;")
+        nTbl="$(sqlite3 "${dbPath}" "
+            SELECT name,seq FROM sqlite_sequence ORDER BY name;
+        ")"
+
+        # Display Table Sequence Number changes.
+        {
+            echo 'TABLE|OLD_SEQ|NEW_SEQ'
+            join -t '|' -1 1 -2 1 -o 1.1,1.2,2.2 \
+                &lt;(echo "${oTbl}") \
+                &lt;(echo "${nTbl}")
+        } | column -ts '|'
+    }
+
+    # Compact database to reclaim space from deleted Records.
+    #   Database is on Host FS, mounted into Container as volume.
+    sqlite3 "${dbPath}" "VACUUM;"
+
+    # Restart Grafana service.
+    systemctl --user start "${systemdSvcName}.service"
+true ); echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

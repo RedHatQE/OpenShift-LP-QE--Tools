@@ -1,0 +1,118 @@
+<p>OpenShift Container Platform (OCP) Test Cluster for MPEX Integrity Engineering Team test activities, aka Cluster Under Test (CUT).</p><ac:structured-macro ac:name="panel" ac:schema-version="1" ac:macro-id="45d93f63-2780-48ad-afd4-01048ce96f8e"><ac:parameter ac:name="borderWidth">0</ac:parameter><ac:parameter ac:name="borderStyle">none</ac:parameter><ac:rich-text-body><p><ac:structured-macro ac:name="toc" ac:schema-version="1" ac:macro-id="67e107a6-e747-4181-b931-e299202c302b"><ac:parameter ac:name="outline">true</ac:parameter></ac:structured-macro><ac:structured-macro ac:name="multiexcerpt-include" ac:schema-version="1" ac:macro-id="7c6da25c-b7f8-4b60-9944-81984c186f61"><ac:parameter ac:name="MultiExcerptName">Include--Global</ac:parameter><ac:parameter ac:name="DisableCaching">true</ac:parameter><ac:parameter ac:name="PageWithExcerpt"><ac:link><ri:page ri:content-title="MPEX Integrity Engineering" /></ac:link></ac:parameter><ac:parameter ac:name="shouldDisplayInlineCommentsInIncludes">false</ac:parameter></ac:structured-macro></p></ac:rich-text-body></ac:structured-macro><h1>Infrastructure</h1><p>Currently, the supported platform for CUT are:</p><ul><li>Bare Metal (BM) on-premise hardware.<ul><li><ac:link><ri:page ri:content-title="Bare Metal - Goldman Sachs HW Cluster" /><ac:plain-text-link-body><![CDATA[Goldman Sach Configuration]]></ac:plain-text-link-body></ac:link></li></ul></li><li>Amazon Web Service (AWS) Cloud.<ul><li><ac:link><ri:page ri:content-title="Cloud - AWS Account" /><ac:plain-text-link-body><![CDATA[IENG Account]]></ac:plain-text-link-body></ac:link></li></ul></li></ul><h1>Tooling</h1><h2>Secret Management</h2><h3>BitWarden</h3><p>The <a href="https://vault.bitwarden.com/#/vault?organizationId=cd864c42-0667-4521-afb0-aae600ef844c&amp;collectionId=2b243874-ff92-48b7-a36f-b31601273469">BitWarden Collection</a> is used as main secret storage. Please install <a href="https://bitwarden.com/help/cli/">BitWarden CLI</a> in your workstation.</p><ac:structured-macro ac:name="note" ac:schema-version="1" ac:macro-id="52cf5114-029c-4e51-8424-4282131450ae"><ac:rich-text-body><p><ac:structured-macro ac:name="anchor" ac:schema-version="1" ac:macro-id="29c1b192-b2ba-4a0f-89f4-801eeea71fec"><ac:parameter ac:name="">BitWarden--Env--ProxyRequirement</ac:parameter></ac:structured-macro>In some country an HTTP Proxy may be needed, i.e. set Env. Var. <code>HTTP_PROXY='squid.corp.redhat.com:3128'</code>.</p></ac:rich-text-body></ac:structured-macro><ac:structured-macro ac:name="info" ac:schema-version="1" ac:macro-id="fdb0f880-399c-4bb1-9104-dcca0ca9e37f"><ac:rich-text-body><p>Please read this <a href="https://source.redhat.com/departments/it/it_information_security/wiki/intro_to_bitwarden_password_management_and_frequently_asked_questions">article</a> if you are not familiar with how to use BitWarden in Red Hat.</p></ac:rich-text-body></ac:structured-macro><ac:structured-macro ac:name="panel" ac:schema-version="1" ac:macro-id="63d26d16-c1a3-4e03-ba45-9b22068ce9b0"><ac:parameter ac:name="borderStyle">solid</ac:parameter><ac:parameter ac:name="title">BitWarden CLI Installation</ac:parameter><ac:rich-text-body><ac:structured-macro ac:name="html" ac:schema-version="1" ac:macro-id="3d6573e5-b0b8-486f-9c53-4b18766e6eb8"><ac:plain-text-body><![CDATA[<div style="font-family:monospace;font-size:large;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+(
+    dlFile=/tmpfs/bw-cli--$$
+    wget -qO "${dlFile}.zip" 'https://bitwarden.com/download/?app=cli&platform=linux'
+    unzip "${dlFile}" -d "/usr/local/bin/"
+    rm -rf "${dlFile}.zip"
+)
+
+</pre>
+    </div>
+</div>]]></ac:plain-text-body></ac:structured-macro></ac:rich-text-body></ac:structured-macro><h3>HashiCorp Vault</h3><p>The <code>CI Operator</code> uses HashiCorp Vault as their secret storage. Please install <a href="https://developer.hashicorp.com/vault/install">HashiCorp Vault CLI</a> in your workstation if you are the appointed maintainer.</p><ac:structured-macro ac:name="info" ac:schema-version="1" ac:macro-id="d203624e-ea95-4fde-a4c1-4c2eae9e2983"><ac:rich-text-body><p>Login using Web Browser to <code>${VAULT_ADDR}</code> and copy the active token. Use it during <code>vault login</code> procedure.</p></ac:rich-text-body></ac:structured-macro><ac:structured-macro ac:name="panel" ac:schema-version="1" ac:macro-id="4e730e08-a273-4b9d-9790-1a46c172b57d"><ac:parameter ac:name="borderStyle">solid</ac:parameter><ac:parameter ac:name="title">HashiCorp Vault CLI Installation</ac:parameter><ac:rich-text-body><ac:structured-macro ac:name="html" ac:schema-version="1" ac:macro-id="6788237f-2d6d-4500-ac87-78ecbc32d49b"><ac:plain-text-body><![CDATA[<div style="font-family:monospace;font-size:large;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+(
+    osName="$(cat /etc/os-release | sed -nE '/^ID=/{s/^ID="([^"]+)"/\1/p;q}')"
+    case ${osName} in
+      (centos|rhel)
+        dnf config-manager --add-repo 'https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo'
+        osMjrVer="$(awk -F'[=".]' '/^VERSION_ID=/{print $3}' /etc/os-release)"
+        case ${osMjrVer} in
+          (10)
+            dnf config-manager --set-disabled hashicorp
+            dnf --releasever=9 install -y --enablerepo=hashicorp vault
+            ;;
+          (*)
+            dnf install -y vault
+            ;;
+        esac
+        ;;
+      (fedora)
+        dnf config-manager --add-repo 'https://rpm.releases.hashicorp.com/fedora/hashicorp.repo'
+        dnf install -y vault
+        ;;
+      (*)
+        echo "Linux Distribution \`${osName}\` is not currently supported."
+        ;;
+    esac
+)
+
+</pre>
+    </div>
+</div>]]></ac:plain-text-body></ac:structured-macro></ac:rich-text-body></ac:structured-macro><h2>Installer</h2><p>Pick the appropriate <a href="https://console.redhat.com/openshift/create">installation type</a>.</p><ac:structured-macro ac:name="info" ac:schema-version="1" ac:macro-id="7a4b2e0b-259b-41b9-a590-c577fab170f0"><ac:rich-text-body><p>Please read the <a href="https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/installation_overview/index">Installation Overview</a> documentation to guide yourself.</p></ac:rich-text-body></ac:structured-macro><h2>SSH Key</h2><p>A common SSH Key should be use during OCP installation so everyone have SSH access to the nodes.</p><ac:structured-macro ac:name="panel" ac:schema-version="1" ac:macro-id="b2d00272-1203-49d4-ab35-fb1d806b40a9"><ac:parameter ac:name="borderStyle">solid</ac:parameter><ac:parameter ac:name="title">Installing Group ID.</ac:parameter><ac:rich-text-body><ac:structured-macro ac:name="html" ac:schema-version="1" ac:macro-id="c4a8d08f-8883-4c39-8ad2-020aa7223614"><ac:plain-text-body><![CDATA[<div style="font-family:monospace;font-size:large;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+# Get SSH Key `openshift-qe`.
+(
+    bwNoteName='key.openshift-qe'
+    export BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)"
+    [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+        echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+        exit 1
+    }
+    cd "${HOME}/.ssh"
+    eval "$(
+        bw get notes "${bwNoteName}" || {
+            echo "You may NOT have access to BitWarden Note \`${bwNoteName}\`." 1&gt;&amp;2
+            echo 'exit 1'
+        }
+    )"
+)
+
+</pre>
+    </div>
+</div>]]></ac:plain-text-body></ac:structured-macro></ac:rich-text-body></ac:structured-macro><h1>Authorization Management</h1><p>Various Rover Groups are used as authorization management.</p><h2>IENG Tenant on ITUP.scale Cluster</h2><p>The <a href="https://console-openshift-console.apps.prod-scale-spoke1-aws-us-east-1.itup.redhat.com/">OCP Cluster</a> for hosting VM to be used as workstation.</p><p>Access Control:</p><ul><li><a href="https://rover.redhat.com/groups/group/ieng-vm-farm---users">IENG VM Farm - Users</a></li><li><a href="https://rover.redhat.com/groups/group/ieng-vm-farm---administrators">IENG VM Farm - Administrators</a></li></ul><h2>IENG AWS Acccount</h2><p>The <ac:link><ri:page ri:content-title="Cloud - AWS Account" /><ac:plain-text-link-body><![CDATA[Cloud Environment]]></ac:plain-text-link-body></ac:link> for OCP Cluster Test Bed.</p><p>Access Control (for <a href="https://auth.redhat.com/auth/realms/EmployeeIDP/protocol/saml/clients/itaws">SSO Login</a>):</p><ul><li data-uuid="83b21142-fe46-4add-afa9-ae6c9ce5388d">Chaos &amp; G11N Team: <a href="https://rh-hp-mpex-ieng.signin.aws.amazon.com/console">rh-hp-mpex-ieng</a><br /><ul><li><a href="https://rover.redhat.com/groups/group/it-cloud-aws-624914081466-readonlywithinstanceconnect">SSO Assume Role Users</a></li><li><a href="https://rover.redhat.com/groups/group/it-cloud-aws-624914081466-poweruser">SSO Assume Role Power Users</a></li><li><a href="https://rover.redhat.com/groups/group/it-cloud-aws-624914081466-admin">SSO Assume Role Administrators</a></li></ul></li><li data-uuid="59a6f790-0caa-4a66-b02d-22f5def2e4f6">Interop Team: <a href="https://cspi-ocp-lp.signin.aws.amazon.com/console">cspi-ocp-lp</a><br /><ul><li><a href="https://rover.redhat.com/groups/group/it-cloud-aws-725053552188-readonlywithinstanceconnect">SSO Assume Role Users</a></li><li><a href="https://rover.redhat.com/groups/group/it-cloud-aws-725053552188-poweruser">SSO Assume Role Power Users</a></li><li><a href="https://rover.redhat.com/groups/group/it-cloud-aws-725053552188-admin">SSO Assume Role Administrators</a></li></ul></li></ul><p>Setting up CLI env.: Follow this <a href="https://docs.google.com/document/d/1yziT4KU2BhreGP7r1c9LySoW_MseQ5dDqpp6Cm3-18M/view">guide</a>. Or use alternative <a href="https://github.com/app-sre/rh-aws-saml-login">AWS SAML CLI Login</a> tool.</p><h2>BitWarden &quot;IENG VM Farm Users&quot; Collection</h2><p>The Group Collection to store confidential information</p><p>Access Control:</p><ul><li><a href="https://rover.redhat.com/groups/group/ieng-vm-farm---users">IENG VM Farm - Users</a> (R/O)</li><li><a href="https://rover.redhat.com/groups/group/ieng-secret-vault-bw">IENG Secret Vault BW</a> (R/W)</li></ul><h1>Test Platform Integration</h1><h2>CI Operator</h2><h3>Worklow</h3><p>A Job in <code>CI Operator</code>, normally involve the <code>workflow</code> that deploy the CUT, which this procedure alone can take 40-50 minutes, and a long <code>must-gather</code> process during post test, adding another 20-30 minutes. A special <code>workflow</code>, named <code>external-cluster</code>, exists allowing directly connect to an existing OCP Cluster (that may be deployed outside the <code>CI Operator</code> itself). Using this <code>workflow</code> will significantly shorten the Job Rehearsal time in a Pull Request (PR).</p><ac:structured-macro ac:name="note" ac:schema-version="1" ac:macro-id="75bd2720-7d5d-462f-8fea-3d8cb17bc82c"><ac:rich-text-body><p>This ONLY make sense if a Cloud-based Cluster is used for CUT. For Bare Metal Cluster, since each Cluster Profile represent exactly one single instance, while this workflow can still be used, but it simply does not make sense to do so.</p></ac:rich-text-body></ac:structured-macro><p>Please follow these instructions.</p><ol><li data-uuid="b41d38b1-258e-42de-a9fb-fee2b28c65fe">Create personal Secret Path in <code>CI Operator Secret Vault</code>. Please follow the instructions in <a href="https://docs.ci.openshift.org/docs/how-tos/adding-a-new-secret-to-ci/#add-a-new-secret">CI Operator Guide</a>. The <a href="https://docs.ci.openshift.org/docs/how-tos/adding-a-cluster-profile/#providing-credentials">Providing Credential</a> procedure MUST be followed to connect it to the used Cluster Profile.</li><li data-uuid="c0e7c0dc-5a42-4e91-af20-f778906e1512">Store the corresponding <code>KUBECONFIG</code> and optionally the <code>KUBEADMIN_PASSWORD_FILE</code>, those are associated with the &quot;external&quot; OCP Cluster in this personal Secret Path.<br /><ac:structured-macro ac:name="tip" ac:schema-version="1" ac:macro-id="971ffba4-1417-4204-a414-aa2ad5f1ac64"><ac:rich-text-body><p>Since we can only use one K8s Secret for each Cluster Profile and the current implementation in CI Operator it to merge the content of multiple Vault Secrets if those are configured to be synchronized to the same Secret Name, a special care is needed to avoid any Secret Key Collision (as there is no way to predict which Secret is overriding as the final content). Please use a unique Secret Key Name inside the Vault Secret to add user specific <code>kubeconfig</code> and <code>kubeadmin-password</code> file (make <span style="color:var(--ds-background-accent-red-subtle,#f87168);"><strong>SURE</strong></span> those 2 files use the <span style="color:var(--ds-background-accent-red-subtle,#f87168);"><strong>SAME</strong></span> suffix and the the file name and suffix connector, i.e. <code>--</code>, <span style="color:var(--ds-background-accent-red-subtle,#f87168);">IS</span> important):</p><ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="d0ea4303-6cb1-4bf8-898a-387612244bb5"><ac:parameter ac:name="language">yaml</ac:parameter><ac:parameter ac:name="title">Personal CI Operator HashiCorp Vault Secret item.</ac:parameter><ac:plain-text-body><![CDATA[kubeadmin-password--<userID>--<freeDescription>: "<WebConsolePwd_for_kubeadmin_for_ExternalCluster>"
+kubeconfig--<userID>--<freeDescription>: "<Content_of_KUBECONFiG_file_for_ExternalCluster>"
+secretsync/target-name: "<Same_SecretName_for_ClusterProfile_AsConfiguredInMasterBranch>"
+secretsync/target-namespace: "ci"]]></ac:plain-text-body></ac:structured-macro><ac:structured-macro ac:name="warning" ac:schema-version="1" ac:macro-id="137daa89-08cd-47cd-853d-5ae277a112cf"><ac:rich-text-body>BEWARE that the Keys from the personal CI Operator HashiCorp Vault Secret item may potentially clutter ALL Jobs that uses the Cluster Profile it synchronizes to. So please be a good citizen by NOT forgetting to remove the synchronizer Keys (at least the <code>secretsync/target-name</code> Key) or rename them by removing the <code>secretync/</code> after you are finished with the PR.</ac:rich-text-body></ac:structured-macro></ac:rich-text-body></ac:structured-macro></li><li data-uuid="901db7bb-abb8-4650-a50a-6ef2b2c324e4"><p>In the PR's Head Commit, update the corresponding Job Configuration file.</p><ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="916f30d0-79e0-41d9-afa5-6cc5e35f9983"><ac:parameter ac:name="language">yaml</ac:parameter><ac:parameter ac:name="title">ci-operator/config/&lt;GitHubOrg&gt;/&lt;GitHubRepo&gt;/&lt;GitHubOrg&gt;&lt;GitHubRepo&gt;&lt;GitHubBranch&gt;__&lt;JobVariantDescription&gt;.yaml</ac:parameter><ac:plain-text-body><![CDATA[ ...
+tests:
+-  ...
+- as: ...StepName...
+   ...
+  post: []                              # Override `post` steps in the `workflow`, to avoid lenghty tear down.
+   ...
+  steps:
+     ...
+    cluster_profile: ...                # Connect to the same Cluster Profile as usual.
+     ...
+    env:
+       ...
+      KCFG_SRC_SFX: <userID>--<freeDescription>
+       ...
+     ...
+    workflow: external-cluster
+     ...
+   ...
+-  ...
+ ...]]></ac:plain-text-body></ac:structured-macro></li><li data-uuid="87197b07-8abf-4478-ae1c-ebf7f76729f5">After all the Job Rehearsals in the PR yield the expected results, the changes from the above Step 3 can be reverted back. A final Job Rehearsal using the final intended Job Configuration then may be carried out as final PR test.</li></ol><p><br /></p><ac:structured-macro ac:name="details" ac:schema-version="1" ac:macro-id="8c9adf32-72a5-4a67-be36-5133b41f3841"><ac:parameter ac:name="hidden">true</ac:parameter><ac:rich-text-body><ac:structured-macro ac:name="tip" ac:schema-version="1" ac:macro-id="1e3f6f88-aaa3-4845-a6d6-81c95ded20aa"><ac:rich-text-body><p>Since we can only use one K8s Secret for each Cluster Profile, for faster Job Rehearsal in the PR, one may choose to connect to an existing OCP Cluster (this will speed up the Job Rehearsal execution time significantly, since we don't need to keep deploying the OCP Cluster every time we rehearse the Job) via one's own Secret in the Vault.</p><p>To avoid any Secret Collision, please use a unique Secret Name inside <code>ci</code> Namespace:</p><ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="a57fdd19-08da-424a-916e-f2e585212c9d"><ac:parameter ac:name="language">yaml</ac:parameter><ac:parameter ac:name="title">Personal CI Operator HashiCorp Vault Secret Collection.</ac:parameter><ac:plain-text-body><![CDATA[kubeadmin-password: "<WebConsolePwd_for_kubeadmin_for_ExternalCluster>"
+kubeconfig: "<Content_of_KUBECONFiG_file_for_ExternalCluster>"
+secretsync/target-name: "cluster-secrets-<clusterProfileName>--<userID>--<freeDescription>"
+secretsync/target-namespace: "ci"
+ssh-privatekey: "<Content_of_SSH_PrivateKey_file_used_in_OCP_deployement>"
+ssh-publickey: "<Content_of_SSH_PublicKey_file_used_in_OCP_deployement>"
+...anyOtherSecretRequiredBy_ClusterProfile_AndOr_Test...]]></ac:plain-text-body></ac:structured-macro><p>The in the PR's Head Commit:</p><ol><li data-uuid="d64061e7-bb54-4538-9c42-f9734943b803">In the <code>ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml</code>, set the corresponding array element associated with the used Cluster Profile to use this custom secret:<br /><ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="ea1eeebc-8c1e-453b-9154-2fe79eac8f00"><ac:parameter ac:name="language">yaml</ac:parameter><ac:parameter ac:name="title">ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml</ac:parameter><ac:plain-text-body><![CDATA[ ...
+-  ...
+- profile: <ClusterProfileName>
+   ...
+  secret: cluster-secrets-<ClusterProfileName>--<userID>--<freeDescription>
+   ...
+-  ...
+ ...]]></ac:plain-text-body></ac:structured-macro></li><li data-uuid="78077027-ead4-4b62-87c1-01ae4e5aab2a">In the <code>core-services/ci-secret-bootstrap/_config.yaml</code>, set the Secret Mapping configuration to use the same exact name.<ac:structured-macro ac:name="code" ac:schema-version="1" ac:macro-id="71ad450a-c8ed-47ab-bfec-4047b2355897"><ac:parameter ac:name="language">yaml</ac:parameter><ac:parameter ac:name="title">core-services/ci-secret-bootstrap/_config.yaml</ac:parameter><ac:plain-text-body><![CDATA[ ...
+secret_configs:
+-  ...
+- from:
+    pull-secret:
+      dockerconfigJSON:
+       ...
+     ...
+  to:
+  -  ...
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-<ClusterProfileName>--<userID>--<freeDescription>
+    namespace: ci
+  -  ...
+-  ...
+ ...]]></ac:plain-text-body></ac:structured-macro></li></ol></ac:rich-text-body></ac:structured-macro></ac:rich-text-body></ac:structured-macro>

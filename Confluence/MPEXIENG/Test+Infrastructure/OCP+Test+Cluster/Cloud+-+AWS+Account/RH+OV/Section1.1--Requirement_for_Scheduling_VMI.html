@@ -1,0 +1,35 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Requirement for Scheduling Virtual Machine Instance (VMI)</title>
+    <base href="{{site.url}}{{site.baseurl}}{{page.url}}" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../../Scripts/js/global.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+{
+    _OCP__INSTLR_FLG__CUSTOM="$((_OCP__INSTLR_FLG__CUSTOM | 0x00000008))"
+    _OCP__INSTLR_DAY0="${_OCP__INSTLR_DAY0:+${_OCP__INSTLR_DAY0}$'\n'}"$'(\n'"$(cat - 0&lt;&lt;'scrEOF'
+: 'Day-0 Customization for RH OV: Worker Nodes need to be `*.metal` Instance Type.'
+yq -i eval '.compute[0].platform.aws.type = "m6i.metal"' "${_OCP__CLUSTER_DIR}/install-config.yaml"
+true
+scrEOF
+    )"$'\n)'
+}
+</pre>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,434 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grafana - Operational Tasks</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../js/global.js"></script>
+    <script type="module" src="../../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="grafana--oper-tasks">
+    <script type="application/json" class="cw-cls--config">
+        {% raw %}{
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vSV--apiBaseURL\": \"https://...svcHost1.../api\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vSV--apiBaseURL\": \"https://...svcHost2.../api\"}"
+                        }
+                    }
+                ],
+                "vEV--_GF__CRD_ADM": "...gfAdm...:...lclAdmPwd...",
+                "vEV--_GF__DS__CFG": "{\n    export _GF__DS__CFG=\"$(\n        cat - 0&lt;&lt;'cfgEOF' | yq -o json e . | jq -c .\n# This is just an EXAMPLE!!! NOT actual Data Source definitions.\nshellVars:\n  orgID: 0\nprovCfg:    # Define Data Sources in provisioning YAML format.\n  apiVersion: 1\n  datasources:\n  - name: &lt;dsName&gt;\n    type: &lt;dsType&gt;\n    access: &lt;{proxy|direct}&gt;\n    orgId: 0\n    uid: '[&lt;rgx:^[_0-9A-Za-z-]{1,40}$&gt;]'    # Optional, for reliable match.\n    url: &lt;dsURL&gt;\n    basicAuth: true\n    basicAuthUser: &lt;dsCrdUsr&gt;\n    jsonData:\n      esVersion: 80\n      timeField: timestamp\n      logMessageField: message\n      logLevelField: level\n      index: krkn-telemetry*\n    secureJsonData:\n      basicAuthPassword: &lt;dsCrdPwd&gt;\n    version: 1\n    editable: &lt;{true|false}&gt;\ncfgEOF\n    )\"\n}",
+                "vEV--_GF__DB__CFG": "{\n    export _GF__DB__CFG=\"$(\n        cat - 0&lt;&lt;'cfgEOF' | yq -o json e . | jq -c .\n# This is just an EXAMPLE!!! NOT actual Dashboard definitions.\nshellVars:\n  orgID: 0\ndbCfg:\n  - dbPath:\n      # Each Path Segment MUST be URL Endoded. Ignored if the UID-based\n      #   macthing succeeded.\n      name: /topFolder/subFolder\n      # Optional, for faster search (`^[_0-9A-Za-z-]{1,40}$`) and take\n      #   precedence.\n      uid: topFolder--subFolder\n    dbGetter: | # MUST yield array of Grafana Dashboard JSON format to FD 3!!!\n      {\n        curl -fsSL 'https://host.dom/path/db.json'\n        cat '/path/to/file.json'\n      } | jq -s . 1&gt;&amp;3\ncfgEOF\n    )\"\n}",
+                "vSV--apiBaseURL": "https://...svcHost.../api"
+            }
+        }{% endraw %}
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_GF__CRD_ADM</span> <input type="text"  data-var="vEV--_GF__CRD_ADM" value="" /></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">Data Source</p>
+        <label><span class="cw-cls--label-text">_GF__DS__CFG</span> <textarea           data-var="vEV--_GF__DS__CFG" rows="10"></textarea></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">Dashboard</p>
+        <label><span class="cw-cls--label-text">_GF__DB__CFG</span> <textarea           data-var="vEV--_GF__DB__CFG" rows="10"></textarea></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Shell Variables</p>
+        <label><span class="cw-cls--label-text">apiBaseURL</span>   <input type="text"  data-var="vSV--apiBaseURL" value="" /></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Connect Data Sources
+###     Data Source Definitions
+<span style="color:red;font-weight:bold;" data-var="vEV--_GF__DS__CFG"></span>
+# Run the script defining the Data Sources FIRST!!!
+( set -euo pipefail; shopt -s inherit_errexit
+    typeset crdAdm="${_GF__CRD_ADM-$(echo '<span style="color:red;font-weight:bold;" data-var="vEV--_GF__CRD_ADM"></span>')}"
+    typeset apiBaseURL='<span style="color:red;font-weight:bold;" data-var="vSV--apiBaseURL"></span>'
+    typeset e= dsUID= dsName= dsAPIidPath=
+    typeset -i orgID=0 dsID=0
+
+    typeset dsCfg="$(
+        jq -c \
+            '
+                .shellVars.orgID as $orgID |
+                .provCfg.datasources|=map(
+                    .orgId = $orgID |
+                    .version = 1
+                )
+            ' \
+            0&lt;&lt;&lt;"${_GF__DS__CFG:-"$(
+        cat - 0&lt;&lt;'cfgEOF' | yq -o json e . | jq -c .
+# This is just an EXAMPLE!!! NOT actual Data Source definitions.
+shellVars:
+  orgID: 0
+provCfg:    # Define Data Sources in provisioning YAML format.
+  apiVersion: 1
+  datasources:
+  - name: &lt;dsName&gt;
+    type: &lt;dsType&gt;
+    access: &lt;{proxy|direct}&gt;
+    orgId: 0
+    uid: '[&lt;rgx:^[_0-9A-Za-z-]{1,40}$&gt;]'    # Optional, for reliable match.
+    url: &lt;dsURL&gt;
+    basicAuth: true
+    basicAuthUser: &lt;dsCrdUsr&gt;
+    jsonData:
+      esVersion: 80
+      timeField: timestamp
+      logMessageField: message
+      logLevelField: level
+      index: krkn-telemetry*
+    secureJsonData:
+      basicAuthPassword: &lt;dsCrdPwd&gt;
+    version: 1
+    editable: &lt;{true|false}&gt;
+cfgEOF
+            )"}"
+    )"
+
+    # Handle credential input.
+    [ -z "${crdAdm}" ] &amp;&amp; read -p 'Grafana Administrator Username: ' crdAdm
+    [[ "${crdAdm}" =~ : ]] || {
+        read -sp 'Grafana Administrator Password: ' &amp;&amp; echo
+        crdAdm+=":${REPLY}"; unset REPLY
+    }
+
+    # Assign appropriate pre-defined variables from \`${dsCfg}\`.
+    while IFS= read -r e; do
+        [[ -v "${e}" ]] &amp;&amp; eval "$(
+            printf '%s=%q' "${e}" "$(jq -r ".shellVars.${e}" 0&lt;&lt;&lt;"${dsCfg}")"
+        )"
+    done 0&lt; &lt;(jq -r '.shellVars | keys[]' 0&lt;&lt;&lt;"${dsCfg}")
+
+    # Create/update each Data Source.
+    while IFS= read -r e; do
+        dsUID="$(jq -r '(.uid // empty)' 0&lt;&lt;&lt;"${e}")"
+        dsName="$(jq -r '.name' 0&lt;&lt;&lt;"${e}")"
+        [ -n "${dsUID}" ] &amp;&amp;
+            dsAPIidPath="uid/${dsUID}" ||
+            dsAPIidPath="name/$(
+                python3 \
+                    -c "
+import sys, urllib.parse
+print(urllib.parse.quote(sys.argv[1], safe=''), end='')
+                    " \
+                    "${dsName}"
+            )"
+        dsID="$(
+            curl -fsSL \
+                -u "${crdAdm}" \
+                -H "X-Grafana-Org-Id: ${orgID}" \
+                "${apiBaseURL}/datasources/${dsAPIidPath}" |
+            jq -r '.id'
+        )" || dsID=0
+        if ((dsID)); then
+            curl -fsSL \
+                -X PUT \
+                -u "${crdAdm}" \
+                -H "Content-Type: application/json" \
+                -H "X-Grafana-Org-Id: ${orgID}" \
+                -d "$(jq -c 'del(.version)' 0&lt;&lt;&lt;"${e}")" \
+                "${apiBaseURL}/datasources/${dsID}" \
+                1&gt; /dev/null
+        else
+            curl -fsSL \
+                -X POST \
+                -u "${crdAdm}" \
+                -H "Content-Type: application/json" \
+                -H "X-Grafana-Org-Id: ${orgID}" \
+                -d "${e}" \
+                "${apiBaseURL}/datasources" \
+                1&gt; /dev/null
+        fi
+    done 0&lt; &lt;(jq -c '.provCfg.datasources[]' 0&lt;&lt;&lt;"${dsCfg}")
+
+    # List all Data Sources in Organization with health status.
+    {
+        echo -e 'ID\tNAME\t(TYPE)\t[STATUS]'
+        join -t $'\t' -1 1 -2 1 -o 1.1,1.2,1.3,2.2 \
+            &lt;(
+                curl -fsSL \
+                    -u "${crdAdm}" \
+                    -H "X-Grafana-Org-Id: ${orgID}" \
+                    "${apiBaseURL}/datasources" |
+                jq -r '.[] | [.id, .name, "(\(.type))"] | @tsv' |
+                sort -nk 1,1 -t $'\t'
+            ) &lt;(
+                curl -fsSL \
+                    -u "${crdAdm}" \
+                    -H "X-Grafana-Org-Id: ${orgID}" \
+                    "${apiBaseURL}/datasources" |
+                jq -r '.[].id' |
+                while IFS= read -r e; do
+                    {
+                        curl -fsSL \
+                            -u "${crdAdm}" \
+                            -H "X-Grafana-Org-Id: ${orgID}" \
+                            "${apiBaseURL}/datasources/${e}/health" |
+                        jq -r --arg id "${e}" \
+                            '[$id, "[\((.status // "N/A"))]"] | @tsv'
+                    } || echo "${e}"$'\tERROR'
+                done |
+                sort -nk 1,1 -t $'\t'
+            )
+    } | column -ts $'\t'
+true ); echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Import Dashboards
+###     Dashboard Definitions
+<span style="color:red;font-weight:bold;" data-var="vEV--_GF__DB__CFG"></span>
+# Run the script defining the Dashboards FIRST!!!
+( set -euo pipefail; shopt -s inherit_errexit
+    typeset crdAdm="${_GF__CRD_ADM-$(echo '<span style="color:red;font-weight:bold;" data-var="vEV--_GF__CRD_ADM"></span>')}"
+    typeset apiBaseURL='<span style="color:red;font-weight:bold;" data-var="vSV--apiBaseURL"></span>'
+    typeset e= seg= pSeg= dbPathUID= dbPathName= folderUID= parentUID=
+    typeset dbJSON= dbTitle= dbUID=
+    typeset -i orgID=0
+
+    typeset dbCfg="${_GF__DB__CFG:-"$(
+        cat - 0&lt;&lt;'cfgEOF' | yq -o json e . | jq -c .
+# This is just an EXAMPLE!!! NOT actual Dashboard definitions.
+shellVars:
+  orgID: 0
+dbCfg:
+  - dbPath:
+      # Each Path Segment MUST be URL Endoded. Ignored if the UID-based
+      #   macthing succeeded.
+      name: /topFolder/subFolder
+      # Optional, for faster search (\`^[_0-9A-Za-z-]{1,40}$\`) and take
+      #   precedence.
+      uid: topFolder--subFolder
+    dbGetter: | # MUST yield array of Grafana Dashboard JSON format to FD 3!!!
+      {
+        curl -fsSL 'https://host.dom/path/db.json'
+        cat '/path/to/file.json'
+      } | jq -s . 1&gt;&amp;3
+cfgEOF
+    )"}"
+
+    # Handle credential input.
+    [ -z "${crdAdm}" ] &amp;&amp; read -p 'Grafana Administrator Username: ' crdAdm
+    [[ "${crdAdm}" =~ : ]] || {
+        read -sp 'Grafana Administrator Password: ' &amp;&amp; echo
+        crdAdm+=":${REPLY}"; unset REPLY
+    }
+
+    # Assign appropriate pre-defined variables from \`${dbCfg}\`.
+    while IFS= read -r e; do
+        [[ -v "${e}" ]] &amp;&amp; eval "$(
+            printf '%s=%q' "${e}" "$(jq -r ".shellVars.${e}" 0&lt;&lt;&lt;"${dbCfg}")"
+        )"
+    done 0&lt; &lt;(jq -r '.shellVars | keys[]' 0&lt;&lt;&lt;"${dbCfg}")
+
+    # Create or update Dashboards.
+    while IFS= read -r e; do
+        dbPathUID="$(jq -r '(.dbPath.uid // empty)' 0&lt;&lt;&lt;"${e}")"
+        dbPathName="$(jq -r '(.dbPath.name // empty)' 0&lt;&lt;&lt;"${e}")"
+        # Find or create Folder hierarchy.
+        if {
+            [ -z "${dbPathUID}" ] || ! pSeg="$(
+                curl -fsSL \
+                    -u "${crdAdm}" \
+                    "${apiBaseURL}/folders/${dbPathUID}" |
+                jq -r '"/" + ([.parents[]?.title, .title] | join("/"))'
+            )"
+        }; then
+            # Fallback to peruse Folder hierarchy by name.
+            dbPathUID= parentUID= pSeg=
+            while read -d / -r seg; do
+                [ -z "${seg}" ] &amp;&amp;
+                    continue ||
+                    seg="$(
+                        python3 \
+                            -c "
+import sys, urllib.parse
+print(urllib.parse.unquote(sys.argv[1]), end='')
+                            " \
+                            "${seg}"
+                    )"
+                pSeg+="/${seg}"
+
+                # Search for Folder by name under parent.
+                folderUID="$(
+                    curl -fsSL \
+                        -u "${crdAdm}" \
+                        "${apiBaseURL}/folders${parentUID:+?parentUid=${parentUID}}" |
+                    jq -r \
+                        --arg title "${seg}" \
+                        --arg parent "${parentUID}" \
+                        '
+                            .[] | select(
+                                (.title == $title) and
+                                ((.parentUid // "") == $parent)
+                            ).uid
+                        '
+                )"
+
+                # Using REST API, it possible to create multiple Folders with
+                #   the same name under the same parent. Exit out and tell user
+                #   to delete the duplicated Folders via Web UI.
+                (("$(echo -n "${folderUID}" | wc -l)")) &amp;&amp; {
+                    cat - 0&lt;&lt;errEOF 1&gt;&amp;2
+ERROR:
+    Found multiple Folders with name: ${pSeg}
+    Please delete duplicates via Web UI.
+errEOF
+                    false
+                }
+
+                if [ -n "${folderUID}" ]; then
+                    parentUID="${folderUID}"
+                else
+                    # Create Folder.
+                    parentUID="$(
+                        curl -fsSL \
+                            -X POST \
+                            -u "${crdAdm}" \
+                            -H "Content-Type: application/json" \
+                            -d "$(
+                                jq -cn \
+                                    --arg title "${seg}" \
+                                    --arg parent "${parentUID}" \
+                                    '
+                                        {title: $title} |
+                                        if ($parent != "") then
+                                            .parentUid=$parent
+                                        end
+                                    '
+                            )" \
+                            "${apiBaseURL}/folders" |
+                        jq -r '.uid'
+                    )"
+                fi
+            done 0&lt;&lt;&lt;"${dbPathName}/"
+            dbPathUID="${parentUID}"
+        fi
+
+        # Import Dashboards to Folder.
+        while IFS= read -r dbJSON; do
+            [ -n "${e}" ] &amp;&amp; {
+                echo "Importing Dashboards to: ${pSeg}/"
+                e=
+            }
+            dbTitle="$(jq -r '.title' 0&lt;&lt;&lt;"${dbJSON}")"
+            echo " |- ${dbTitle}"
+
+            [ -z "$(jq -r '(.uid // empty)' 0&lt;&lt;&lt;"${dbJSON}")" ] &amp;&amp; {
+                # Query for existing dashboard by Title in Folder to get UID.
+                dbUID="$(
+                    curl -fsSL \
+                        -u "${crdAdm}" \
+                        -H "X-Grafana-Org-Id: ${orgID}" \
+                        "${apiBaseURL}/search?"\
+"type=dash-db&amp;folderUids=${dbPathUID}&amp;query=$(
+    python3 \
+        -c "
+import sys, urllib.parse
+print(urllib.parse.quote(sys.argv[1], safe=''), end='')
+        " \
+        "${dbTitle}"
+)"                      |
+                    jq -r \
+                        --arg title "${dbTitle}" \
+                        '.[] | select(.title == $title).uid'
+                )"
+
+                # It possible to create multiple Dashboards with the same name
+                #   under the same Folder. Exit out and tell user to delete the
+                #   duplicated Dashboards via Web UI.
+                (("$(echo -n "${dbUID}" | wc -l)")) &amp;&amp; {
+                    cat - 0&lt;&lt;errEOF 1&gt;&amp;2
+ERROR:
+    Found multiple Dashboards with name: ${dbTitle}
+    Please delete duplicates via Web UI.
+errEOF
+                    false
+                }
+
+                # Inject existing UID if found for idempotent update.
+                [ -n "${dbUID}" ] &amp;&amp; dbJSON="$(
+                    jq -c --arg uid "${dbUID}" '.uid=$uid' 0&lt;&lt;&lt;"${dbJSON}"
+                )"
+            }
+
+            curl -fsSL \
+                -X POST \
+                -u "${crdAdm}" \
+                -H "Content-Type: application/json" \
+                -H "X-Grafana-Org-Id: ${orgID}" \
+                -d "$(
+                    jq -cn \
+                        --argjson db "${dbJSON}" \
+                        --arg fUID "${dbPathUID}" \
+                        '{
+                            dashboard: $db,
+                            folderUid: $fUID,
+                            overwrite: true
+                        }' ||
+                    echo '{}'
+                )" \
+                "${apiBaseURL}/dashboards/db" \
+                1&gt; /dev/null
+        done 0&lt; &lt;(
+            eval "$(cat - 0&lt;&lt;scrEOF
+exec 3&gt;&amp;1; ( set -euxo pipefail; shopt -s inherit_errexit
+$(jq -r '.dbGetter' 0&lt;&lt;&lt;"${e}")
+true ) 1&gt;&amp;2; exec 3&gt;&amp;-
+scrEOF
+            )" | jq -cr '.[]'
+        )
+    done 0&lt; &lt;(jq -c '.dbCfg[]' 0&lt;&lt;&lt;"${dbCfg}")
+
+    # List all Dashboards in Organization.
+    {
+        echo -e 'ID\tTITLE\t(UID)'
+        curl -fsSL \
+            -u "${crdAdm}" \
+            -H "X-Grafana-Org-Id: ${orgID}" \
+            "${apiBaseURL}/search?type=dash-db" |
+        jq -r '.[] | [.id, .title, "(\(.uid))"] | @tsv' |
+        sort -nk 1,1 -t $'\t'
+    } | column -ts $'\t'
+true ); echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

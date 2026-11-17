@@ -1,0 +1,153 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS S3 - Object Management</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../js/global.js"></script>
+    <script type="module" src="../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="aws-s3--object-mgmt">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-P--awsRegion": [
+                    ["Please select a Region."],
+                    {
+                        "val": "...awsRegion1...",
+                        "txt": "...awsRegion1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vP--s3BucketName\": [{\"val\": \"...s3BucketName1...\"}]}"
+                        }
+                    },
+                    {
+                        "val": "...awsRegion2...",
+                        "txt": "...awsRegion2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vP--s3BucketName\": [{\"val\": \"...s3BucketName2...\"}]}"
+                        }
+                    }
+                ],
+                "vP--awsProfile": [
+                    ["Please select a Profile."],
+                    {"val": "...awsProfile1..."},
+                    {"val": "...awsProfile2..."}
+                ],
+                "vP--localPath": "/path/to/file",
+                "vP--s3BucketName": [
+                    ["Please select a Bucket."],
+                    {"val": "...s3BucketName1..."},
+                    {"val": "...s3BucketName2..."}
+                ],
+                "vP--s3BucketPath": "optional/prefix/object",
+                "vP--s3BucketOldPath": "object",
+                "vP--s3PreSignURLperiodInSec": "3600"
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">AWS Region</p>
+        <label><span class="cw-cls--label-text">awsRegion</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-P--awsRegion"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Parameters</p>
+        <label><span class="cw-cls--label-text">awsProfile</span>               <select class="cw-cls--opt" data-var="vP--awsProfile"></select></label>
+        <label><span class="cw-cls--label-text">localPath</span>                <input type="text"          data-var="vP--localPath" value="" /></label>
+        <label><span class="cw-cls--label-text">s3BucketName</span>             <select class="cw-cls--opt" data-var="vP--s3BucketName"></select></label>
+        <label><span class="cw-cls--label-text">s3BucketPath</span>             <input type="text"          data-var="vP--s3BucketPath" value="" /></label>
+        <label><span class="cw-cls--label-text">s3BucketOldPath</span>          <input type="text"          data-var="vP--s3BucketOldPath" value="" /></label>
+        <label><span class="cw-cls--label-text">s3PreSignURLperiodInSec</span>  <input type="number"        data-var="vP--s3PreSignURLperiodInSec" value="" /></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Uploading an Object
+aws s3 cp \
+    --profile '<span style="color:red;font-weight:bold;" data-var="vP--awsProfile"></span>' \
+    '<span style="color:red;font-weight:bold;" data-var="vP--localPath"></span>' 's3://<span style="color:red;font-weight:bold;" data-var="vP--s3BucketName"></span>/<span style="color:red;font-weight:bold;" data-var="vP--s3BucketPath"></span>'
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Listing Bucket Contents
+# Top-level only.
+aws s3 ls \
+    --profile '<span style="color:red;font-weight:bold;" data-var="vP--awsProfile"></span>' \
+    's3://<span style="color:red;font-weight:bold;" data-var="vP--s3BucketName"></span>/'
+
+# All objects recursively.
+aws s3 ls \
+    --profile '<span style="color:red;font-weight:bold;" data-var="vP--awsProfile"></span>' \
+    --recursive \
+    's3://<span style="color:red;font-weight:bold;" data-var="vP--s3BucketName"></span>/'
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Moving an Object to a Folder (Rename or Update Prefix)
+aws s3 mv \
+    --profile '<span style="color:red;font-weight:bold;" data-var="vP--awsProfile"></span>' \
+    's3://<span style="color:red;font-weight:bold;" data-var="vP--s3BucketName"></span>/<span style="color:red;font-weight:bold;" data-var="vP--s3BucketOldPath"></span>' 's3://<span style="color:red;font-weight:bold;" data-var="vP--s3BucketName"></span>/<span style="color:red;font-weight:bold;" data-var="vP--s3BucketPath"></span>'
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Downloading an Object
+# Using AWS CLI.
+aws s3 cp \
+    --profile '<span style="color:red;font-weight:bold;" data-var="vP--awsProfile"></span>' \
+    's3://<span style="color:red;font-weight:bold;" data-var="vP--s3BucketName"></span>/<span style="color:red;font-weight:bold;" data-var="vP--s3BucketPath"></span>' '<span style="color:red;font-weight:bold;" data-var="vP--localPath"></span>'
+
+# Using `awscurl` (SigV4-signed HTTP Request).
+### WARNING!!!
+### For `legal90/awscurl`, do NOT use to download binary file. It will be corrupted!!!
+### See: https://github.com/legal90/awscurl/issues/13
+awscurl \
+    --profile '<span style="color:red;font-weight:bold;" data-var="vP--awsProfile"></span>' \
+    --region '<span style="color:red;font-weight:bold;" data-var="vGrp-P--awsRegion"></span>' \
+    --service s3 \
+    -H 'x-amz-content-sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' \
+    'https://s3.<span style="color:red;font-weight:bold;" data-var="vGrp-P--awsRegion"></span>.amazonaws.com/<span style="color:red;font-weight:bold;" data-var="vP--s3BucketName"></span>/<span style="color:red;font-weight:bold;" data-var="vP--s3BucketPath"></span>' \
+    1&gt; '<span style="color:red;font-weight:bold;" data-var="vP--localPath"></span>'
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Deleting an Object
+aws s3 rm \
+    --profile '<span style="color:red;font-weight:bold;" data-var="vP--awsProfile"></span>' \
+    's3://<span style="color:red;font-weight:bold;" data-var="vP--s3BucketName"></span>/<span style="color:red;font-weight:bold;" data-var="vP--s3BucketPath"></span>'
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Creating Temporary Pre-Signed HTTPS URL
+aws s3 presign \
+    --profile '<span style="color:red;font-weight:bold;" data-var="vP--awsProfile"></span>' \
+    --region '<span style="color:red;font-weight:bold;" data-var="vGrp-P--awsRegion"></span>' \
+    --expires-in <span style="color:red;font-weight:bold;" data-var="vP--s3PreSignURLperiodInSec"></span> \
+    's3://<span style="color:red;font-weight:bold;" data-var="vP--s3BucketName"></span>/<span style="color:red;font-weight:bold;" data-var="vP--s3BucketPath"></span>'
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

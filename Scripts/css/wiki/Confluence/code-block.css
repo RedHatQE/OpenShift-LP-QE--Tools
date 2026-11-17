@@ -1,0 +1,40 @@
+/* Confluence-Style Inline Code */
+code {
+    font-family: 'Courier New', Courier, monospace;
+    border-radius: 3px;
+    padding: 2px 4px;
+    background-color: color-mix(in srgb, CanvasText 8%, Canvas);
+    color: CanvasText;
+}
+
+/* Confluence-Style Code Block */
+.code-block {
+    margin: 10px 0;
+    border: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+    border-radius: 3px;
+    background-color: Canvas;
+}
+
+.code-block-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+    background-color: color-mix(in srgb, CanvasText 10%, Canvas);
+    border-bottom: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
+    padding: 10px;
+    color: CanvasText;
+}
+
+.code-block pre {
+    overflow: auto;
+    margin: 0;
+    background-color: Canvas;
+    padding: 10px;
+}
+
+.code-block code {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+    color: CanvasText;
+    line-height: 1.5;
+}

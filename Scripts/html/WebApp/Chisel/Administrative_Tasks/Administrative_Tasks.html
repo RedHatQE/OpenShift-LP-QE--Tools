@@ -1,0 +1,504 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chisel - Administrative Tasks</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../js/global.js"></script>
+    <script type="module" src="../../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="chisel--admin-tasks">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_SVC__CRD_USR\": \"bot--...team1...--...name1...\", \"vEV--_BW__NOTE_NAME\": [[{\"val\": \"\", \"txt\": \"None\"}], {\"val\": \"...bwNoteName1...\", \"txt\": \"...bwNoteName1...\"}], \"vEV--_GSM__SEC_COL\": \"...gsmSecCol1...\", \"vEV--_GSM__SEC_PATH__GRP\": \"...gsmSecPathGrp1...\", \"vEV--_VAULT_KEY_PATH\": \"...vaultKeyPath1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_SVC__CRD_USR\": \"bot--...team2...--...name2...\", \"vEV--_BW__NOTE_NAME\": [[{\"val\": \"\", \"txt\": \"None\"}], {\"val\": \"...bwNoteName2...\", \"txt\": \"...bwNoteName2...\"}], \"vEV--_GSM__SEC_COL\": \"...gsmSecCol2...\", \"vEV--_GSM__SEC_PATH__GRP\": \"...gsmSecPathGrp2...\", \"vEV--_VAULT_KEY_PATH\": \"...vaultKeyPath2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_SVC__CRD_USR": "...chiselCrdUsr...",
+                "vEV--_SVC__ACL_RGX": "(\"^R:0\\.0\\.0\\.0:8443$\")",
+                "vEV--_BW__NOTE_NAME": [[{"val": "", "txt": "None"}], {"val": "...bwNoteName...", "txt": "...bwNoteName..."}],
+                "vEV--_GSM__CTR_IMG": "...gsmCtrImg...",
+                "vEV--_GSM__SEC_COL": "...gsmSecCol...",
+                "vEV--_GSM__SEC_PATH__GRP": "...gsmSecPathGrp...",
+                "vEV--_GSM__SEC_PATH__FLD__USR": "...gsmSecPathFldUsr...",
+                "vEV--_GSM__SEC_PATH__FLD__PWD": "...gsmSecPathFldPwd...",
+                "vEV--_VAULT_MOUNT": [[{"val": "", "txt": "None"}], {"val": "...vaultMount...", "txt": "...vaultMount..."}],
+                "vEV--_VAULT_KEY_PATH": "...vaultKeyPath...",
+                "vEV--_VAULT_KEY_USR": "...vaultKeyUsr...",
+                "vEV--_VAULT_KEY_PWD": "...vaultKeyPwd...",
+                "vEV--VAULT_ADDR": "...vaultAddr..."
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_SVC__ACTION</span>             <select class="cw-cls--opt" data-var="vEV--_SVC__ACTION">
+            <option value="-2"             >     -2: Delete ACL entries only.</option>
+            <option value="-1"             >     -1: Delete Credential.</option>
+            <option value="0"              >&nbsp;0: List.</option>
+            <option value="1"   selected="">&nbsp;1: Create/Update Credential only.</option>
+            <option value="2"              >&nbsp;2: Create/Update ACL entries only.</option>
+            <option value="3"              >&nbsp;3: Create/Update Credential and ACL entries.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_SVC__CRD_USR</span>            <input type="text"          data-var="vEV--_SVC__CRD_USR" value="" /></label>
+        <label><span class="cw-cls--label-text">_SVC__CRD_PWD_CHG</span>        <select class="cw-cls--opt" data-var="vEV--_SVC__CRD_PWD_CHG">
+            <option value="0"   selected="">0: Reuse existing password.</option>
+            <option value="1"              >1: Force password rotation.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_SVC__ACL_RGX</span>            <input type="text"          data-var="vEV--_SVC__ACL_RGX" value="" /></label>
+        <label><span class="cw-cls--label-text">_BW__NOTE_NAME</span>           <select class="cw-cls--opt" data-var="vEV--_BW__NOTE_NAME"></select></label>
+        <label><span class="cw-cls--label-text">_GSM__CTR_IMG</span>            <input type="text"          data-var="vEV--_GSM__CTR_IMG" value="" /></label>
+        <label><span class="cw-cls--label-text">_GSM__SEC_COL</span>            <input type="text"          data-var="vEV--_GSM__SEC_COL" value="" /></label>
+        <label><span class="cw-cls--label-text">_GSM__SEC_PATH__GRP</span>      <input type="text"          data-var="vEV--_GSM__SEC_PATH__GRP" value="" /></label>
+        <label><span class="cw-cls--label-text">_GSM__SEC_PATH__FLD__USR</span> <input type="text"          data-var="vEV--_GSM__SEC_PATH__FLD__USR" value="" /></label>
+        <label><span class="cw-cls--label-text">_GSM__SEC_PATH__FLD__PWD</span> <input type="text"          data-var="vEV--_GSM__SEC_PATH__FLD__PWD" value="" /></label>
+<!--    <label><span class="cw-cls--label-text">_VAULT_MOUNT</span>             <select class="cw-cls--opt" data-var="vEV--_VAULT_MOUNT"></select></label>       -->
+<!--    <label><span class="cw-cls--label-text">_VAULT_KEY_PATH</span>          <input type="text"          data-var="vEV--_VAULT_KEY_PATH" value="" /></label>  -->
+<!--    <label><span class="cw-cls--label-text">_VAULT_KEY_USR</span>           <input type="text"          data-var="vEV--_VAULT_KEY_USR" value="" /></label>   -->
+<!--    <label><span class="cw-cls--label-text">_VAULT_KEY_PWD</span>           <input type="text"          data-var="vEV--_VAULT_KEY_PWD" value="" /></label>   -->
+<!--    <label><span class="cw-cls--label-text">VAULT_ADDR</span>               <input type="text"          data-var="vEV--VAULT_ADDR" value="" /></label>       -->
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Managing Credentials
+#   The `_SVC__ACTION` absolute value is a bit flag for which information need
+#   to be updated (while the pos. sign means create or update and neg. sign
+#   means delete).
+#     0x01  User Password.
+#     0x02  User ACL.
+__SHELL=0 \
+    _SVC__ACTION=<span style="color:red;font-weight:bold;" data-var="vEV--_SVC__ACTION"></span> \
+    _SVC__CRD_USR='<span style="color:red;font-weight:bold;" data-var="vEV--_SVC__CRD_USR"></span>' \
+    _SVC__CRD_PWD_CHG=<span style="color:red;font-weight:bold;" data-var="vEV--_SVC__CRD_PWD_CHG"></span> \
+    _SVC__ACL_RGX='<span style="color:red;font-weight:bold;" data-var="vEV--_SVC__ACL_RGX"></span>' \
+    _SVC__OWN_DATA_DIR=/opt/web-app/chisel \
+    _BW__NOTE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME"></span>' \
+    _GSM__CTR_IMG='<span style="color:red;font-weight:bold;" data-var="vEV--_GSM__CTR_IMG"></span>' \
+    _GSM__SEC_COL='<span style="color:red;font-weight:bold;" data-var="vEV--_GSM__SEC_COL"></span>' \
+    _GSM__SEC_PATH__GRP='<span style="color:red;font-weight:bold;" data-var="vEV--_GSM__SEC_PATH__GRP"></span>' \
+    _GSM__SEC_PATH__FLD__USR='<span style="color:red;font-weight:bold;" data-var="vEV--_GSM__SEC_PATH__FLD__USR"></span>' \
+    _GSM__SEC_PATH__FLD__PWD='<span style="color:red;font-weight:bold;" data-var="vEV--_GSM__SEC_PATH__FLD__PWD"></span>' \
+   x_VAULT_MOUNT='<span style="color:red;font-weight:bold;" data-var="vEV--_VAULT_MOUNT"></span>' \
+   x_VAULT_KEY_PATH='<span style="color:red;font-weight:bold;" data-var="vEV--_VAULT_KEY_PATH"></span>' \
+   x_VAULT_KEY_USR='<span style="color:red;font-weight:bold;" data-var="vEV--_VAULT_KEY_USR"></span>' \
+   x_VAULT_KEY_PWD='<span style="color:red;font-weight:bold;" data-var="vEV--_VAULT_KEY_PWD"></span>' \
+    BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}" \
+    BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)" \
+   xVAULT_ADDR='<span style="color:red;font-weight:bold;" data-var="vEV--VAULT_ADDR"></span>' \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+                echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+                exit 1
+            }
+            eval "${__shOpt}"; unset __shOpt
+        }
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this \`DEBUG\` session!!!
+
+        typeset svcConfDir=/etc/chisel
+        typeset svcUsrDB="${_SVC__OWN_DATA_DIR}${svcConfDir}/users.json"
+        typeset systemdSvcName=container--chisel
+        typeset bwData= bwSubFld="cred.${_SVC__CRD_USR}"
+        typeset crdPwd= aclRgxJSON=
+        typeset -i absAction="$((
+            (_SVC__ACTION &lt; 0) ? -_SVC__ACTION : _SVC__ACTION
+        ))"
+        typeset -a aclRgx="${_SVC__ACL_RGX}"
+
+        case ${_SVC__ACTION} in
+            (-[123]|[123])  [ -n "${_BW__NOTE_NAME}" ];;
+            (0)             ;;
+            (*)             false;;
+        esac
+
+        [ -z "${_BW__NOTE_NAME}" ] || {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            bwData="$(bw get item "${_BW__NOTE_NAME}")" || {
+                echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                exit 1
+            }
+            { {
+                bw encode 0&lt;&lt;&lt;"${bwData}" |
+                bw edit item "$(jq -cr '.id' 0&lt;&lt;&lt;"${bwData}")" 1&gt; /dev/null
+            } || {
+                echo "You do NOT have R/W access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                exit 1
+            }; } &amp;&amp; bw sync 1&gt; /dev/null &amp;&amp; bwData="$(bw get item "${_BW__NOTE_NAME}")"
+            eval "${__shOpt}"; unset __shOpt
+        }
+
+        [ -f "${svcUsrDB}" ] || echo '{}' 1&gt; "${svcUsrDB}"
+        exec 3&lt; &lt;(0&lt; "${svcUsrDB}"); wait $!
+        case ${_SVC__ACTION} in
+          (-3|-1)
+            # Delete Credential.
+            jq \
+                --arg usr "${_SVC__CRD_USR}" \
+                'with_entries(select(.key | startswith("\($usr):") | not))' \
+            0&lt;&amp;3 1&gt; "${svcUsrDB}"
+            ;;
+          (-2|1|2|3)
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            # Password handling.
+            crdPwd="$( set +x
+                ((absAction &amp; 0x01)) || {
+                    crdPwd="$(jq -cr \
+                        --arg usr "${_SVC__CRD_USR}" \
+                        '
+                            to_entries[] |
+                            select(.key | startswith("\($usr):")) |
+                            .key |
+                            ltrimstr("\($usr):")
+                        ' \
+                    0&lt; "${svcUsrDB}")"
+                    [ -z "${crdPwd}" ] &amp;&amp; {
+                        echo "[${svcUsrDB}] User not found: ${_SVC__CRD_USR}" 1&gt;&amp;2
+                        exit 1
+                    } || echo "${crdPwd}"
+                exit 0
+                }
+                ((_SVC__CRD_PWD_CHG)) || {
+                    crdPwd="$(jq -cr \
+                        --arg fn__c "${bwSubFld}" \
+                        '
+                            .fields[]? | select(.name == $fn__c).value |
+                            fromjson | (.pwd // "")
+                        ' \
+                    0&lt;&lt;&lt;"${bwData}")"
+                    [ -z "${crdPwd}" ] || { echo "${crdPwd}"; false; }
+                } &amp;&amp; {
+                    while (
+                        ((${#crdPwd} &lt; 32)) ||
+                        ! [[ "${crdPwd}" =~ [[:upper:]] ]] ||
+                        ! [[ "${crdPwd}" =~ [[:lower:]] ]] ||
+                        ! [[ "${crdPwd}" =~ [[:digit:]] ]] ||
+                        ! [[ "${crdPwd}" =~ [+=._-] ]]
+                    ); do
+                        crdPwd="$(
+                            openssl rand 256 | LC_ALL=c tr -dc '[:alnum:]+=._-'
+                        )"
+                        crdPwd="${crdPwd:0:32}"
+                    done
+                    echo "${crdPwd}"
+                }
+            true )"
+            # Build ACL.
+            aclRgxJSON="$(jq -cn --args '$ARGS.positional' "${aclRgx[@]}")"
+            aclRgxJSON="$(jq -c \
+                --arg usr "${_SVC__CRD_USR}" \
+                --argjson inLst "$(
+                    ((absAction &amp; 0x02)) &amp;&amp; echo "${aclRgxJSON}" || echo '[]'
+                )" \
+                --argjson add "$(((_SVC__ACTION &gt; 0) ? 1 : 0))" \
+                '([
+                    to_entries[] |
+                    select(.key | startswith("\($usr):")) |
+                    .value
+                ][0] // []) as $acl | (
+                    if ($add == 1) then (($acl + $inLst) | unique)
+                    else ($acl - $inLst)
+                    end
+                )' \
+            0&lt; "${svcUsrDB}")"
+            # Update User DataBase.
+            jq \
+                --arg usr "${_SVC__CRD_USR}" \
+                --arg pwd "${crdPwd}" \
+                --argjson aclRgx "${aclRgxJSON}" \
+                '
+                    with_entries(select(.key | startswith("\($usr):") | not)) +
+                    {"\($usr):\($pwd)": $aclRgx}
+                ' \
+            0&lt;&amp;3 1&gt; "${svcUsrDB}"
+            eval "${__shOpt}"; unset __shOpt
+            ;;
+        esac
+        exec 3&lt;&amp;-
+        chmod 00600 "${svcUsrDB}"
+        # Restart the Service.
+        case ${_SVC__ACTION} in
+          (-[123]|[123])    systemctl --user restart "${systemdSvcName}.service";;
+        esac
+
+        # List all Users.
+        jq -r '(
+            "List of Users:",
+            (to_entries[] | (
+                "    \(.key | split(":")[0]):",
+                (.value[] | "        \(.)")
+            ))
+        )' "${svcUsrDB}"
+
+        # Update BitWarden.
+        [ -z "${_BW__NOTE_NAME}" ] || ( set +x
+            case ${_SVC__ACTION} in
+              (-3|-1)
+                bwData="$(jq -r \
+                    --arg fn__c "${bwSubFld}" \
+                    '.fields|=map(select(.name != $fn__c))' \
+                0&lt;&lt;&lt;"${bwData}")"
+                bw encode 0&lt;&lt;&lt;"${bwData}" | bw edit item "$(jq -cr '.id' 0&lt;&lt;&lt;"${bwData}")" 1&gt; /dev/null
+                ;;
+              (-2|1|2|3)
+                bwData="$(jq -r \
+                    --arg fn__c "${bwSubFld}" \
+                    --rawfile fv__c &lt;( set +x
+                        jq -cnj \
+                            --arg usr "${_SVC__CRD_USR}" \
+                            --arg pwd "${crdPwd}" \
+                            --argjson aclRgx "${aclRgxJSON}" \
+                            '{usr: $usr, pwd: $pwd, aclRgx: $aclRgx}'
+                    true ) \
+                    '.fields|=((. // []) | (
+                        map(select(.name != $fn__c)) +
+                        [{name: $fn__c, value: $fv__c, type: 1}]
+                    ))' \
+                0&lt;&lt;&lt;"${bwData}")"
+                bw encode 0&lt;&lt;&lt;"${bwData}" | bw edit item "$(jq -cr '.id' 0&lt;&lt;&lt;"${bwData}")" 1&gt; /dev/null
+                ;;
+            esac
+        true )
+
+        # Update Google Secret Manager (GSM).
+        [ -z "${_GSM__SEC_COL}" ] || [ -z "${_GSM__SEC_PATH__GRP}" ] || [ \
+            -z "${_GSM__SEC_PATH__FLD__USR}" ] || [ -z "${_GSM__SEC_PATH__FLD__PWD}" \
+        ] || (( ! (absAction &amp; 0x01) )) || ( set +x
+            function gsm-cli () {
+                podman run --rm -i \
+                    -u 0:0 \
+                    -e CLOUDSDK_CONFIG=/gcloud \
+                    -e GOOGLE_CLOUD_QUOTA_PROJECT=openshift-ci-secrets \
+                    --env-file &lt;(echo _GSM__SEC_VAL) \
+                    -v "${HOME}/.config/gcloud:/gcloud:z" \
+                    --entrypoint bash \
+                    -- \
+                    "${_GSM__CTR_IMG}" \
+                    -c \
+                    "$@"
+            }
+            function gsm-norm-path () {
+                # Must follow encoding in
+                #   `https://github.com/openshift/ci-tools/blob/main/pkg/gsm-validation/gsm.go` (`NormalizeName()`).
+                printf '%s' "$(awk '{
+                    while (match($0, /_{2,}/)) {
+                        printf "%s", substr($0, 1, (RSTART-1))
+                        n = RLENGTH
+                        printf "--"
+                        for (i=1; i&lt;=n; i++) printf "u"
+                        printf "--"
+                        $0 = substr($0, (RSTART+RLENGTH))
+                    }
+                    printf "%s", $0
+                }' 0&lt;&lt;&lt;"${1//./--dot--}")"
+            }
+
+            typeset gsmSecPathUsr= gsmSecPathPwd= gsmSecLst= e=
+            typeset -i gsmSecExistUsr=0 gsmSecExistPwd=0
+            typeset -x _GSM__SEC_VAL=
+
+            typeset gsmSecPathUsr="$(
+                gsm-norm-path "${_GSM__SEC_PATH__GRP}/${_GSM__SEC_PATH__FLD__USR}"
+            )"
+            typeset gsmSecPathPwd="$(
+                gsm-norm-path "${_GSM__SEC_PATH__GRP}/${_GSM__SEC_PATH__FLD__PWD}"
+            )"
+
+            gcloud auth application-default print-access-token &amp;&gt; /dev/null || {
+                echo 'Logging in to Google Cloud...'
+                gcloud auth application-default login --no-launch-browser
+            } || {
+                echo 'You may NOT have access to Google Cloud.' 1&gt;&amp;2
+                exit 1
+            }
+            gsmSecLst="$(gsm-cli "$(cat - 0&lt;&lt;scrEOF
+python3 main.py list \
+    -c ${_GSM__SEC_COL@Q} \
+    -o json
+scrEOF
+            )")" 2&gt;/dev/null || {
+                echo \
+                    'You do NOT have access to GSM Collection'\
+                    "\`${_GSM__SEC_COL}\`."\
+                    1&gt;&amp;2
+                exit 1
+            }
+            for e in Usr Pwd; do
+                typeset -n gsmSecItemRef="gsmSecPath${e}"
+                typeset -n gsmSecFlagRef="gsmSecExist${e}"
+                gsmSecFlagRef=$(jq -r --arg p "${gsmSecItemRef}" '
+                    (index($p) // -1) + 1
+                ' 0&lt;&lt;&lt;"${gsmSecLst}")
+            done
+
+            case ${_SVC__ACTION} in
+              (-3|-1)
+                for e in Usr Pwd; do
+                    typeset -n gsmSecItemRef="gsmSecPath${e}"
+                    typeset -n gsmSecFlagRef="gsmSecExist${e}"
+                    ((gsmSecFlagRef)) &amp;&amp; {
+                        gsm-cli "$(cat - 0&lt;&lt;scrEOF
+python3 main.py delete \
+    -c ${_GSM__SEC_COL@Q} \
+    ${gsmSecItemRef@Q}
+scrEOF
+                        )" 1&gt; /dev/null
+                    } || true   # Ignore error (may not have delete permission).
+                done
+                ;;
+              (1|3)
+                for e in Usr Pwd; do
+                    typeset -n gsmSecItemRef="gsmSecPath${e}"
+                    typeset -n gsmSecFlagRef="gsmSecExist${e}"
+                    if [ "${e}" = 'Usr' ]; then
+                        _GSM__SEC_VAL="${_SVC__CRD_USR}"
+                    else
+                        _GSM__SEC_VAL="${crdPwd}"
+                    fi
+                    {
+                        if ((gsmSecFlagRef)); then
+                            gsm-cli "$(cat - 0&lt;&lt;scrEOF
+python3 main.py update \
+    -c ${_GSM__SEC_COL@Q} \
+    --from-literal "\${_GSM__SEC_VAL}" \
+    ${gsmSecItemRef@Q}
+scrEOF
+                            )"
+                        else
+                            gsm-cli "$(cat - 0&lt;&lt;scrEOF
+python3 main.py create \
+    -c ${_GSM__SEC_COL@Q} \
+    --from-literal "\${_GSM__SEC_VAL}" \
+    ${gsmSecItemRef@Q} 0&lt;&lt;'ansEOF'
+None
+None
+None
+ansEOF
+scrEOF
+                            )"
+                        fi
+                    } 1&gt; /dev/null || {
+                        echo \
+                            'Failed to create or update GSM Secret'\
+                            "\`${gsmSecItemRef}\` in Collection \`${_GSM__SEC_COL}\`."\
+                            1&gt;&amp;2
+                        exit 1
+                    }
+                done
+                ;;
+            esac
+        true )
+
+#       # Update HashiCorp Vault.
+#       [ -z "${_VAULT_MOUNT}" ] || [ -z "${_VAULT_KEY_PATH}" ] || [ \
+#           -z "${_VAULT_KEY_USR}" ] || [ -z "${_VAULT_KEY_PWD}" \
+#       ] || (( ! (absAction &amp; 0x01) )) || ( set +x
+#           typeset vaultData=
+#
+#           vault token lookup &amp;&gt; /dev/null || {
+#               echo 'Logging in to HashiCorp Vault...'
+#               vault login 1&gt; /dev/null
+#           } || {
+#               echo "You may NOT have access to HashiCorp Vault at \`${VAULT_ADDR}\`." 1&gt;&amp;2
+#               exit 1
+#           }
+#           vaultData="$(vault kv get -mount="${_VAULT_MOUNT}" -format=json "${_VAULT_KEY_PATH}")" || {
+#               echo \
+#                   'You do NOT have access to HashiCorp Vault Secret'\
+#                   "\`${_VAULT_MOUNT}/${_VAULT_KEY_PATH}\` at \`${VAULT_ADDR}\`."\
+#                   1&gt;&amp;2
+#               exit 1
+#           }
+#
+#           case ${_SVC__ACTION} in
+#             (-3|-1)
+#               {
+#                   jq -r \
+#                       --arg ku "${_VAULT_KEY_USR}" \
+#                       --arg kp "${_VAULT_KEY_PWD}" \
+#                       '.data.data | del(.[$ku], .[$kp])' \
+#                   0&lt;&lt;&lt;"${vaultData}" |
+#                   vault kv put -mount="${_VAULT_MOUNT}" "${_VAULT_KEY_PATH}" - 1&gt; /dev/null
+#               } || true   # Ignore error (may not have delete permission).
+#               ;;
+#             (1|3)
+#               [ "$(jq -cr \
+#                       --arg ku "${_VAULT_KEY_USR}" \
+#                       --arg kp "${_VAULT_KEY_PWD}" \
+#                       '
+#                           if . then {
+#                               u: (.data.data[$ku] // ""),
+#                               p: (.data.data[$kp] // "")
+#                           } else {u: "", p: ""} end
+#                       ' \
+#               0&lt;&lt;&lt;"${vaultData}")" = "$(
+#                   jq -cnr \
+#                       --arg ku "${_SVC__CRD_USR}" \
+#                       --arg kp "${crdPwd}" \
+#                       '{u: $ku, p: $kp}'
+#               )" ] || {
+#                   vault kv destroy -mount="${_VAULT_MOUNT}" -versions="$(
+#                       jq -r '.data.metadata.version' 0&lt;&lt;&lt;"${vaultData}"
+#                   )" "${_VAULT_KEY_PATH}" &amp;&gt; /dev/null || true    # Ignore error (may not have delete permission).
+#                   {
+#                       jq -r \
+#                           --arg ku "${_VAULT_KEY_USR}" \
+#                           --arg vu "${_SVC__CRD_USR}" \
+#                           --arg kp "${_VAULT_KEY_PWD}" \
+#                           --arg vp "${crdPwd}" \
+#                           '.data.data | .[$ku]=$vu | .[$kp]=$vp' \
+#                       0&lt;&lt;&lt;"${vaultData}" |
+#                       vault kv put -mount="${_VAULT_MOUNT}" "${_VAULT_KEY_PATH}" - 1&gt; /dev/null
+#                   } || {
+#                       echo \
+#                           'You do NOT have R/W access to HashiCorp Vault secret'\
+#                           "\`${_VAULT_MOUNT}/${_VAULT_KEY_PATH}\`."\
+#                           1&gt;&amp;2
+#                       exit 1
+#                   }
+#               }
+#               ;;
+#           esac
+#       true )
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,76 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS VM - Creating VM Instance</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../Scripts/js/code-widget.js"></script>
+    <script type="module" src="../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/html-include.js"></script>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/Cloud/AWS/VM_CreatingVMinstance.html"
+    data-mod-js="
+        CodeWidget__UsrLib_OvrCfg(html, {
+            'aws-vm--create-vm-instance': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vEV--_AWS__NET_PFX&quot;:         &quot;lp-chaos--svc&quot;,
+                                    &quot;vEV--_AWS__ROLE_NAME_SFX&quot;:   [{&quot;val&quot;: &quot;admin&quot;, &quot;txt&quot;: &quot;admin&quot;}, [{&quot;val&quot;: &quot;poweruser&quot;, &quot;txt&quot;: &quot;poweruser&quot;}]],
+                                    &quot;vEV--_BW__NOTE_NAME&quot;:        &quot;note.AWS--IAMuser--OCPinstaller--Chaos&amp;G11n&quot;,
+                                    &quot;vEV--AWS_ACCOUNT_ID&quot;:        [&quot;624914081466&quot;],
+                                    &quot;vEV--_AWS__DNS_BASE_DOM&quot;:    &quot;chaos.lp.devcluster.openshift.com&quot;,
+                                    &quot;vEV--_AWS__DNS_SUB_DOM&quot;:     &quot;&quot;,
+                                    &quot;vEV--_AWS__DNS_HOST_NAME&quot;:   &quot;lp-chaos--svc--web-app&quot;
+                                }`
+                            },
+                        },
+                    ],
+                    'vEV--_AWS__NET_PFX': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__AZ_SFX': 'a',
+                    'vEV--_AWS__SN_SFX': 'pub0',
+                    'vEV--_AWS__APP_KIND': 'web-app',
+                    'vEV--_AWS__ROLE_NAME_SFX': 'poweruser',
+                    'vEV--_BW__NOTE_NAME': ['...PleaseSelectTeam...'],
+                    'vEV--AWS_REGION': 'us-west-1',
+                    'vEV--AWS_ACCOUNT_ID': [['Please select Team.']],
+                    'vEV--_AWS__VPC_CIDR': '172.24.0.0/20',
+                    'vEV--_AWS__VPC_SN_CIDR': '172.24.0.0/26',
+                    'vEV--_AWS__SG_DESCR': 'FireWall for WebApp host.',
+                    'vEV--_AWS__DNS_BASE_DOM': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__DNS_SUB_DOM': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__DNS_HOST_NAME': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__SSH_KEY__NAME': 'openshift-qe',
+                    'vEV--_AWS__SSH_KEY__PUB--file': 'openshift-qe.pub',
+                    'vEV--_AWS__EC2__AMI_NAME': 'ami--mpex-ieng--svc--al2023--v1',
+                    'vEV--_AWS__EC2__NAME_SFX--sfx': 'host',
+                    'vEV--_AWS__EC2__INST_TYPE': 't4g.small',
+                    'vEV--_AWS__DNS_SVC_PFX_ARR': '(grafana chisel)',
+                },
+                set: {
+                    'vEV--_AWS__EC2__RESTRICT_ACC': '1',
+                },
+            },
+        });
+    "
+></div>
+</body>
+</html>

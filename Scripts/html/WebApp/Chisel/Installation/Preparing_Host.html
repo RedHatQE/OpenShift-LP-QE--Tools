@@ -1,0 +1,425 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chisel - Preparing Host</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../js/global.js"></script>
+    <script type="module" src="../../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="chisel--prepare-host">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_SVC__FQDN\": \"...svcFQDN1...\", \"vEV--_SVC__ADM_EML\": \"...svcAdmEMail1...\", \"vEV--_BW__NOTE_NAME\": \"...bwNoteName1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_SVC__FQDN\": \"...svcFQDN2...\", \"vEV--_SVC__ADM_EML\": \"...svcAdmEMail2...\", \"vEV--_BW__NOTE_NAME\": \"...bwNoteName2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_SVC__FQDN": "...svcFQDN...",
+                "vEV--_SVC__PORT__CP": "5050",
+                "vEV--_SVC__PORT__DP_RGX": "(?:[2-9]\\d{3}|[12]\\d{4})",
+                "vEV--_SVC__ADM_EML": "...svcAdmEMail...",
+                "vEV--_BW__NOTE_NAME": "...bwNoteName..."
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_SVC__FQDN</span>           <input type="text"      data-var="vEV--_SVC__FQDN" value="" /></label>
+        <label><span class="cw-cls--label-text">_SVC__PORT__CP</span>       <input type="number"    data-var="vEV--_SVC__PORT__CP" value="" /></label>
+        <label><span class="cw-cls--label-text">_SVC__PORT__DP_RGX</span>   <input type="text"      data-var="vEV--_SVC__PORT__DP_RGX" value="" /></label>
+        <label><span class="cw-cls--label-text">_SVC__ADM_EML</span>        <input type="text"      data-var="vEV--_SVC__ADM_EML" value="" /></label>
+        <label><span class="cw-cls--label-text">_BW__NOTE_NAME</span>       <input type="text"      data-var="vEV--_BW__NOTE_NAME" value="" /></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="font-size:medium;" tabindex="0">
+            <p style="margin:0"><strong>Pre-requisites:</strong></p>
+            <ul style="margin-top:0">
+                <li><strong>(BitWarden):</strong> Note <code>_BW__NOTE_NAME</code> must have a custom field <code>_BW__NOTE_SUB_FLD</code> whose value is a JSON string containing at least:
+                    <pre>{"usr": "...usrName...", "pwd": "...usrPass...", "aclRgx": ["...aclRgx1..."]}</pre>
+                </li>
+                <li>
+                    <strong>(NGINX)</strong> <code>svc--nginx</code> container running on Container Network <code>net--web-app</code> per
+                    <a href="../../NGINX/Installation/Preparing_Host.html">NGINX SettingUp</a>.
+                </li>
+            </ul>
+        </div>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+__SHELL=0 __DBG=0 \
+    _SVC__FQDN='<span style="color:red;font-weight:bold;" data-var="vEV--_SVC__FQDN"></span>' \
+    _SVC__PORT__CP=<span style="color:red;font-weight:bold;" data-var="vEV--_SVC__PORT__CP"></span> \
+    _SVC__PORT__DP_RGX='<span style="color:red;font-weight:bold;" data-var="vEV--_SVC__PORT__DP_RGX"></span>' \
+    _SVC__ADM_EML='<span style="color:red;font-weight:bold;" data-var="vEV--_SVC__ADM_EML"></span>' \
+    _SVC__OWN_DATA_DIR=/opt/web-app/chisel \
+    _SVC__RPX_NAME=nginx \
+    _SVC__RPX_CFG_DIR="/opt/web-app/${_SVC__RPX_NAME}" \
+    _BW__NOTE_SUB_FLD='cred.defAdm' \
+    _BW__NOTE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME"></span>' \
+    BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}" \
+    BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)" \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+                echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+                exit 1
+            }
+            eval "$(
+                typeset bwData=
+                bwData="$(bw get item "${_BW__NOTE_NAME}")" || {
+                    echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                    echo false; exit 1
+                }
+                jq -r \
+                    --arg fn__c "${_BW__NOTE_SUB_FLD}" \
+                    '
+                        .fields[]? | select(.name == $fn__c).value | fromjson |
+                        (
+                            "typeset -x " +
+                            "svcAdmUsr=\(.usr | @sh) " +
+                            "svcAdmPwd=\(.pwd | @sh) " +
+                            "svcAdmAclRgx=\((.aclRgx // []) | tojson | @sh)"
+                        )
+                    ' \
+                0&lt;&lt;&lt;"${bwData}"
+            )"
+            eval "${__shOpt}"; unset __shOpt
+        }
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this \`DEBUG\` session!!!
+
+        typeset ownUsr="$(id -un)"
+        typeset ownGrp=web-app
+        typeset ctrNet=net--web-app
+        typeset svcCtrName=svc--chisel
+        typeset svcConfDir=/etc/chisel
+        typeset svcUsrDB="${_SVC__OWN_DATA_DIR}${svcConfDir}/users.json"
+        typeset rpxCtrName="svc--${_SVC__RPX_NAME}"
+        typeset rpxSvcConf="${_SVC__RPX_CFG_DIR}/etc/nginx/conf.d/chisel.conf"
+        typeset certsDir="${_SVC__RPX_CFG_DIR}/etc/nginx/certs"
+        typeset certbotDir="${_SVC__RPX_CFG_DIR}/var/www/certbot"
+        typeset quadletUsrDir="${HOME}/.config/containers/systemd"
+        typeset systemdSvcName=container--chisel
+        typeset +x svcAdmUsr svcAdmPwd svcAdmAclRgx
+
+        ((__DBG)) &amp;&amp; {
+            podman container run \
+                --name "${svcCtrName}" \
+                --rm -it \
+                --network "${ctrNet}" \
+                -v "${_SVC__OWN_DATA_DIR}${svcConfDir}:${svcConfDir}:Z" \
+                docker.io/jpillora/chisel:latest \
+                server \
+                    --port "${_SVC__PORT__CP}" \
+                    --authfile "${svcConfDir}/users.json" \
+                    --reverse
+            exit 0
+        }
+
+        function ReloadRPXsvc () {
+            typeset rpxCtrName="${1}"; (($#)) &amp;&amp; shift
+
+            [ "$(podman container inspect "${rpxCtrName}" --format '{% raw %}{{.State.Status}}{% endraw %}')" = running ]
+            podman container exec "${rpxCtrName}" "${_SVC__RPX_NAME}" -t
+            podman container exec "${rpxCtrName}" "${_SVC__RPX_NAME}" -s reload
+
+            true
+        }
+
+        sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;sudoEOF
+            # Prepare Directories.
+            mkdir -p ${_SVC__OWN_DATA_DIR@Q}${svcConfDir@Q}
+            chown -R ${ownUsr@Q}:${ownGrp@Q} ${_SVC__OWN_DATA_DIR@Q}/
+            chmod -R 02775 ${_SVC__OWN_DATA_DIR@Q}/
+            setfacl \
+                -Rm g::rwx,m::rwx,d:g::rwx,d:m::rwx \
+                ${_SVC__OWN_DATA_DIR@Q}/
+
+            true
+sudoEOF
+        )"
+
+        # Create minimal HTTP-only configuration for ACME challenge.
+        # Note: NGINX container sees this because
+        #   \`-v ${_SVC__RPX_CFG_DIR}/conf.d:/etc/nginx/conf.d\` mounts the
+        #   directory, so any file changes on host are visible in container.
+        cat - 0&lt;&lt;cfgEOF 1&gt; "${rpxSvcConf}"
+# NGINX Chisel Configuration File (Minimal - HTTP Only for ACME Challenge)
+
+server {
+    listen 0.0.0.0:80;
+    listen [::]:80;
+
+    server_name ${_SVC__FQDN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 503;
+    }
+}
+cfgEOF
+        # Reload NGINX to pick up minimal config.
+        ReloadRPXsvc "${rpxCtrName}"
+
+        # Request Let's Encrypt certificate using Certbot (webroot method).
+        # Certbot stores certificates in \`/etc/letsencrypt/live/${_SVC__FQDN}/\`
+        #   on host.
+        sudo certbot certonly \
+            --webroot \
+            --webroot-path "${certbotDir}" \
+            --domain "${_SVC__FQDN}" \
+            --non-interactive \
+            --agree-tos \
+            --email "${_SVC__ADM_EML}" \
+            --keep-until-expiring
+
+        # Create Certbot Deploy Hook.
+        sudo bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;sudoEOF
+            mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+            cat - 0&lt;&lt;'scrEOF' 1&gt; /etc/letsencrypt/renewal-hooks/deploy/${_SVC__FQDN@Q}.sh
+#!/bin/bash
+set -euo pipefail; shopt -s inherit_errexit
+# Copy certificates to NGINX certs directory.
+cp -f \\
+    /etc/letsencrypt/live/${_SVC__FQDN@Q}/privkey.pem \\
+    ${certsDir@Q}/chisel.key
+cp -f \\
+    /etc/letsencrypt/live/${_SVC__FQDN@Q}/fullchain.pem \\
+    ${certsDir@Q}/chisel.crt
+chown ${ownUsr@Q}:${ownGrp@Q} ${certsDir@Q}/chisel.{key,crt}
+chmod 00600 ${certsDir@Q}/chisel.key
+chmod 00644 ${certsDir@Q}/chisel.crt
+# Reload NGINX.
+runuser -u ${ownUsr@Q} -- podman container exec ${rpxCtrName@Q} nginx -s reload
+scrEOF
+            chmod 00755 /etc/letsencrypt/renewal-hooks/deploy/${_SVC__FQDN@Q}.sh
+
+            # Execute for initial certificates.
+            /etc/letsencrypt/renewal-hooks/deploy/${_SVC__FQDN@Q}.sh
+            # Enable renewal timer.
+            systemctl enable --now certbot-renew.timer
+
+            true
+sudoEOF
+        )"
+
+        # Create full configuration file with HTTPS.
+        cat /dev/fd/{3..11} \
+            3&lt;&lt;'cfgEOF' 4&lt;&lt;cfgEOF \
+            5&lt;&lt;'cfgEOF' 6&lt;&lt;cfgEOF \
+            7&lt;&lt;'cfgEOF' 8&lt;&lt;cfgEOF \
+            9&lt;&lt;'cfgEOF' 10&lt;&lt;cfgEOF \
+            11&lt;&lt;'cfgEOF' 1&gt; "${rpxSvcConf}"
+# NGINX Chisel Configuration File
+
+# ==============================================================================
+# 1.  HTTP Block (Port 80)
+#     Handles ACME Challenges &amp; redirects to HTTPS.
+# ==============================================================================
+server {
+    listen 0.0.0.0:80;
+    listen [::]:80;
+
+    server_name
+cfgEOF
+        ${_SVC__FQDN}
+cfgEOF
+    ;
+
+    # --------------------------------------------------------------------------
+    # ACME Challenge Location
+    # --------------------------------------------------------------------------
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # --------------------------------------------------------------------------
+    # HTTPS Redirect
+    # --------------------------------------------------------------------------
+    location / {
+        return 301 https://${host}${request_uri};
+    }
+}
+
+# ==============================================================================
+# 2.  HTTPS Block (Port 443)
+#     Control Plane (`/cp/`):           WebSocket proxy to Chisel Container.
+#     Data Plane (`/dp/&lt;ctrPort&gt;/`):    HTTP proxy to Reverse-Tunneled Service.
+# ==============================================================================
+server {
+    listen 0.0.0.0:443 ssl;
+    listen [::]:443 ssl;
+    # The `http2` parameter is deprecated in newer NGINX versions, usually
+    #   enabled automatically or via 'http2 on;' directive.
+    # If using older NGINX (pre-1.25.1), use `listen 0.0.0.0:443 ssl http2;`.
+    http2 on;
+
+    server_name
+cfgEOF
+        ${_SVC__FQDN}
+cfgEOF
+    ;
+
+    # --------------------------------------------------------------------------
+    # SSL Certificates
+    # --------------------------------------------------------------------------
+    ssl_certificate     /etc/nginx/certs/chisel.crt;
+    ssl_certificate_key /etc/nginx/certs/chisel.key;
+
+    # --------------------------------------------------------------------------
+    # Control Plane
+    # Accepts `https://` (WebSocket over TLS) from Chisel clients.
+    # NGINX terminates TLS and forwards as plain `ws://` to Chisel container.
+    # Whole Path with prefix `/cp/` is completely removed and replaced with
+    #   `/` (via trailing `/` while using var. in `proxy_pass`).
+    # --------------------------------------------------------------------------
+    location /cp/ {
+cfgEOF
+        # Use variable to force dynamic DNS resolution via resolver directive.
+        #   The \`${svcCtrName}\` is the container name on the \`${ctrNet}\`
+        #   Podman Network.
+        set \$svcBackEndCP ${svcCtrName}:${_SVC__PORT__CP};
+cfgEOF
+        proxy_pass http://${svcBackEndCP}/;
+
+        # WebSocket upgrade: convert `https://` (client) to `ws://` (chisel).
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade ${http_upgrade};
+        proxy_set_header Connection 'upgrade';
+
+        proxy_set_header Host ${host};
+        proxy_set_header X-Real-IP ${remote_addr};
+        proxy_set_header X-Forwarded-For ${proxy_add_x_forwarded_for};
+        proxy_set_header X-Forwarded-Proto ${scheme};
+
+        # Long timeouts: chisel control connection is persistent.
+        proxy_connect_timeout 7d;
+        proxy_send_timeout 7d;
+        proxy_read_timeout 7d;
+    }
+
+    # --------------------------------------------------------------------------
+    # Data Plane
+    # HTTP access to the service exposed by Chisel Reverse Tunnel.
+    # Container port is embedded in URL path `/dp/&lt;ctrPort&gt;/`, restricted to
+    #   `_SVC__PORT__DP_RGX`. Path remainder is forwarded to Chisel container.
+    # --------------------------------------------------------------------------
+cfgEOF
+    location ~ "^/dp/(${_SVC__PORT__DP_RGX})/(.*)$" {
+        # \$1:   The `ctrPort` (from URL Path)
+        # \$2:   The remainder of the Path.
+        # The \`${svcCtrName}\` is the container name on the \`${ctrNet}\`
+        #   Podman Network.
+        set \$svcBackEndDP ${svcCtrName}:\$1;
+cfgEOF
+        proxy_pass http://$svcBackEndDP/$2;
+
+        proxy_set_header Host ${host};
+        proxy_set_header X-Real-IP ${remote_addr};
+        proxy_set_header X-Forwarded-For ${proxy_add_x_forwarded_for};
+        proxy_set_header X-Forwarded-Proto ${scheme};
+
+        # No buffering: pass data through immediately.
+        proxy_buffering off;
+        proxy_request_buffering off;
+        client_max_body_size 0;
+    }
+}
+cfgEOF
+
+        # Create or update default Administrator entry in Chisel AuthFile.
+        [ -f "${svcUsrDB}" ] || echo '{}' 1&gt; "${svcUsrDB}"
+        exec 3&lt; &lt;(0&lt; "${svcUsrDB}"); wait $!
+        jq \
+            --rawfile usr &lt;(set +x; printf '%s' "${svcAdmUsr}") \
+            --rawfile pwd &lt;(set +x; printf '%s' "${svcAdmPwd}") \
+            --argjson aclRgx "${svcAdmAclRgx}" \
+            '
+                with_entries(
+                    select(.key | startswith("\($usr):") | not)
+                ) + {"\($usr):\($pwd)": $aclRgx}
+            ' \
+        0&lt;&amp;3 1&gt; "${svcUsrDB}"
+        exec 3&lt;&amp;-
+        chmod 00600 "${svcUsrDB}"
+
+        # Create Podman Network.
+        podman network create "${ctrNet}" 2&gt; /dev/null || true
+        # Create Quadlet container file.
+        mkdir -p "${quadletUsrDir}"
+        cat - 0&lt;&lt;cfgEOF 1&gt; "${quadletUsrDir}/${systemdSvcName}.container"
+[Unit]
+Description=Chisel Tunnel Service
+After=network-online.target
+
+[Container]
+Image=docker.io/jpillora/chisel:latest
+ContainerName=${svcCtrName}
+AutoUpdate=registry
+Network=${ctrNet}
+Exec=server \\
+    --port ${_SVC__PORT__CP} \\
+    --authfile ${svcConfDir}/users.json \\
+    --reverse
+Volume=${_SVC__OWN_DATA_DIR}${svcConfDir}:${svcConfDir}:Z
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
+cfgEOF
+        # Reload and start the service.
+        systemctl --user daemon-reload  # Quadlet will generate unit file.
+        if systemctl --user is-active "${systemdSvcName}.service" &amp;&gt; /dev/null; then
+            systemctl --user restart "${systemdSvcName}.service"
+        else
+            systemctl --user start "${systemdSvcName}.service"
+        fi
+        systemctl --user is-enabled podman--auto-update.timer &amp;&gt; /dev/null ||
+            systemctl --user enable --now podman--auto-update.timer
+        # Reload NGINX to apply full configuration with HTTPS.
+        ReloadRPXsvc "${rpxCtrName}"
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

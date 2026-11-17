@@ -1,0 +1,329 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS OpenSearch - Maintenance</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../js/global.js"></script>
+    <script type="module" src="../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="aws-opensearch--maintenance--domain">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--AWS_REGION\": \"...awsRegion1...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID1...\", \"vEV--_AWS__OS__FQDN\": \"...osFQDN1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--AWS_REGION\": \"...awsRegion2...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID2...\", \"vEV--_AWS__OS__FQDN\": \"...osFQDN2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_AWS__ROLE_NAME_SFX": "...roleNameSfx...",
+                "vEV--AWS_REGION": "...awsRegion...",
+                "vEV--AWS_ACCOUNT_ID": [
+                    ["Please select an AWS Account."],
+                    {
+                        "val": "...awsAccID1...",
+                        "txt": "...awsAccName1..."
+                    },
+                    {
+                        "val": "...awsAccID2...",
+                        "txt": "...awsAccName2..."
+                    }
+                ],
+                "vEV--_AWS__OS__DOM_NAME": "...osDomName...",
+                "vEV--_AWS__OS__SCALE": "0",
+                "vEV--_AWS__OS__INST_TYPE": "r7g.large.search",
+                "vEV--_AWS__OS__INST_CNT": "1",
+                "vEV--_AWS__OS__ZONE_CNT": "0",
+                "vEV--_AWS__OS__EBS_SZ": "10",
+                "vEV--_AWS__OS__ENG_VER_NEW": "",
+                "vEV--_AWS__OS__SVC_SW_UPD": "0",
+                "vEV--_AWS__OS__FQDN": "...osFQDN..."
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_AWS__RESET_PROFILE</span>      <select class="cw-cls--opt" data-var="vEV--_AWS__RESET_PROFILE">
+            <option value="0"   selected="">0: Keep existing Profile.</option>
+            <option value="1"              >1: Reset Profile.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__ROLE_NAME_SFX</span>      <input type="text"          data-var="vEV--_AWS__ROLE_NAME_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_REGION</span>               <input type="text"          data-var="vEV--AWS_REGION" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_ACCOUNT_ID</span>           <select class="cw-cls--opt" data-var="vEV--AWS_ACCOUNT_ID"></select></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">Scaling, Upgrading, and/or Service Software Update</p>
+        <label><span class="cw-cls--label-text">_AWS__OS__DOM_NAME</span>       <input type="text"          data-var="vEV--_AWS__OS__DOM_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__SCALE</span>          <select class="cw-cls--opt" data-var="vEV--_AWS__OS__SCALE">
+            <option value="0"   selected="">0: Skip.</option>
+            <option value="1"              >1: Scale.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__INST_TYPE</span>      <input type="text"          data-var="vEV--_AWS__OS__INST_TYPE" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__INST_CNT</span>       <input type="number"        data-var="vEV--_AWS__OS__INST_CNT" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__ZONE_CNT</span>       <input type="number"        data-var="vEV--_AWS__OS__ZONE_CNT" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__EBS_SZ</span>         <input type="number"        data-var="vEV--_AWS__OS__EBS_SZ" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__ENG_VER_NEW</span>    <input type="text"          data-var="vEV--_AWS__OS__ENG_VER_NEW" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__SVC_SW_UPD</span>     <select class="cw-cls--opt" data-var="vEV--_AWS__OS__SVC_SW_UPD">
+            <option value="0"   selected="">0: Skip.</option>
+            <option value="1"              >1: Update.</option>
+        </select></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">Disk Usage</p>
+        <label><span class="cw-cls--label-text">_AWS__OS__FQDN</span>           <input type="text"          data-var="vEV--_AWS__OS__FQDN" value="" /></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Scaling, Upgrading OpenSearch Domain, and/or Updating Service Software
+__SHELL=0 \
+    _AWS__OS__DOM_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__DOM_NAME"></span>' \
+    _AWS__OS__SCALE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__SCALE"></span> \
+    _AWS__OS__INST_TYPE='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__INST_TYPE"></span>' \
+    _AWS__OS__INST_CNT=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__INST_CNT"></span> \
+    _AWS__OS__ZONE_CNT=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__ZONE_CNT"></span> \
+    _AWS__OS__EBS_SZ=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__EBS_SZ"></span> \
+    _AWS__OS__ENG_VER_NEW='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__ENG_VER_NEW"></span>' \
+    _AWS__OS__SVC_SW_UPD=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__SVC_SW_UPD"></span> \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset -i wInt=0 wMax=0
+
+        # Scale OpenSearch Domain.
+        if ((_AWS__OS__SCALE)); then
+            aws opensearch update-domain-config \
+                --domain-name "${_AWS__OS__DOM_NAME}" \
+                --cluster-config "$(
+                    jq -cn \
+                        --arg type "${_AWS__OS__INST_TYPE}" \
+                        --argjson nodeCnt "${_AWS__OS__INST_CNT}" \
+                        --argjson zoneCnt "${_AWS__OS__ZONE_CNT}" \
+                        '{
+                            InstanceType: $type,
+                            InstanceCount: $nodeCnt,
+                            ZoneAwarenessEnabled: ($zoneCnt &gt; 0)
+                        } | (
+                            if ($zoneCnt &gt; 0) then
+                                .ZoneAwarenessConfig
+                                    .AvailabilityZoneCount=$zoneCnt
+                            else . end
+                        )'
+                )" \
+                --ebs-options \
+"EBSEnabled=true,"\
+"VolumeType=gp3,"\
+"VolumeSize=${_AWS__OS__EBS_SZ}" \
+                --no-cli-pager
+
+            # Monitor OpenSearch Domain scaling.
+            (   # Isolate `SECONDS` reset.
+                SECONDS=0 wInt=60 wMax=3600     # 60 Min. Max.
+                while ((SECONDS &lt; wMax)); do
+                    [ "$(
+                        aws opensearch describe-domain \
+                            --domain-name "${_AWS__OS__DOM_NAME}" \
+                            --output text \
+                            --query 'DomainStatus.Processing'
+                    )" != "False" ] &amp;&amp; sleep ${wInt} || break
+                    echo "Waited ${SECONDS}/${wMax} sec.: "\
+'Scaling OpenSearch Domain...' 1&gt;&amp;2
+                done
+                ((SECONDS &gt;= wMax)) &amp;&amp; { echo 'Timed out waiting for '\
+'OpenSearch Domain scaling.' 1&gt;&amp;2; exit 2; }
+                # Final status.
+                aws opensearch describe-domain \
+                    --domain-name "${_AWS__OS__DOM_NAME}" \
+                    --no-cli-pager
+            )
+        fi
+
+        # Upgrade OpenSearch Engine Version.
+        if {
+            [ -n "${_AWS__OS__ENG_VER_NEW}" ] &amp;&amp;
+            [ "$(
+                aws opensearch describe-domain \
+                    --domain-name "${_AWS__OS__DOM_NAME}" \
+                    --output text \
+                    --query 'DomainStatus.EngineVersion'
+            )" != "${_AWS__OS__ENG_VER_NEW}" ]
+        }; then
+            aws opensearch upgrade-domain \
+                --domain-name "${_AWS__OS__DOM_NAME}" \
+                --target-version "${_AWS__OS__ENG_VER_NEW}" \
+                --no-cli-pager
+
+            # Monitor OpenSearch Engine upgrade.
+            (   # Isolate `SECONDS` reset.
+                SECONDS=0 wInt=60 wMax=7200     # 120 Min. Max.
+                while ((SECONDS &lt; wMax)); do
+                    [ "$(
+                        aws opensearch describe-domain \
+                            --domain-name "${_AWS__OS__DOM_NAME}" \
+                            --output text \
+                            --query 'DomainStatus.UpgradeProcessing'
+                    )" != "False" ] &amp;&amp; sleep ${wInt} || break
+                    echo "Waited ${SECONDS}/${wMax} sec.: "\
+'Upgrading OpenSearch Engine...' 1&gt;&amp;2
+                done
+                ((SECONDS &gt;= wMax)) &amp;&amp; { echo 'Timed out waiting for '\
+'OpenSearch Engine upgrade.' 1&gt;&amp;2; exit 2; }
+                # Final status.
+                aws opensearch describe-domain \
+                    --domain-name "${_AWS__OS__DOM_NAME}" \
+                    --no-cli-pager
+            )
+        fi
+
+        # Update Service Software.
+        if ((_AWS__OS__SVC_SW_UPD)); then
+            aws opensearch start-service-software-update \
+                --domain-name "${_AWS__OS__DOM_NAME}" \
+                --schedule-at NOW \
+                --no-cli-pager
+
+            # Monitor Service Software Update.
+            (   # Isolate `SECONDS` reset.
+                SECONDS=0 wInt=60 wMax=3600     # 60 Min. Max.
+                while ((SECONDS &lt; wMax)); do
+                    typeset swUpdSt="$(
+                        aws opensearch describe-domain \
+                            --domain-name "${_AWS__OS__DOM_NAME}" \
+                            --output text \
+                            --query 'DomainStatus.ServiceSoftwareOptions.UpdateStatus'
+                    )"
+                    [ "${swUpdSt}" = 'COMPLETED' ] &amp;&amp; break || sleep ${wInt}
+                    echo "Waited ${SECONDS}/${wMax} sec.: "\
+'Updating Service Software...' 1&gt;&amp;2
+                done
+                ((SECONDS &gt;= wMax)) &amp;&amp; { echo 'Timed out waiting for '\
+'Service Software Update.' 1&gt;&amp;2; exit 2; }
+                # Final status.
+                aws opensearch describe-domain \
+                    --domain-name "${_AWS__OS__DOM_NAME}" \
+                    --no-cli-pager
+            )
+        fi
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Disk Usage
+__SHELL=0 \
+    _AWS__OS__FQDN='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__FQDN"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        function awscurl () {
+            command awscurl \
+                --region "${AWS_REGION}" \
+                --profile "${_AWS__PROFILE}" \
+                --service es \
+                "$@"
+        }
+
+        # Cluster level.
+        awscurl -X GET \
+            "https://${_AWS__OS__FQDN}/_cluster/stats" |
+        jq -r '.nodes.fs | (
+            "Cluster Storage Usage:",
+            "    Total:      \(((.total_in_bytes     * 10) / (1024*1024*1024)) | round | (. / 10)) GiB",
+            "    Free:       \(((.free_in_bytes      * 10) / (1024*1024*1024)) | round | (. / 10)) GiB",
+            "    Available:  \(((.available_in_bytes * 10) / (1024*1024*1024)) | round | (. / 10)) GiB"
+        )'
+
+        # Node level.
+        awscurl -X GET \
+            "https://${_AWS__OS__FQDN}/_cat/allocation?v&amp;pretty"
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

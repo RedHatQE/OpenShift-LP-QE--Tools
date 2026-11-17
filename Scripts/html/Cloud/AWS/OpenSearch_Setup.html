@@ -1,0 +1,1019 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS OpenSearch - Setup</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../js/global.js"></script>
+    <script type="module" src="../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<h3>Domain Creation</h3>
+<div class="code-widget" id="aws-opensearch--setup--domain">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__COG__IDP_NAME\": \"...cogIdPname1...\", \"vEV--_AWS__DNS_BASE_DOM\": \"...dnsBaseDom1...\", \"vEV--_AWS__DNS_SUB_DOM\": \"...dnsSubDom1...\", \"vEV--AWS_REGION\": \"...awsRegion1...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__COG__IDP_NAME\": \"...cogIdPname2...\", \"vEV--_AWS__DNS_BASE_DOM\": \"...dnsBaseDom2...\", \"vEV--_AWS__DNS_SUB_DOM\": \"...dnsSubDom2...\", \"vEV--AWS_REGION\": \"...awsRegion2...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_AWS__COG__IDP_NAME": "...cogIdPname...",
+                "vEV--_AWS__DNS_BASE_DOM": "...dnsBaseDom...",
+                "vEV--_AWS__DNS_SUB_DOM": "",
+                "vEV--_AWS__OS__DOM_NAME": "...osDomName...",
+                "vEV--_AWS__OS__ENG_VER": "...osEngVer...",
+                "vEV--_AWS__OS__INST_TYPE": "r7g.large.search",
+                "vEV--_AWS__OS__INST_CNT": "1",
+                "vEV--_AWS__OS__ZONE_CNT": "0",
+                "vEV--_AWS__OS__EBS_SZ": "10",
+                "vEV--_AWS__OS__MASTER_ROLE_SFX": "poweruser",
+                "vEV--_AWS__ROLE_NAME_SFX": "...roleNameSfx...",
+                "vEV--AWS_REGION": "...awsRegion...",
+                "vEV--AWS_ACCOUNT_ID": [
+                    ["Please select an AWS Account."],
+                    {
+                        "val": "...awsAccID1...",
+                        "txt": "...awsAccName1..."
+                    },
+                    {
+                        "val": "...awsAccID2...",
+                        "txt": "...awsAccName2..."
+                    }
+                ]
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_AWS__COG__IDP_NAME</span>          <input type="text"          data-var="vEV--_AWS__COG__IDP_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__DNS_BASE_DOM</span>           <input type="text"          data-var="vEV--_AWS__DNS_BASE_DOM" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__DNS_SUB_DOM</span>            <input type="text"          data-var="vEV--_AWS__DNS_SUB_DOM" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__DOM_NAME</span>           <input type="text"          data-var="vEV--_AWS__OS__DOM_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__ENG_VER</span>            <input type="text"          data-var="vEV--_AWS__OS__ENG_VER" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__INST_TYPE</span>          <input type="text"          data-var="vEV--_AWS__OS__INST_TYPE" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__INST_CNT</span>           <input type="number"        data-var="vEV--_AWS__OS__INST_CNT" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__ZONE_CNT</span>           <input type="number"        data-var="vEV--_AWS__OS__ZONE_CNT" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__EBS_SZ</span>             <input type="number"        data-var="vEV--_AWS__OS__EBS_SZ" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__MASTER_ROLE_SFX</span>    <input type="text"          data-var="vEV--_AWS__OS__MASTER_ROLE_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__RESET_PROFILE</span>          <select class="cw-cls--opt" data-var="vEV--_AWS__RESET_PROFILE">
+            <option value="0"   selected="">0: Keep existing Profile.</option>
+            <option value="1"              >1: Reset Profile.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__ROLE_NAME_SFX</span>          <input type="text"          data-var="vEV--_AWS__ROLE_NAME_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_REGION</span>                   <input type="text"          data-var="vEV--AWS_REGION" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_ACCOUNT_ID</span>               <select class="cw-cls--opt" data-var="vEV--AWS_ACCOUNT_ID"></select></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="font-size:medium;" tabindex="0">
+            <p style="margin:0"><strong>Pre-requisites:</strong></p>
+            <ul style="margin-top:0">
+                <li>Run <strong>Cognito.md - User Pool - Cognito User Pool and IdP</strong>.</li>
+                <li>Run <strong>Cognito.md - Identity Pool - Cognito Identity Pool</strong> with:
+                    <table style="margin:0.5em 0;">
+                        <thead>
+                            <tr><th>Variable</th>                       <th>Value</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>_AWS__COG__ACTION</code></td> <td><code>0</code></td></tr>
+                        </tbody>
+                    </table>
+                    <p style="margin:0 0 0.5em 0"><strong>Notes:</strong></p>
+                    <ul style="margin-top:0">
+                        <li>
+                            It creates the Identity Pool without linking the App. Client Provider, as the App. Client is auto-created by OpenSearch Domain
+                            creation.
+                        </li>
+                    </ul>
+                </li>
+                <li>Run <strong>Cognito.md - IAM Roles - IAM App. Servicing Role</strong> with:
+                    <table style="margin:0.5em 0;">
+                        <thead>
+                            <tr><th>Variable</th>                               <th>Value</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>_AWS__COG__ACTION</code></td>         <td><code>1</code></td></tr>
+                            <tr><td><code>_AWS__COG__APP_POL_NAME</code></td>   <td><code>AmazonOpenSearchServiceCognitoAccess</code></td></tr>
+                            <tr><td><code>_AWS__COG__APP_PRINCIPAL</code></td>  <td><code>es.amazonaws.com</code></td></tr>
+                        </tbody>
+                    </table>
+                </li>
+                <li>
+                    The Federated IAM Role (<code>${AWS_ACCOUNT_ID}-${_AWS__OS__MASTER_ROLE_SFX}</code>) used for administrative access via
+                    <code>aws-saml.py</code> serves as the OpenSearch Master User.
+                </li>
+            </ul>
+        </div>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Creating OpenSearch Domain
+__SHELL=0 \
+    _AWS__COG__IDP_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__IDP_NAME"></span>' \
+    _AWS__DNS_BASE_DOM='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__DNS_BASE_DOM"></span>' \
+    _AWS__DNS_SUB_DOM='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__DNS_SUB_DOM"></span>' \
+    _AWS__OS__DOM_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__DOM_NAME"></span>' \
+    _AWS__OS__ENG_VER='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__ENG_VER"></span>' \
+    _AWS__OS__INST_TYPE='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__INST_TYPE"></span>' \
+    _AWS__OS__INST_CNT=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__INST_CNT"></span> \
+    _AWS__OS__ZONE_CNT=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__ZONE_CNT"></span> \
+    _AWS__OS__EBS_SZ=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__EBS_SZ"></span> \
+    _AWS__OS__MASTER_ROLE_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__MASTER_ROLE_SFX"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset cogUsrPoolName="cog--${_AWS__COG__IDP_NAME}--up"
+        typeset cogIdPoolName="cog--${_AWS__COG__IDP_NAME}--ip"
+        typeset cogIAMroleApp="cog--${_AWS__COG__IDP_NAME}--role--app"
+        typeset dnsHstFQDN="${_AWS__OS__DOM_NAME,,}${_AWS__DNS_SUB_DOM:+.${_AWS__DNS_SUB_DOM}}.${_AWS__DNS_BASE_DOM}"
+        typeset cogUsrPoolID= cogIdPoolID= cogIAMroleAppARN=
+        typeset r53ZoneID= acmCertARN= osMasterRoleARN= osEP=
+        typeset -i wInt=0 wMax=0
+
+        cogUsrPoolID="$(
+            typeset _page= _cur= _id= _nextTkn=
+            while true; do
+                _page="$(
+                    aws cognito-idp list-user-pools \
+                        --max-results 60 \
+                        ${_nextTkn:+--next-token "${_nextTkn}"} \
+                        --output json
+                )"
+                _cur="$(jq -cr \
+                    --arg name "${cogUsrPoolName}" \
+                    '.UserPools[] | select(.Name == $name).Id' \
+                0&lt;&lt;&lt;"${_page}")"
+                [ -n "${_cur}" ] &amp;&amp; {
+                    [ -n "${_id}" ] || [[ "${_cur}" == *$'\n'* ]] &amp;&amp; {
+                        : "ERROR: Multiple User Pools: ${cogUsrPoolName}"
+                        exit 1
+                    }
+                    _id="${_cur}"
+                }
+                _nextTkn="$(jq -cr '(.NextToken // empty)' 0&lt;&lt;&lt;"${_page}")"
+                [ -z "${_nextTkn}" ] &amp;&amp; break
+            done
+            [ -n "${_id}" ] || {
+                : "ERROR: User Pool not found: ${cogUsrPoolName}"
+                exit 1
+            }
+            echo "${_id}"
+        )"
+        cogIdPoolID="$(
+            typeset _page= _cur= _id= _nextTkn=
+            while true; do
+                _page="$(
+                    aws cognito-identity list-identity-pools \
+                        --max-results 60 \
+                        ${_nextTkn:+--next-token "${_nextTkn}"} \
+                        --output json
+                )"
+                _cur="$(jq -cr \
+                    --arg name "${cogIdPoolName}" \
+                    '
+                        .IdentityPools[] |
+                        select(.IdentityPoolName == $name).IdentityPoolId
+                    ' \
+                0&lt;&lt;&lt;"${_page}")"
+                [ -n "${_cur}" ] &amp;&amp; {
+                    [ -n "${_id}" ] || [[ "${_cur}" == *$'\n'* ]] &amp;&amp; {
+                        : "ERROR: Multiple Identity Pools: ${cogIdPoolName}"
+                        exit 1
+                    }
+                    _id="${_cur}"
+                }
+                _nextTkn="$(jq -cr '(.NextToken // empty)' 0&lt;&lt;&lt;"${_page}")"
+                [ -z "${_nextTkn}" ] &amp;&amp; break
+            done
+            [ -n "${_id}" ] || {
+                : "ERROR: Identity Pool not found: ${cogIdPoolName}"
+                exit 1
+            }
+            echo "${_id}"
+        )"
+        cogIAMroleAppARN="$(
+            aws iam get-role \
+                --role-name "${cogIAMroleApp}" \
+                --output text \
+                --query 'Role.Arn'
+        )"
+
+        # Get Route 53 Hosted Zone ID.
+        r53ZoneID="$(
+            aws route53 list-hosted-zones-by-name \
+                --dns-name "${_AWS__DNS_BASE_DOM}" \
+                --output text \
+                --query "HostedZones[?
+                    (Name == \`\"${_AWS__DNS_BASE_DOM}.\"\`)
+                ].Id" |
+            cut -d/ -f3
+        )"; [ -n "${r53ZoneID}" ]
+
+        # Get or create ACM Certificate for Custom EndPoint.
+        acmCertARN="$(
+            acmCertARN="$(
+                aws acm list-certificates \
+                    --certificate-statuses ISSUED PENDING_VALIDATION \
+                    --output text \
+                    --query "CertificateSummaryList[?
+                        contains(SubjectAlternativeNameSummaries, '${dnsHstFQDN}')
+                    ].CertificateArn"
+            )"
+            [ -n "${acmCertARN}" ] &amp;&amp; {
+                [[ "${acmCertARN}" == *$'\t'* ]] &amp;&amp; {
+                    : "ERROR: Multiple ISSUED ACM Certificates for: ${dnsHstFQDN}"
+                    exit 1
+                }
+                echo "${acmCertARN}"
+                exit 0
+            }
+            aws acm request-certificate \
+                --domain-name "${_AWS__OS__DOM_NAME,,}.${_AWS__DNS_BASE_DOM}" \
+                --subject-alternative-names "${dnsHstFQDN}" \
+                --validation-method DNS \
+                --output text \
+                --query 'CertificateArn'
+        )"
+        # Add DNS validation CNAMEs (all Domains) to Route 53.
+        aws route53 change-resource-record-sets \
+            --hosted-zone-id "${r53ZoneID}" \
+            --change-batch "$(
+                aws acm describe-certificate \
+                    --certificate-arn "${acmCertARN}" \
+                    --output json \
+                    --query 'Certificate.DomainValidationOptions[].ResourceRecord' |
+                jq -c '{Changes: [.[] | {
+                    Action: "UPSERT",
+                    ResourceRecordSet: {
+                        Name: .Name,
+                        Type: .Type,
+                        TTL: 300,
+                        ResourceRecords: [{Value: .Value}]
+                    }
+                }]}'
+            )" \
+            --no-cli-pager
+        # Monitor for ACM Certificate validation.
+        (   # Isolate `SECONDS` reset.
+            SECONDS=0 wInt=30 wMax=3600     # 60 Min. Max.
+            # ACM Certificate validation.
+            while ((SECONDS &lt; wMax)); do
+                [ "$(
+                    aws acm describe-certificate \
+                        --certificate-arn "${acmCertARN}" \
+                        --output text \
+                        --query 'Certificate.Status'
+                )" != "ISSUED" ] &amp;&amp; sleep ${wInt} || break
+                echo "Waited ${SECONDS}/${wMax} sec.: "\
+'Validating for ACM Certificate...' 1&gt;&amp;2
+            done
+            ((SECONDS &gt;= wMax)) &amp;&amp; { echo 'Timed out waiting for '\
+'ACM Certificate validation.' 1&gt;&amp;2; exit 2; }
+            # Final status.
+            aws acm describe-certificate \
+                --certificate-arn "${acmCertARN}" \
+                --no-cli-pager
+        )
+
+        # Create OpenSearch Service-Linked Role.
+        aws iam get-role \
+            --role-name AWSServiceRoleForAmazonOpenSearchService \
+            --no-cli-pager &amp;&gt; /dev/null || {
+            aws iam create-service-linked-role \
+                --aws-service-name opensearchservice.amazonaws.com \
+                --no-cli-pager
+            sleep 30    # Wait for IAM propagation.
+        }
+
+        # Create OpenSearch Domain.
+        osMasterRoleARN="$(
+            aws iam get-role \
+                --role-name "${AWS_ACCOUNT_ID}-${_AWS__OS__MASTER_ROLE_SFX}" \
+                --output text \
+                --query 'Role.Arn'
+        )"
+        {
+            aws opensearch describe-domain \
+                --domain-name "${_AWS__OS__DOM_NAME}" \
+                &amp;&gt; /dev/null ||
+            aws opensearch create-domain \
+                --domain-name "${_AWS__OS__DOM_NAME}" \
+                --engine-version "${_AWS__OS__ENG_VER}" \
+                --cluster-config "$(
+                    jq -cn \
+                        --arg type "${_AWS__OS__INST_TYPE}" \
+                        --argjson nodeCnt "${_AWS__OS__INST_CNT}" \
+                        --argjson zoneCnt "${_AWS__OS__ZONE_CNT}" \
+                        '{
+                            InstanceType: $type,
+                            InstanceCount: $nodeCnt,
+                            ZoneAwarenessEnabled: ($zoneCnt &gt; 0)
+                        } | (
+                            if ($zoneCnt &gt; 0) then
+                                .ZoneAwarenessConfig
+                                    .AvailabilityZoneCount=$zoneCnt
+                            else . end
+                        )'
+                )" \
+                --ebs-options \
+"EBSEnabled=true,"\
+"VolumeType=gp3,"\
+"VolumeSize=${_AWS__OS__EBS_SZ}" \
+                --access-policies "$(
+                    jq -cn \
+                        --arg acc "${AWS_ACCOUNT_ID}" \
+                        --arg reg "${AWS_REGION}" \
+                        --arg dom "${_AWS__OS__DOM_NAME}" \
+                        '{
+                            Version: "2012-10-17",
+                            Statement: [{
+                                Effect: "Allow",
+                                Principal: {AWS: (
+                                    "arn:aws:iam::" + $acc + ":root"
+                                )},
+                                Action: "es:*",
+                                Resource: (
+                                    "arn:aws:es:" + $reg + ":" + $acc +
+                                    ":domain/" + $dom + "/*"
+                                )
+                            }, {
+                                Effect: "Allow",
+                                Principal: {AWS: "*"},
+                                Action: "es:ESHttp*",
+                                Resource: (
+                                    "arn:aws:es:" + $reg + ":" + $acc +
+                                    ":domain/" + $dom + "/*"
+                                )
+                            }]
+                        }'
+                )" \
+                --cognito-options "$(
+                    jq -cn \
+                        --arg upID "${cogUsrPoolID}" \
+                        --arg ipID "${cogIdPoolID}" \
+                        --arg roleARN "${cogIAMroleAppARN}" \
+                        '{
+                            Enabled: true,
+                            UserPoolId: $upID,
+                            IdentityPoolId: $ipID,
+                            RoleArn: $roleARN
+                        }'
+                )" \
+                --encryption-at-rest-options 'Enabled=true' \
+                --node-to-node-encryption-options 'Enabled=true' \
+                --domain-endpoint-options "$(
+                    jq -cn \
+                        --arg hstFQDN "${dnsHstFQDN}" \
+                        --arg certARN "${acmCertARN}" \
+                        '{
+                            EnforceHTTPS: true,
+                            TLSSecurityPolicy: "Policy-Min-TLS-1-2-2019-07",
+                            CustomEndpointEnabled: true,
+                            CustomEndpoint: $hstFQDN,
+                            CustomEndpointCertificateArn: $certARN
+                        }'
+                )" \
+                --advanced-security-options "$(
+                    jq -cn \
+                        --arg masterARN "${osMasterRoleARN}" \
+                        '{
+                            Enabled: true,
+                            InternalUserDatabaseEnabled: true,
+                            MasterUserOptions: {MasterUserARN: $masterARN}
+                        }'
+                )" \
+                --off-peak-window-options "$(
+                    jq -cn \
+                        '{
+                            Enabled: true,
+                            OffPeakWindow: {WindowStartTime: {
+                                Hours: 6, Minutes: 0
+                            }}
+                        }'
+                )" \
+                --software-update-options 'AutoSoftwareUpdateEnabled=true' \
+                --no-cli-pager
+        }
+
+        # Monitor OpenSearch Domain creation.
+        (   # Isolate `SECONDS` reset.
+            SECONDS=0 wInt=60 wMax=3600     # 60 Min. Max.
+            # Domain creation.
+            while ((SECONDS &lt; wMax)); do
+                [ "$(
+                    aws opensearch describe-domain \
+                        --domain-name "${_AWS__OS__DOM_NAME}" \
+                        --output text \
+                        --query 'DomainStatus.Processing'
+                )" != "False" ] &amp;&amp; sleep ${wInt} || break
+                echo "Waited ${SECONDS}/${wMax} sec.: "\
+'Creating OpenSearch Domain...' 1&gt;&amp;2
+            done
+            ((SECONDS &gt;= wMax)) &amp;&amp; { echo 'Timed out waiting for '\
+'OpenSearch Domain creation.' 1&gt;&amp;2; exit 2; }
+            # Final status.
+            aws opensearch describe-domain \
+                --domain-name "${_AWS__OS__DOM_NAME}" \
+                --no-cli-pager
+        )
+
+        osEP="$(
+            aws opensearch describe-domain \
+                --domain-name "${_AWS__OS__DOM_NAME}" \
+                --output text \
+                --query 'DomainStatus.Endpoint'
+        )"
+
+        # Create or update Route 53 Hosted Zone DNS CNAME Records.
+        aws route53 change-resource-record-sets \
+            --hosted-zone-id "${r53ZoneID}" \
+            --change-batch "$(
+                jq -cn \
+                    --arg hstFQDN "${dnsHstFQDN}" \
+                    --arg osEP "${osEP}" \
+                    '{
+                        Changes: [{
+                            Action: "UPSERT",
+                            ResourceRecordSet: {
+                                Name: $hstFQDN,
+                                Type: "CNAME",
+                                TTL: 300,
+                                ResourceRecords: [{Value: $osEP}]
+                            }
+                        }]
+                    }'
+            )" \
+            --no-cli-pager
+
+        # Show DNS Records.
+        aws route53 list-resource-record-sets \
+            --hosted-zone-id "${r53ZoneID}" \
+            --query "ResourceRecordSets[?
+                (Name == \`\"${dnsHstFQDN}.\"\`)
+            ]" \
+            --output table --no-cli-pager
+
+        cat - 0&lt;&lt;txtEOF 1&gt;&amp;2
+--------------------------------------------------------------------------------
+OpenSearch Domain ready:
+    Domain:     ${_AWS__OS__DOM_NAME}
+    EndPoint:   ${osEP}
+    Dashboards: https://${dnsHstFQDN}/_dashboards
+--------------------------------------------------------------------------------
+txtEOF
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+<hr style="height:2px;border:0;border-block:1px solid CanvasText;"/>
+<h3>Finalizing AWS Cognito Integration</h3>
+<ol>
+    <li>
+        Update AWS Cognito User Pool App. Client CallBack and LogOut URLs.<br/>
+        Run <strong>Cognito.md - User Pool - User Pool App. Client</strong> with:
+        <table style="margin:0.5em 0;">
+            <thead>
+                <tr><th>Variable</th>                               <th>Value</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>_AWS__COG__ACTION</code></td>         <td><code>0</code></td></tr>
+                <tr><td><code>_AWS__COG__CLIENT_NAME</code></td>    <td><code>AmazonOpenSearchService-&lt;osClientSfx&gt;</code></td></tr>
+                <tr><td><code>_AWS__COG__CALLBACK_URLS</code></td>  <td><code>https://&lt;osFQDN&gt;/_dashboards/app/home</code></td></tr>
+                <tr><td><code>_AWS__COG__LOGOUT_URLS</code></td>    <td><code>https://&lt;osFQDN&gt;/_dashboards</code></td></tr>
+            </tbody>
+        </table>
+        <details><summary>Helper Script</summary>
+            <div class="code-widget" id="aws-opensearch--cognito-app-client">
+                <script type="application/json" class="cw-cls--config">
+                    {
+                        "def": {
+                            "vGrp-EV--Team": [
+                                ["Please select a Team."],
+                                {
+                                    "val": "...teamID1...",
+                                    "txt": "...teamName1...",
+                                    "attr": {
+                                        "data-grp-opts-val": "{\"vSV--osEP\": \"...osEP1...\", \"vSV--osFQDN\": \"...osFQDN1...\"}"
+                                    }
+                                },
+                                {
+                                    "val": "...teamID2...",
+                                    "txt": "...teamName2...",
+                                    "attr": {
+                                        "data-grp-opts-val": "{\"vSV--osEP\": \"...osEP2...\", \"vSV--osFQDN\": \"...osFQDN2...\"}"
+                                    }
+                                }
+                            ],
+                            "vSV--osEP": "...osEP...",
+                            "vSV--osFQDN": "...osFQDN..."
+                        }
+                    }
+                </script>
+                <div class="cw-cls--inputs">
+                    <p class="cw-cls--title">Team</p>
+                    <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+                </div>
+                <div class="cw-cls--inputs">
+                    <p class="cw-cls--title">Shell Variables</p>
+                    <label><span class="cw-cls--label-text">osEP</span>     <input type="text"  data-var="vSV--osEP" value="" /></label>
+                    <label><span class="cw-cls--label-text">osFQDN</span>   <input type="text"  data-var="vSV--osFQDN" value="" /></label>
+                </div>
+                <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+                    <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+( set -euo pipefail; shopt -s inherit_errexit
+    typeset osEP='<span style="color:red;font-weight:bold;" data-var="vSV--osEP"></span>'
+    typeset osFQDN='<span style="color:red;font-weight:bold;" data-var="vSV--osFQDN"></span>'
+
+    IFS=. read -ra sParts 0&lt;&lt;&lt;"${osEP}"
+    typeset osEPhash="${sParts[0]##*-}"
+    typeset osDomName="${sParts[0]#search-}"; osDomName="${osDomName%-${osEPhash}}"
+    typeset cogClientName="AmazonOpenSearchService-${osDomName}-${sParts[1]}-${osEPhash}"
+
+    cat - 0&lt;&lt;txtEOF
+--------------------------------------------------------------------------------
+_AWS__COG__CLIENT_NAME:     ${cogClientName}
+_AWS__COG__CALLBACK_URLS:   https://${osFQDN}/_dashboards/app/home
+_AWS__COG__LOGOUT_URLS:     https://${osFQDN}/_dashboards
+--------------------------------------------------------------------------------
+txtEOF
+true )
+</pre>
+                    </div>
+                </div>
+            </div>
+        </details>
+        <p style="margin:0 0 0.5em 0"><strong>Notes:</strong></p>
+        <ul style="margin-top:0">
+            <li>
+                The <code>_AWS__COG__CLIENT_NAME</code> must match the App Client name that AWS OpenSearch Service automatically created in the User
+                Pool when the domain was enabled with Cognito auth. The client is named <code>AmazonOpenSearchService-&lt;osClientSfx&gt;</code> (where
+                <code>osClientSfx=&lt;osDom&gt;-&lt;awsReg&gt;-&lt;randomHash&gt;</code>) and cannot
+                be renamed.
+            </li>
+            <li>
+                The <code>&lt;osFQDN&gt;</code> is the OpenSearch Dashboards FQDN (derive from the <code>Dashboards:</code> value in the domain creation output
+                above).
+            </li>
+        </ul>
+    </li>
+    <li>
+        Create AWS Cognito Identity Pool.<br/>
+        Run <strong>Cognito.md - Identity Pool</strong> with:
+        <table style="margin:0.5em 0;">
+            <thead>
+                <tr><th>Variable</th>                               <th>Value</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>_AWS__COG__ACTION</code></td>         <td><code>1</code></td></tr>
+                <tr><td><code>_AWS__COG__APP_NAME</code></td>       <td><code>open-search</code></td></tr>
+                <tr><td><code>_AWS__COG__CLIENT_NAME</code></td>    <td><code>AmazonOpenSearchService-&lt;osClientSfx&gt;</code></td></tr>
+            </tbody>
+        </table>
+    </li>
+    <li>
+        Create IAM Auth/Un-Auth Roles.<br/>
+        Run <strong>Cognito.md - IAM Roles - IAM Auth/Un-Auth Role</strong> with:
+        <table style="margin:0.5em 0;">
+            <thead>
+                <tr><th>Variable</th>                       <th>Value</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>_AWS__COG__ACTION</code></td> <td><code>1</code></td></tr>
+            </tbody>
+        </table>
+    </li>
+</ol>
+<hr style="height:2px;border:0;border-block:1px solid CanvasText;"/>
+<h3>Access Control</h3>
+<div class="code-widget" id="aws-opensearch--setup--access-ctrl">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__COG__IDP_NAME\": \"...cogIdPname1...\", \"vEV--_AWS__OS__FQDN\": \"...osFQDN1...\", \"vEV--AWS_REGION\": \"...awsRegion1...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__COG__IDP_NAME\": \"...cogIdPname2...\", \"vEV--_AWS__OS__FQDN\": \"...osFQDN2...\", \"vEV--AWS_REGION\": \"...awsRegion2...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_AWS__COG__IDP_NAME": "...cogIdPname...",
+                "vEV--_AWS__OS__FQDN": "...osFQDN...",
+                "vEV--_AWS__ROLE_NAME_SFX": "...roleNameSfx...",
+                "vEV--AWS_REGION": "...awsRegion...",
+                "vEV--AWS_ACCOUNT_ID": [
+                    ["Please select an AWS Account."],
+                    {
+                        "val": "...awsAccID1...",
+                        "txt": "...awsAccName1..."
+                    },
+                    {
+                        "val": "...awsAccID2...",
+                        "txt": "...awsAccName2..."
+                    }
+                ],
+                "vEV--_AWS__OS__MASTER_ROLE_SFX": "poweruser",
+                "vEV--_AWS__OS__ADM_EML": "...osAdmEMail..."
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_AWS__COG__IDP_NAME</span>          <input type="text"          data-var="vEV--_AWS__COG__IDP_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__FQDN</span>               <input type="text"          data-var="vEV--_AWS__OS__FQDN" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__RESET_PROFILE</span>          <select class="cw-cls--opt" data-var="vEV--_AWS__RESET_PROFILE">
+            <option value="0"   selected="">0: Keep existing Profile.</option>
+            <option value="1"              >1: Reset Profile.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__ROLE_NAME_SFX</span>          <input type="text"          data-var="vEV--_AWS__ROLE_NAME_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_REGION</span>                   <input type="text"          data-var="vEV--AWS_REGION" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_ACCOUNT_ID</span>               <select class="cw-cls--opt" data-var="vEV--AWS_ACCOUNT_ID"></select></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">BootStrapping Access Control</p>
+        <label><span class="cw-cls--label-text">_AWS__OS__MASTER_ROLE_SFX</span>    <input type="text"          data-var="vEV--_AWS__OS__MASTER_ROLE_SFX" value="" /></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">Granting Administrator Access to SSO User</p>
+        <label><span class="cw-cls--label-text">_AWS__OS__ADM_EML</span>            <input type="text"          data-var="vEV--_AWS__OS__ADM_EML" value="" /></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="font-size:medium;" tabindex="0">
+            <p style="margin:0"><strong>Note:</strong></p>
+            <ul style="margin-top:0">
+                <li>Uses <code>awscurl</code> (SigV4) authenticated as the Master IAM Role.</li>
+                <li>Run <strong>after</strong> the Domain is ready and the Cognito CallBack URLs are updated.</li>
+            </ul>
+        </div>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  BootStrapping Access Control
+__SHELL=0 \
+    _AWS__COG__IDP_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__IDP_NAME"></span>' \
+    _AWS__OS__FQDN='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__FQDN"></span>' \
+    _AWS__OS__MASTER_ROLE_SFX=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__MASTER_ROLE_SFX"></span> \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset cogIAMroleAuth="cog--${_AWS__COG__IDP_NAME}--role--auth"
+        typeset cogIAMroleAuthARN=
+        typeset osMasterRoleARN=
+        typeset e=
+
+        function awscurl () {
+            command awscurl \
+                --region "${AWS_REGION}" \
+                --profile "${_AWS__PROFILE}" \
+                --service es \
+                "$@"
+        }
+
+        cogIAMroleAuthARN="$(
+            aws iam get-role \
+                --role-name "${cogIAMroleAuth}" \
+                --output text \
+                --query 'Role.Arn'
+        )"; [ -n "${cogIAMroleAuthARN}" ]
+        osMasterRoleARN="$(
+            aws iam get-role \
+                --role-name "${AWS_ACCOUNT_ID}-${_AWS__OS__MASTER_ROLE_SFX}" \
+                --output text \
+                --query 'Role.Arn'
+        )"; [ -n "${osMasterRoleARN}" ]
+
+        # Create Custom `dashboards_readonly` OpenSearch Role, i.e. R/O access
+        #   to Dashboards Index Patterns only in Global Tenant.
+        awscurl -X PUT \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -cn '{
+                cluster_permissions: [],
+                index_permissions: [{
+                    index_patterns: [".kibana*", ".opensearch_dashboards*"],
+                    allowed_actions: [
+                        "read",
+                        "indices:admin/aliases/get",
+                        "indices:admin/mappings/get"
+                    ]
+                }],
+                tenant_permissions: [{
+                    tenant_patterns: ["global_tenant"],
+                    allowed_actions: ["kibana_all_read"]
+                }]
+            }')" \
+            "https://${_AWS__OS__FQDN}/_plugins/_security/api/roles/dashboards_readonly"
+        # Map Cognito IAM Auth Role to OpenSearch Roles:
+        # - Custom `dashboards_readonly` (R/O access to Dashboards Index
+        #   Patterns in global tenant).
+        # NOTE: Do NOT map `opensearch_dashboards_read_only` to the Cognito
+        #   IAM Auth Role. Despite its name suggesting R/O UI controls, it is
+        #   a Dashboards-level kiosk mode that hides Discover and Management
+        #   apps entirely — making Dashboards unusable for data exploration.
+        #   R/O enforcement is handled at the backend via `kibana_all_read`
+        #   tenant permissions; saves fail server-side even if UI shows buttons.
+        for e in dashboards_readonly; do
+            awscurl -X PUT \
+                -H 'Content-Type: application/json' \
+                -d "$(jq -c \
+                    --arg beRole "${cogIAMroleAuthARN}" \
+                    --arg role "${e}" \
+                    '{
+                        backend_roles: (
+                            ((.[$role].backend_roles // []) + [$beRole]) |
+                            unique
+                        )
+                    }' \
+                0&lt; &lt;(
+                    awscurl -X GET \
+                        "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping/${e}" \
+                        2&gt; /dev/null ||
+                    echo 'null'
+                ))" \
+                "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping/${e}"
+        done
+
+        # Show Roles assigned to Cognito IAM Auth Role.
+        {
+            awscurl -X GET \
+                "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping" |
+            jq -r \
+                --arg beRole "${cogIAMroleAuthARN}" \
+                '["Roles:"] + [
+                    to_entries[] |
+                    select(.value.backend_roles | contains([$beRole])) |
+                    "    \(.key)"
+                ] | .[]'
+        }
+
+#       # Map Master IAM Role to OpenSearch Roles:
+#       # - Built-In `all_access` (full access to all Cluster, Index, and
+#       #   Tenant operations).
+#       # - Built-In `security_manager` (access to the Security Plugin REST
+#       #   API for managing roles, mappings, etc.).
+#       awscurl -X PATCH \
+#           -H 'Content-Type: application/json' \
+#           -d "$(
+#               jq -cn \
+#                   --arg beRole "${osMasterRoleARN}" \
+#                   '[{
+#                       op: "add",
+#                       path: "/all_access/backend_roles/-",
+#                       value: $roleARN
+#                   }, {
+#                       op: "add",
+#                       path: "/security_manager/backend_roles/-",
+#                       value: $roleARN
+#                   }]'
+#           )" \
+#           "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping"
+
+        # Show Roles assigned to Master IAM Role.
+        {
+            awscurl -X GET \
+                "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping" |
+            jq -r \
+                --arg beRole "${osMasterRoleARN}" \
+                '["Roles:"] + [
+                    to_entries[] |
+                    select(.value.backend_roles | contains([$beRole])) |
+                    "    \(.key)"
+                ] | .[]'
+        }
+
+        cat - 0&lt;&lt;txtEOF 1&gt;&amp;2
+--------------------------------------------------------------------------------
+OpenSearch Security BootStrapped.
+    Dashboards: https://${_AWS__OS__FQDN}/_dashboards
+      - SSO via Google will grant R/O Dashboards access.
+      - Log in once with Google to register your Cognito User Identity, then
+        run the next section to grant Administrator Access.
+--------------------------------------------------------------------------------
+txtEOF
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="font-size:medium;" tabindex="0">
+            <p style="margin:0 0 0.5em 0"><strong>Pre-requisite:</strong></p>
+            <ul style="margin-top:0">
+                <li>User must have logged in at least once via Google SSO.</li>
+            </ul>
+        </div>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Granting Administrator Access to SSO User
+__SHELL=0 \
+    _AWS__COG__IDP_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__IDP_NAME"></span>' \
+    _AWS__OS__FQDN='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__FQDN"></span>' \
+    _AWS__OS__ADM_EML='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__ADM_EML"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset cogUsrPoolName="cog--${_AWS__COG__IDP_NAME}--up"
+        typeset cogUsrPoolID= osAdmUsr=
+
+        function awscurl () {
+            command awscurl \
+                --region "${AWS_REGION}" \
+                --profile "${_AWS__PROFILE}" \
+                --service es \
+                "$@"
+        }
+
+        cogUsrPoolID="$(
+            typeset _page= _cur= _id= _nextTkn=
+            while true; do
+                _page="$(
+                    aws cognito-idp list-user-pools \
+                        --max-results 60 \
+                        ${_nextTkn:+--next-token "${_nextTkn}"} \
+                        --output json
+                )"
+                _cur="$(jq -cr \
+                    --arg name "${cogUsrPoolName}" \
+                    '.UserPools[] | select(.Name == $name).Id' \
+                0&lt;&lt;&lt;"${_page}")"
+                [ -n "${_cur}" ] &amp;&amp; {
+                    [ -n "${_id}" ] || [[ "${_cur}" == *$'\n'* ]] &amp;&amp; {
+                        : "ERROR: Multiple User Pools: ${cogUsrPoolName}"
+                        exit 1
+                    }
+                    _id="${_cur}"
+                }
+                _nextTkn="$(jq -cr '(.NextToken // empty)' 0&lt;&lt;&lt;"${_page}")"
+                [ -z "${_nextTkn}" ] &amp;&amp; break
+            done
+            [ -n "${_id}" ] || { : "ERROR: User Pool not found: ${cogUsrPoolName}"; exit 1; }
+            echo "${_id}"
+        )"
+        osAdmUsr="$(
+            aws cognito-idp list-users \
+                --user-pool-id "${cogUsrPoolID}" \
+                --filter "email = \"${_AWS__OS__ADM_EML}\"" \
+                --output text \
+                --query 'Users[0].Username'
+        )"; [ "${osAdmUsr}" != "None" ]
+        osAdmUsr="Cognito/${cogUsrPoolID}/${osAdmUsr}"
+
+        # Add User to `all_access` + `security_manager`.
+        for e in all_access security_manager; do
+            awscurl -X PUT \
+                -H 'Content-Type: application/json' \
+                -d "$(jq -c \
+                    --arg usr "${osAdmUsr}" \
+                    --arg role "${e}" \
+                    '{
+                        backend_roles: (.[$role].backend_roles // []),
+                        users: (((.[$role].users // []) + [$usr]) | unique)
+                    }' \
+                0&lt; &lt;(
+                    awscurl -X GET \
+                        "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping/${e}" \
+                        2&gt; /dev/null ||
+                    echo 'null'
+                ))" \
+                "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping/${e}"
+        done
+
+        # Show Roles assigned to User.
+        {
+            awscurl -X GET \
+                "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping" |
+            jq -r \
+                --arg usr "${osAdmUsr}" \
+                '["Roles:"] + [
+                    to_entries[] |
+                    select(.value.users | contains([$usr])) |
+                    "    \(.key)"
+                ] | .[]'
+        }
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

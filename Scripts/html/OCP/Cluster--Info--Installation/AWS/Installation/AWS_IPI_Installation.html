@@ -1,0 +1,461 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS IPI Installation</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../../js/global.js"></script>
+    <script type="module" src="../../../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="OCP--aws--IPI-Install">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_BW__NOTE_NAME\": \"...bwNoteName1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_BW__NOTE_NAME\": \"...bwNoteName2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_OCP__INSTLR_DIR": "...ocpInstallerDir...",
+                "vEV--_OCP__INSTLR_WAIT__CLUSTER__TRY": "...numOfTryToWaitForCluster...",
+                "vEV--_OCP__CLUSTER_DIR": "...ocpClusterDir...",
+                "vEV--_BW__NOTE_NAME": "...bwNoteName...",
+                "vEV--AWS_REGION": "...awsRegion..."
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_OCP__INSTLR_ACTION</span>              <select class="cw-cls--opt" data-var="vEV--_OCP__INSTLR_ACTION">
+            <option value="-2"             >     -2: Destroy Cluster and remove Cluster Directory.</option>
+            <option value="-1"             >     -1: Destroy Cluster only.</option>
+            <option value="0"              >&nbsp;0: Destroy Installer BootStrap Resources.</option>
+            <option value="1"   selected="">&nbsp;1: Deploy Cluster.</option>
+            <option value="2"              >&nbsp;2: Destroy Cluster then deploy new Cluster.</option>
+            <option value="i"              >&nbsp;i: Enter CLI Interactive Session.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_OCP__INSTLR_DIR</span>                 <input type="text"          data-var="vEV--_OCP__INSTLR_DIR" value="" /></label>
+        <label><span class="cw-cls--label-text">_OCP__INSTLR_WAIT__CLUSTER__TRY</span>  <input type="text"          data-var="vEV--_OCP__INSTLR_WAIT__CLUSTER__TRY" value="" /></label>
+        <label><span class="cw-cls--label-text">_OCP__CLUSTER_DIR</span>                <input type="text"          data-var="vEV--_OCP__CLUSTER_DIR" value="" /></label>
+        <label><span class="cw-cls--label-text">_BW__NOTE_NAME</span>                   <input type="text"          data-var="vEV--_BW__NOTE_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_REGION</span>                       <input type="text"          data-var="vEV--AWS_REGION" value="" /></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+# OCP Installation IPI on AWS.
+#   Installation Phases:
+#     Day-0   Cluster Configuration.
+#               Responsible for producing a final `install-config.yaml`. If any
+#               customization flag or interactive session is requested, `create
+#               install-config` is called (creating or updating the file). Use
+#               the custom script and/or interactive session to further modify
+#               it, if desired. A pre-created `install-config.yaml`, prior to
+#               calling this script, can also serve as the starting point, or
+#               be used directly when no flags are set.
+#     Day-1   Manifest Customization.
+#               Runs `create manifests`, if customization is requested, to
+#               generate the full manifest tree under `openshift/`. Use the
+#               custom script and/or interactive session to add or modify
+#               manifests (e.g. MachineConfig, custom resources), if desired,
+#               before the cluster is deployed.
+#     Day-2   Post-Deployment Customization.
+#               Runs after `create cluster` completes and `KUBECONFIG` is set.
+#               Use the custom script and/or interactive session to configure
+#               the running cluster (e.g. install operators, apply policies,
+#               configure identity providers), if desired.
+#   The `_OCP__INSTLR_FLG__CUSTOM` is a bit flag to control phase behaviour.
+#     0x00000001    Interactive Session at the end of Day-0 Phase.
+#     0x00000002    Interactive Session at the end of Day-1 Phase.
+#     0x00000004    Interactive Session at the end of Day-2 Phase.
+#       NOTE:   Exiting any of these Sessions with Exit Status 255 will stop
+#               the whole Installation procedure.
+#     0x00000008    Executing `_OCP__INSTLR_DAY0` during Day-0 Phase.
+#     0x00000010    Executing `_OCP__INSTLR_DAY1` during Day-1 Phase.
+#     0x00000020    Executing `_OCP__INSTLR_DAY2` during Day-2 Phase.
+#       NOTE:   The content of these Env. Var. is executed via
+#               `eval "( set -euxo pipefail; shopt -s inherit_errexit;
+#               ${_OCP__INSTLR_...}; true )"` (in a sub-shell).
+#     0x01000000    Enabling SSM Access for OCP Nodes on AWS.
+__SHELL=0 \
+    _OCP__INSTLR_ACTION='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__INSTLR_ACTION"></span>' \
+    _OCP__INSTLR_FLG__CUSTOM="$((_OCP__INSTLR_FLG__CUSTOM | 0x01000000))" \
+    _OCP__INSTLR_LOG_LEVEL=info \
+    _OCP__INSTLR_DIR='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__INSTLR_DIR"></span>' \
+    _OCP__INSTLR_DAY0="${_OCP__INSTLR_DAY0:-: 'Custom Day-0 Script.'}" \
+    _OCP__INSTLR_DAY1="${_OCP__INSTLR_DAY1:-: 'Custom Day-1 Script.'}" \
+    _OCP__INSTLR_DAY2="${_OCP__INSTLR_DAY2:-: 'Custom Day-2 Script.'}" \
+    _OCP__INSTLR_WAIT__CLUSTER__TRY='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__INSTLR_WAIT__CLUSTER__TRY"></span>' \
+    _OCP__CLUSTER_DIR='<span style="color:red;font-weight:bold;" data-var="vEV--_OCP__CLUSTER_DIR"></span>' \
+    _BW__NOTE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME"></span>' \
+    _RC__SRCS='()' \
+    BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}" \
+    BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)" \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+                echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+                exit 1
+            }
+            eval "$(
+                bw get notes "${_BW__NOTE_NAME}" || {
+                    echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                    echo false
+                }
+            )"
+            eval "${__shOpt}"; unset __shOpt
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        }
+        eval "$(
+            typeset e1= e2=
+            typeset -a a1=() a2=()
+            mkdir -p -- "${_OCP__CLUSTER_DIR}"
+            for e1 in _OCP__{CLUSTER,INSTLR}_DIR; do
+                eval "${e1}=\"\$(CDPATH= cd -L \"\${${e1}}\" &amp;&amp; pwd)\""
+            done
+            for e1 in _RC__SRCS; do
+                eval "eval \"a1=\${${e1}}\""
+                for e2 in "${a1[@]}"; do
+                    eval "a2+=(\"\$(CDPATH= cd -L ${e2@Q} &amp;&amp; pwd)\")"
+                done
+                eval "${e1}=\"(${a2[@]@Q})\""
+            done
+            typeset -p _OCP__{CLUSTER,INSTLR}_DIR _RC__SRCS
+        )"
+        typeset -i _OCP__INSTLR_FLG__CUSTOM="${_OCP__INSTLR_FLG__CUSTOM}"
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset kubeCfg="${_OCP__CLUSTER_DIR}/kubecfg"
+
+        function openshift-install () {
+            typeset -i es=0
+            {
+                echo \
+"$(date -Iseconds)|${FUNCNAME[0]@Q} ${*@Q}"$'\n'"$(printf '%.0s-' {1..80})"
+                "${_OCP__INSTLR_DIR}/openshift-install" \
+                    --dir "${_OCP__CLUSTER_DIR}/" \
+                    ${_OCP__INSTLR_LOG_LEVEL:+--log-level "${_OCP__INSTLR_LOG_LEVEL}"} \
+                    "$@" 2&gt;&amp;1 || es=$?
+                echo "$(printf '%.0s=' {1..80})"
+                exit ${es}
+            } | tee -a "${_OCP__CLUSTER_DIR}/ocp--installer--cluster.log"
+            return ${PIPESTATUS[0]}
+        }
+        function EnterShell () {
+            typeset -i asChild="${1:-1}"; (($#)) &amp;&amp; shift
+            export -f openshift-install
+            cd "${_OCP__CLUSTER_DIR}/"
+            if ((asChild)); then
+                echo \
+                    'Exit this interactive session, when you are finished, to' \
+                    'continue (Exit Status 255 will cancel the installation).'
+                "${SHELL}" || (($? != 255))
+                cd - 1&gt; /dev/null
+            else
+                echo 'Do NOT forget to exit this interactive session!!!'
+                exec "${SHELL}"
+            fi
+            true
+        }
+
+        case ${_OCP__INSTLR_ACTION} in
+          (-2|0|2)  openshift-install destroy bootstrap || true;;&amp;
+          (-2|-1|2) openshift-install destroy cluster || exit 1;;&amp;
+          (-2|2)    rm -rf "${_OCP__CLUSTER_DIR}/";;&amp;
+          (1|2)     (
+            typeset -i iSes=0 fCstm=0 lsb=0
+            {   # Preparation Phase.
+                rm -f "${_OCP__CLUSTER_DIR}/auth/kubeconfig"
+                unset KUBECONFIG
+            }
+            {   # Day-0 Phase.
+                iSes=$((_OCP__INSTLR_FLG__CUSTOM &amp; 0x01))
+                fCstm=$(((_OCP__INSTLR_FLG__CUSTOM &amp;= ~0x01) &amp; ~0x03))
+                ((fCstm | iSes)) &amp;&amp; openshift-install create install-config
+                while ((fCstm)); do
+                    lsb=$((fCstm &amp; -fCstm))
+                    case ${lsb} in
+                      (8)   printf "Day-0 Phase (0x%08x):\n" ${lsb};;&amp;
+                      (8)           (   # 0x000008  Executing Custom Day-0 Script.
+eval '( set -euxo pipefail; shopt -s inherit_errexit
+'"${_OCP__INSTLR_DAY0}"$'\ntrue )'
+                      );;
+                    esac
+                    ((fCstm ^= lsb)) || true
+                done
+                ((iSes)) &amp;&amp; echo 'Manual Day-0 Operation.' &amp;&amp;
+                    PROMPT_COMMAND='PS1="${PS1%\[Day-0\] }[Day-0] "' EnterShell
+            }
+            {   # Day-1 Phase.
+                iSes=$((_OCP__INSTLR_FLG__CUSTOM &amp; 0x02))
+                fCstm=$(((_OCP__INSTLR_FLG__CUSTOM &amp;= ~0x02) &amp; ~0x03))
+                ((fCstm | iSes)) &amp;&amp; openshift-install create manifests
+                while ((fCstm)); do
+                    lsb=$((fCstm &amp; -fCstm))
+                    case ${lsb} in
+                      (16|16777216) printf "Day-1 Phase (0x%08x):\n" ${lsb};;&amp;
+                      (16)          (   # 0x000010  Executing Custom Day-1 Script.
+eval '( set -euxo pipefail; shopt -s inherit_errexit
+'"${_OCP__INSTLR_DAY1}"$'\ntrue )'
+                      );;
+                      (16777216)    (   # 0x01000000    Enabling SSM Access for OCP Nodes on AWS.
+                        typeset e= mcDir="${_OCP__CLUSTER_DIR}/openshift"
+                        mkdir -p -- "${mcDir}"
+                        # Applying MachineConfig to OCP Nodes.
+                        for e in {master,worker}; do
+                            cat - 0&lt;&lt;ocEOF 1&gt; "${mcDir}/99999-00--${e}--ssm-agent-install.yaml"
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  name: 99999-00--${e}--ssm-agent-install
+  labels:
+    machineconfiguration.openshift.io/role: ${e}
+spec:
+  config:
+    ignition:
+      version: 3.2.0  # Safest value.
+    storage: {} # Required empty object
+    systemd:
+      units:
+        - name: aws-ec2--ssm-agent--install.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Install AWS EC2 SSM Agent
+            After=network-online.target
+            Wants=network-online.target
+
+            [Service]
+            Type=oneshot
+            RemainAfterExit=yes
+            ExecStart=/usr/bin/sh -c ' \\
+                # Determine the correct the architecture string. \\
+                typeset arch="\$\$(/usr/bin/uname -m)"; \\
+                case \$\${arch} in \\
+                  (x86_64)  arch=amd64;; \\
+                  (aarch64) arch=arm64;; \\
+                esac; \\
+                if /usr/bin/rpm -q amazon-ssm-agent; then \\
+                    /usr/bin/systemctl enable amazon-ssm-agent.service; \\
+                    /usr/bin/systemctl start amazon-ssm-agent.service; \\
+                else \\
+                    # Remove any broken stub agent if present, ignore if not found. \\
+                    /usr/bin/rpm-ostree override remove amazon-ssm-agent || true; \\
+                    # Install the agent. \\
+                    /usr/bin/rpm-ostree install "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_\$\${arch}/amazon-ssm-agent.rpm"; \\
+                    /usr/bin/systemctl reboot; \\
+                fi; \\
+            '
+
+            [Install]
+            WantedBy=multi-user.target
+ocEOF
+                        done
+                      );;
+                    esac
+                    ((fCstm ^= lsb)) || true
+                done
+                ((iSes)) &amp;&amp; echo 'Manual Day-1 Operation.' &amp;&amp;
+                    PROMPT_COMMAND='PS1="${PS1%\[Day-1\] }[Day-1] "' EnterShell
+            }
+            {   # Deployment Phase.
+                (
+                    typeset -i tryLeft="${_OCP__INSTLR_WAIT__CLUSTER__TRY}"
+                    while ((tryLeft)); do
+                        openshift-install create cluster &amp;&amp; break
+                        ((--tryLeft))
+                    done
+                )
+                cp "${_OCP__CLUSTER_DIR}/auth/kubeconfig" "${kubeCfg}"
+                export KUBECONFIG="${kubeCfg}"
+            }
+            {   # Day-2 Phase.
+                iSes=$((_OCP__INSTLR_FLG__CUSTOM &amp; 0x04))
+                fCstm=$(((_OCP__INSTLR_FLG__CUSTOM &amp;= ~0x04) &amp; ~0x03))
+                while ((fCstm)); do
+                    lsb=$((fCstm &amp; -fCstm))
+                    case ${lsb} in
+                      (32|16777216) printf "Day-2 Phase (0x%08x):\n" ${lsb};;&amp;
+                      (32)          (   # 0x000020  Executing Custom Day-2 Script.
+eval '( set -euxo pipefail; shopt -s inherit_errexit
+'"${_OCP__INSTLR_DAY2}"$'\ntrue )'
+                      );;
+                      (16777216)    (   # 0x01000000    Enabling SSM Access for OCP Nodes on AWS.
+                        typeset e= iamIP= iamRNs=
+                        # Adding IAM Permission Policy `AmazonSSMManagedInstanceCore` to the EC2 Instance IAM Role to allow connecting to the VM via SSM.
+                        iamRNs="$(
+                            for e in $(
+                                oc get Nodes -o jsonpath='{range .items[*]}{.spec.providerID}{"\n"}{end}'
+                            ); do
+                                iamIP="$(
+                                    aws ec2 describe-instances \
+                                        --instance-ids "${e##*/}" \
+                                        --output text \
+                                        --query 'Reservations[0].Instances[0].IamInstanceProfile.Arn'
+                                )"
+                                aws iam get-instance-profile \
+                                    --instance-profile-name "${iamIP##*/}" \
+                                    --output text \
+                                    --query 'InstanceProfile.Roles[0].RoleName'
+                            done | sort -u
+                        )"
+                        [ "${iamRNs}" ]
+                        for e in ${iamRNs}; do
+                            {   # Attached Policy.
+                                aws iam list-attached-role-policies \
+                                    --role-name "${e}" \
+                                    --output text \
+                                    --query 'AttachedPolicies[].PolicyName' |
+                                grep -qE '^AmazonSSMManagedInstanceCore$'
+                            } || aws iam attach-role-policy \
+                                --role-name "${e}" \
+                                --policy-arn 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
+                        done
+                      );;
+                    esac
+                    ((fCstm ^= lsb)) || true
+                done
+                ((iSes)) &amp;&amp; echo 'Manual Day-2 Operation.' &amp;&amp;
+                    PROMPT_COMMAND='PS1="${PS1%\[Day-2\] }[Day-2] "' EnterShell
+            }
+            true
+          );;
+          (i)   PROMPT_COMMAND='PS1="${PS1%\[IPI-AWS\] }[IPI-AWS] "' EnterShell 0;;
+          (*)   false;;
+        esac
+        ((_OCP__INSTLR_ACTION &lt; 0)) || cat - 0&lt;&lt;tailEOF
+Please keep the files \`${_OCP__CLUSTER_DIR}/auth/*\` safe, because they are
+not recoverable.
+It is recommended to use the copy of KUBECONFIG file instead:
+    export KUBECONFIG=${kubeCfg@Q}
+tailEOF
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+<hr style="border:1px solid CanvasText;"/>
+<div style="font-family:monospace;font-size:large;max-height:20em;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;color:black;background-color:cyan;">
+? Master password: <span style="color:red;font-weight:bold;">[hidden]</span>
+Syncing complete.
+      Name                    Value             Type    Location
+      ----                    -----             ----    --------
+   profile                &lt;not set&gt;             None    None
+access_key     ****************H6YB              env
+secret_key     ****************r+ME              env
+    region                us-east-1              env    ['AWS_REGION', 'AWS_DEFAULT_REGION']
+{
+    "UserId": "AIDAZC76IE25KXVQUCR6W",
+    "Account": "624914081466",
+    "Arn": "arn:aws:iam::624914081466:user/u-ieng--ocp-installer"
+}
+? SSH Public Key <span style="color:red;font-weight:bold;">/home/etirtara/.ssh/openshift-qe.pub</span>
+? Platform <span style="color:red;font-weight:bold;">aws</span>
+INFO Credentials loaded from default AWS environment variables
+? Region <span style="color:red;font-weight:bold;">us-east-1</span>
+? Base Domain <span style="color:red;font-weight:bold;">test.lp.devcluster.openshift.com</span>
+? Cluster Name <span style="color:red;font-weight:bold;">etirtara--chaos-poc</span>
+? Pull Secret [? for help] <span style="color:red;font-weight:bold;">****************************************************************************************************************************************************************************************************************</span>
+INFO Successfully populated MCS CA cert information: root-ca 2035-07-08T22:22:21Z 2025-07-10T22:22:21Z
+INFO Successfully populated MCS TLS cert information: root-ca 2035-07-08T22:22:21Z 2025-07-10T22:22:21Z
+WARNING Following quotas ec2/L-0263D0A3 (us-east-1) are available but will be completely used pretty soon.
+INFO Adding clusters...
+INFO Creating infrastructure resources...
+INFO Reconciling IAM roles for control-plane and compute nodes
+INFO Creating IAM role for master
+INFO Creating IAM role for worker
+INFO Started local control plane with envtest
+INFO Stored kubeconfig for envtest in: /wrk--edttjRedHat.RHP-k8s--dev/local/ocp-clusters/rhp/aws/.clusterapi_output/envtest.kubeconfig
+INFO Running process: Cluster API with args [-v=2 --diagnostics-address=0 --health-addr=127.0.0.1:37217 --webhook-port=41651 --webhook-cert-dir=/tmp/envtest-serving-certs-1723178587 --kubeconfig=/wrk--edttjRedHat.RHP-k8s--dev/local/ocp-clusters/rhp/aws/.clusterapi_output/envtest.kubeconfig]
+INFO Running process: aws infrastructure provider with args [-v=4 --diagnostics-address=0 --health-addr=127.0.0.1:46093 --webhook-port=42053 --webhook-cert-dir=/tmp/envtest-serving-certs-3672214960 --feature-gates=BootstrapFormatIgnition=true,ExternalResourceGC=true,TagUnmanagedNetworkResources=false,EKS=false --kubeconfig=/wrk--edttjRedHat.RHP-k8s--dev/local/ocp-clusters/rhp/aws/.clusterapi_output/envtest.kubeconfig]
+INFO Creating infra manifests...
+INFO Created manifest *v1.Namespace, namespace= name=openshift-cluster-api-guests
+INFO Created manifest *v1beta2.AWSClusterControllerIdentity, namespace= name=default
+INFO Created manifest *v1beta1.Cluster, namespace=openshift-cluster-api-guests name=chaos-lp-etirtara-jfthl
+INFO Created manifest *v1beta2.AWSCluster, namespace=openshift-cluster-api-guests name=chaos-lp-etirtara-jfthl
+INFO Done creating infra manifests
+INFO Creating kubeconfig entry for capi cluster chaos-lp-etirtara-jfthl
+INFO Waiting up to 15m0s (until 10:37PM UTC) for network infrastructure to become ready...
+INFO Network infrastructure is ready
+INFO Creating Route53 records for control plane load balancer
+INFO Created private Hosted Zone
+INFO Created manifest *v1beta2.AWSMachine, namespace=openshift-cluster-api-guests name=chaos-lp-etirtara-jfthl-bootstrap
+INFO Created manifest *v1beta2.AWSMachine, namespace=openshift-cluster-api-guests name=chaos-lp-etirtara-jfthl-master-0
+INFO Created manifest *v1beta2.AWSMachine, namespace=openshift-cluster-api-guests name=chaos-lp-etirtara-jfthl-master-1
+INFO Created manifest *v1beta2.AWSMachine, namespace=openshift-cluster-api-guests name=chaos-lp-etirtara-jfthl-master-2
+INFO Created manifest *v1beta1.Machine, namespace=openshift-cluster-api-guests name=chaos-lp-etirtara-jfthl-bootstrap
+INFO Created manifest *v1beta1.Machine, namespace=openshift-cluster-api-guests name=chaos-lp-etirtara-jfthl-master-0
+INFO Created manifest *v1beta1.Machine, namespace=openshift-cluster-api-guests name=chaos-lp-etirtara-jfthl-master-1
+INFO Created manifest *v1beta1.Machine, namespace=openshift-cluster-api-guests name=chaos-lp-etirtara-jfthl-master-2
+INFO Created manifest *v1.Secret, namespace=openshift-cluster-api-guests name=chaos-lp-etirtara-jfthl-bootstrap
+INFO Created manifest *v1.Secret, namespace=openshift-cluster-api-guests name=chaos-lp-etirtara-jfthl-master
+INFO Created manifest *v1.Secret, namespace=openshift-cluster-api-guests name=chaos-lp-etirtara-jfthl-worker
+INFO Waiting up to 15m0s (until 10:45PM UTC) for machines [chaos-lp-etirtara-jfthl-bootstrap chaos-lp-etirtara-jfthl-master-0 chaos-lp-etirtara-jfthl-master-1 chaos-lp-etirtara-jfthl-master-2] to provision...
+INFO Control-plane machines are ready
+INFO Cluster API resources have been created. Waiting for cluster to become ready...
+INFO Waiting up to 20m0s (until 10:50PM UTC) for the Kubernetes API at https://api.chaos-lp--etirtara.chaos.lp.devcluster.openshift.com:6443...
+INFO API v1.32.5 up
+INFO Waiting up to 45m0s (until 11:29PM UTC) for bootstrapping to complete...
+INFO Waiting for the bootstrap etcd member to be removed...
+INFO Bootstrap etcd member has been removed
+INFO Destroying the bootstrap resources...
+INFO Waiting up to 5m0s for bootstrap machine deletion openshift-cluster-api-guests/chaos-lp-etirtara-jfthl-bootstrap...
+INFO Shutting down local Cluster API controllers...
+INFO Stopped controller: Cluster API
+WARNING process cluster-api-provider-aws exited with error: signal: killed
+INFO Stopped controller: aws infrastructure provider
+INFO Shutting down local Cluster API control plane...
+INFO Local Cluster API system has completed operations
+INFO Finished destroying bootstrap resources
+INFO Waiting up to 40m0s (until 11:36PM UTC) for the cluster at https://api.chaos-lp--etirtara.chaos.lp.devcluster.openshift.com:6443 to initialize...
+INFO Waiting up to 30m0s (until 11:34PM UTC) to ensure each cluster operator has finished progressing...
+INFO All cluster operators have completed progressing
+INFO Checking to see if there is a route at openshift-console/console...
+INFO Install complete!
+INFO To access the cluster as the system:admin user when using 'oc', run
+INFO     export KUBECONFIG=/wrk--edttjRedHat.RHP-k8s--dev/local/ocp-clusters/rhp/aws/auth/kubeconfig
+INFO Access the OpenShift web-console here: https://console-openshift-console.apps.chaos-lp--etirtara.chaos.lp.devcluster.openshift.com
+INFO Login to the console with user: "kubeadmin", and password: "*****-*****-*****-*****"
+INFO Time elapsed: 46m53s
+</pre>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,1495 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS OpenSearch - Administrative Tasks</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../js/global.js"></script>
+    <script type="module" src="../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="aws-opensearch--admin-tasks">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__OS__FQDN\": \"...osFQDN1...\", \"vEV--AWS_REGION\": \"...awsRegion1...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID1...\", \"vEV--_AWS__OS__IDX__PFX\": \"...osIdxPfx1...-...subIdx...\", \"vEV--_AWS__OS__TEN__NAME\": \"...osTenantName1...\", \"vEV--_AWS__OS__TEN__DESC\": \"...osTenantDesc1...\", \"vEV--_AWS__OS__IDX__PAT\": \"...osIdxPat1...\", \"vEV--_AWS__OS__TEN__PAT\": \"...osTenPat1...\", \"vEV--_AWS__OS__CRD_USR\": \"bot--...team1...--...name1...--...accMode...\", \"vEV--_BW__NOTE_NAME\": [[{\"val\": \"\", \"txt\": \"None\"}], {\"val\": \"...bwNoteName1...\", \"txt\": \"...bwNoteName1...\"}], \"vEV--_GSM__SEC_COL\": \"...gsmSecCol1...\", \"vEV--_GSM__SEC_PATH__GRP\": \"...gsmSecPathGrp1...\", \"vEV--_VAULT_KEY_PATH\": \"...vaultKeyPath1...\", \"vEV--_AWS__COG__IDP_NAME\": \"...cogIdPname1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__OS__FQDN\": \"...osFQDN2...\", \"vEV--AWS_REGION\": \"...awsRegion2...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID2...\", \"vEV--_AWS__OS__IDX__PFX\": \"...osIdxPfx2...-...subIdx...\", \"vEV--_AWS__OS__TEN__NAME\": \"...osTenantName2...\", \"vEV--_AWS__OS__TEN__DESC\": \"...osTenantDesc2...\", \"vEV--_AWS__OS__IDX__PAT\": \"...osIdxPat2...\", \"vEV--_AWS__OS__TEN__PAT\": \"...osTenPat2...\", \"vEV--_AWS__OS__CRD_USR\": \"bot--...team2...--...name2...--...accMode...\", \"vEV--_BW__NOTE_NAME\": [[{\"val\": \"\", \"txt\": \"None\"}], {\"val\": \"...bwNoteName2...\", \"txt\": \"...bwNoteName2...\"}], \"vEV--_GSM__SEC_COL\": \"...gsmSecCol2...\", \"vEV--_GSM__SEC_PATH__GRP\": \"...gsmSecPathGrp2...\", \"vEV--_VAULT_KEY_PATH\": \"...vaultKeyPath2...\", \"vEV--_AWS__COG__IDP_NAME\": \"...cogIdPname2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_AWS__OS__FQDN": "...osFQDN...",
+                "vEV--_AWS__ROLE_NAME_SFX": "...roleNameSfx...",
+                "vEV--AWS_REGION": "...awsRegion...",
+                "vEV--AWS_ACCOUNT_ID": [
+                    ["Please select an AWS Account."],
+                    {
+                        "val": "...awsAccID1...",
+                        "txt": "...awsAccName1..."
+                    },
+                    {
+                        "val": "...awsAccID2...",
+                        "txt": "...awsAccName2..."
+                    }
+                ],
+                "vEV--_AWS__OS__IDX__PFX": "...osIdxPfx...",
+                "vEV--_AWS__OS__ISM__KEEP_DAYS": "90",
+                "vEV--_AWS__OS__ISM__RO_IDX_MIN_SIZE": "1gb",
+                "vEV--_AWS__OS__ISM__RO_IDX_MIN_DAYS": "30",
+                "vEV--_AWS__OS__IDX__SHARDS": "1",
+                "vEV--_AWS__OS__IDX__REPLS": "0",
+                "vEV--_AWS__OS__TEN__NAME": "...osTenantName...",
+                "vEV--_AWS__OS__TEN__DESC": "...osTenantDesc...",
+                "vEV--_AWS__OS__IDX__PAT": "...osIdxPat...",
+                "vEV--_AWS__OS__TEN__PAT": "...osTenPat...",
+                "vEV--_AWS__OS__CRD_USR": "...osCrdUsr...",
+                "vEV--_AWS__OS__ROLE_NAME-internal-user": "",
+                "vEV--_BW__NOTE_NAME": [[{"val": "", "txt": "None"}], {"val": "...bwNoteName...", "txt": "...bwNoteName..."}],
+                "vEV--_GSM__CTR_IMG": "...gsmCtrImg...",
+                "vEV--_GSM__SEC_COL": "...gsmSecCol...",
+                "vEV--_GSM__SEC_PATH__GRP": "...gsmSecPathGrp...",
+                "vEV--_GSM__SEC_PATH__FLD__USR": "...gsmSecPathFldUsr...",
+                "vEV--_GSM__SEC_PATH__FLD__PWD": "...gsmSecPathFldPwd...",
+                "vEV--_VAULT_MOUNT": [[{"val": "", "txt": "None"}], {"val": "...vaultMount...", "txt": "...vaultMount..."}],
+                "vEV--_VAULT_KEY_PATH": "...vaultKeyPath...",
+                "vEV--_VAULT_KEY_USR": "...vaultKeyUsr...",
+                "vEV--_VAULT_KEY_PWD": "...vaultKeyPwd...",
+                "vEV--VAULT_ADDR": "...vaultAddr...",
+                "vEV--_AWS__OS__USR_EML": "...osUsrEml...",
+                "vEV--_AWS__OS__ROLE_NAME-sso-user": "...osRoleName...",
+                "vEV--_AWS__COG__IDP_NAME": "...cogIdPname..."
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_AWS__OS__FQDN</span>                   <input type="text"          data-var="vEV--_AWS__OS__FQDN" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__RESET_PROFILE</span>              <select class="cw-cls--opt" data-var="vEV--_AWS__RESET_PROFILE">
+            <option value="0"   selected="">0: Keep existing Profile.</option>
+            <option value="1"              >1: Reset Profile.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__ROLE_NAME_SFX</span>              <input type="text"          data-var="vEV--_AWS__ROLE_NAME_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_REGION</span>                       <input type="text"          data-var="vEV--AWS_REGION" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_ACCOUNT_ID</span>                   <select class="cw-cls--opt" data-var="vEV--AWS_ACCOUNT_ID"></select></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">Index and ISM Retention Policy</p>
+        <label><span class="cw-cls--label-text">_AWS__OS__ACTION</span>                 <select class="cw-cls--opt" data-var="vEV--_AWS__OS__ACTION--ism">
+            <option value="-2"             >     -2: Delete matching Indices.</option>
+            <option value="-1"             >     -1: Delete.</option>
+            <option value="0"              >&nbsp;0: List.</option>
+            <option value="1"   selected="">&nbsp;1: Create/Update.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__ISM__KEEP_DAYS</span>         <input type="number"        data-var="vEV--_AWS__OS__ISM__KEEP_DAYS" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__ISM__RO_IDX_MIN_SIZE</span>   <input type="text"          data-var="vEV--_AWS__OS__ISM__RO_IDX_MIN_SIZE" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__ISM__RO_IDX_MIN_DAYS</span>   <input type="number"        data-var="vEV--_AWS__OS__ISM__RO_IDX_MIN_DAYS" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__IDX__PFX</span>               <input type="text"          data-var="vEV--_AWS__OS__IDX__PFX" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__IDX__SHARDS</span>            <input type="number"        data-var="vEV--_AWS__OS__IDX__SHARDS" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__IDX__REPLS</span>             <input type="number"        data-var="vEV--_AWS__OS__IDX__REPLS" value="" /></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">Tenant</p>
+        <label><span class="cw-cls--label-text">_AWS__OS__ACTION</span>                 <select class="cw-cls--opt" data-var="vEV--_AWS__OS__ACTION--tenant">
+            <option value="-1"             >     -1: Delete.</option>
+            <option value="0"              >&nbsp;0: List.</option>
+            <option value="1"   selected="">&nbsp;1: Create/Update.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__TEN__NAME</span>              <input type="text"          data-var="vEV--_AWS__OS__TEN__NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__TEN__DESC</span>              <input type="text"          data-var="vEV--_AWS__OS__TEN__DESC" value="" /></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">Role</p>
+        <label><span class="cw-cls--label-text">_AWS__OS__ACTION</span>                 <select class="cw-cls--opt" data-var="vEV--_AWS__OS__ACTION--role">
+            <option value="-1"             >     -1: Delete.</option>
+            <option value="0"              >&nbsp;0: List.</option>
+            <option value="1"   selected="">&nbsp;1: Create/Update.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__IDX__PAT</span>               <input type="text"          data-var="vEV--_AWS__OS__IDX__PAT" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__IDX__PERMS</span>             <select class="cw-cls--opt" data-var="vEV--_AWS__OS__IDX__PERMS">
+            <option value="R/O"     selected="">R/O  - Read only.</option>
+            <option value="W/O"                >W/O  - Write only.</option>
+            <option value="R/W"                >R/W  - Read and write.</option>
+            <option value="CRUD"               >CRUD - Full Index Data Access.</option>
+            <option value="ADM"                >ADM  - Full Index authority (CRUD + Index management).</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__TEN__PAT</span>               <input type="text"          data-var="vEV--_AWS__OS__TEN__PAT" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__TEN__PERMS</span>             <select class="cw-cls--opt" data-var="vEV--_AWS__OS__TEN__PERMS">
+            <option value="R/O" selected="">R/O - View Dashboards and saved objects only.</option>
+            <option value="R/W"            >R/W - View and modify Dashboards and saved objects.</option>
+        </select></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">Service Account</p>
+        <label><span class="cw-cls--label-text">_AWS__OS__ACTION</span>                 <select class="cw-cls--opt" data-var="vEV--_AWS__OS__ACTION--internal-user">
+            <option value="-2"             >     -2: Remove Role.</option>
+            <option value="-1"             >     -1: Delete.</option>
+            <option value="0"              >&nbsp;0: List.</option>
+            <option value="1"   selected="">&nbsp;1: Create/Update and assign Role.</option>
+            <option value="2"              >&nbsp;2: Show assigned Roles.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__CRD_USR</span>                <input type="text"          data-var="vEV--_AWS__OS__CRD_USR" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__CRD_PWD_CHG</span>            <select class="cw-cls--opt" data-var="vEV--_AWS__OS__CRD_PWD_CHG">
+            <option value="0"   selected="">0: Reuse existing password.</option>
+            <option value="1"              >1: Force password rotation.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__ROLE_NAME</span>              <input type="text"          data-var="vEV--_AWS__OS__ROLE_NAME-internal-user" value="" /></label>
+        <label><span class="cw-cls--label-text">_BW__NOTE_NAME</span>                   <select class="cw-cls--opt" data-var="vEV--_BW__NOTE_NAME"></select></label>
+        <label><span class="cw-cls--label-text">_GSM__CTR_IMG</span>                    <input type="text"          data-var="vEV--_GSM__CTR_IMG" value="" /></label>
+        <label><span class="cw-cls--label-text">_GSM__SEC_COL</span>                    <input type="text"          data-var="vEV--_GSM__SEC_COL" value="" /></label>
+        <label><span class="cw-cls--label-text">_GSM__SEC_PATH__GRP</span>              <input type="text"          data-var="vEV--_GSM__SEC_PATH__GRP" value="" /></label>
+        <label><span class="cw-cls--label-text">_GSM__SEC_PATH__FLD__USR</span>         <input type="text"          data-var="vEV--_GSM__SEC_PATH__FLD__USR" value="" /></label>
+        <label><span class="cw-cls--label-text">_GSM__SEC_PATH__FLD__PWD</span>         <input type="text"          data-var="vEV--_GSM__SEC_PATH__FLD__PWD" value="" /></label>
+<!--    <label><span class="cw-cls--label-text">_VAULT_MOUNT</span>                     <select class="cw-cls--opt" data-var="vEV--_VAULT_MOUNT"></select></label>       -->
+<!--    <label><span class="cw-cls--label-text">_VAULT_KEY_PATH</span>                  <input type="text"          data-var="vEV--_VAULT_KEY_PATH" value="" /></label>  -->
+<!--    <label><span class="cw-cls--label-text">_VAULT_KEY_USR</span>                   <input type="text"          data-var="vEV--_VAULT_KEY_USR" value="" /></label>   -->
+<!--    <label><span class="cw-cls--label-text">_VAULT_KEY_PWD</span>                   <input type="text"          data-var="vEV--_VAULT_KEY_PWD" value="" /></label>   -->
+<!--    <label><span class="cw-cls--label-text">VAULT_ADDR</span>                       <input type="text"          data-var="vEV--VAULT_ADDR" value="" /></label>       -->
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">SSO User</p>
+        <label><span class="cw-cls--label-text">_AWS__OS__ACTION</span>                 <select class="cw-cls--opt" data-var="vEV--_AWS__OS__ACTION--sso-user">
+            <option value="-1"             >     -1: Remove Role.</option>
+            <option value="0"              >&nbsp;0: List and show assigned Roles.</option>
+            <option value="1"   selected="">&nbsp;1: Assign Role.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__USR_EML</span>                <input type="text"          data-var="vEV--_AWS__OS__USR_EML" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__OS__ROLE_NAME</span>              <input type="text"          data-var="vEV--_AWS__OS__ROLE_NAME-sso-user" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__COG__IDP_NAME</span>              <input type="text"          data-var="vEV--_AWS__COG__IDP_NAME" value="" /></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Managing Index with ISM Retention Policy
+__SHELL=0 \
+    _AWS__OS__ACTION=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__ACTION--ism"></span> \
+    _AWS__OS__FQDN='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__FQDN"></span>' \
+    _AWS__OS__ISM__KEEP_DAYS='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__ISM__KEEP_DAYS"></span>' \
+    _AWS__OS__ISM__RO_IDX_MIN_SIZE='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__ISM__RO_IDX_MIN_SIZE"></span>' \
+    _AWS__OS__ISM__RO_IDX_MIN_DAYS='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__ISM__RO_IDX_MIN_DAYS"></span>' \
+    _AWS__OS__IDX__PFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__IDX__PFX"></span>' \
+    _AWS__OS__IDX__SHARDS='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__IDX__SHARDS"></span>' \
+    _AWS__OS__IDX__REPLS='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__IDX__REPLS"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset ismPolName="${_AWS__OS__IDX__PFX}--retention"
+        typeset idxTemplName="${_AWS__OS__IDX__PFX}--template"
+        typeset ismSeqNo= ismPriTerm= freeIdx=
+
+        case ${_AWS__OS__ACTION} in (-2|-1|0|1);; (*)false;; esac
+
+        function awscurl () {
+            command awscurl \
+                --profile "${_AWS__PROFILE}" \
+                --region "${AWS_REGION}" \
+                --service es \
+                "$@"
+        }
+
+        case ${_AWS__OS__ACTION} in
+          (-2)
+            # Delete matching Indices.
+            ( set +x
+                typeset line= idxName=
+                while IFS= read -r line; do
+                    [ -n "${line}" ] || continue
+                    idxName="${line:2}"
+                    if [ "${line:0:1}" = 'A' ]; then
+                        awscurl -X DELETE \
+                            "https://${_AWS__OS__FQDN}/*/_alias/${idxName}" ||
+                        true
+                    else
+                        awscurl -X DELETE \
+                            "https://${_AWS__OS__FQDN}/${idxName}" ||
+                        true
+                    fi
+                done 0&lt; &lt;(
+                    jq -nr \
+                        --argjson idxLst "$(
+                            awscurl -X GET \
+                                "https://${_AWS__OS__FQDN}/_cat/indices/${_AWS__OS__IDX__PFX}*?format=json"
+                        )" \
+                        --argjson alsLst "$(
+                            awscurl -X GET \
+                                "https://${_AWS__OS__FQDN}/_cat/aliases/${_AWS__OS__IDX__PFX}*?format=json"
+                        )" \
+                        '
+                            [
+                                ($alsLst[]? | {name: .alias, isAlias: true}),
+                                ($idxLst[]? | {name: .index, isAlias: false})
+                            ]
+                            | unique_by([.name, .isAlias])
+                            | sort_by(.name)
+                            | .[]
+                            | "\(if .isAlias then "A" else " " end) \(.name)"
+                        ' |
+                    fzf \
+                        -m \
+                        --bind alt-a:toggle-all \
+                        --header 'Select indices to delete.'
+                )
+            true )
+            ;;
+          (-1)
+            # Delete Index Template and ISM Retention Policy.
+            {
+                awscurl -X DELETE \
+                    "https://${_AWS__OS__FQDN}/_index_template/${idxTemplName}" ||
+                true
+                awscurl -X DELETE \
+                    "https://${_AWS__OS__FQDN}/_plugins/_ism/policies/${ismPolName}" ||
+                true
+            }
+            ;;
+          (0)
+            # List Index Templates, Retention Policies, and matching Indices.
+            {
+                jq -n \
+                    --argjson tmpl "$(
+                        awscurl -X GET \
+                            "https://${_AWS__OS__FQDN}/_index_template"
+                    )" \
+                    --argjson pol "$(
+                        awscurl -X GET \
+                            "https://${_AWS__OS__FQDN}/_plugins/_ism/policies"
+                    )" \
+                    --argjson idxCfg "$(
+                        awscurl -X GET \
+                            "https://${_AWS__OS__FQDN}/_cat/indices?format=json"
+                    )" \
+                    --argjson idxLst "$(
+                        awscurl -X GET \
+                            "https://${_AWS__OS__FQDN}/_plugins/_ism/explain/*?show_policy=true"
+                    )" \
+                    '
+                        ([
+                            $pol.policies[]? |
+                            {key: ._id, value: .policy.states}
+                        ] | from_entries) as $polMap |
+                        ([
+                            $idxCfg[]? |
+                            {key: .index, value: {
+                                shards: (.pri | tonumber? // "N/A"),
+                                replicas: (.rep | tonumber? // "N/A")
+                            }}
+                        ] | from_entries) as $iCfg |
+                        [
+                            $idxLst |
+                            to_entries[] |
+                            select(
+                                (.key | startswith(".") | not) and
+                                (.value | type == "object")
+                            )
+                        ] as $allUsrIdx |
+                        ([
+                            $tmpl.index_templates[]? |
+                            select(.name | endswith("--template")) |
+                            .name as $tName | (
+                                .index_template |
+                                (.index_patterns // []) as $ptrn |
+                                (
+                                    .template.settings.index //
+                                    .template.settings //
+                                    {}
+                                ) as $s |
+                                (($s.number_of_shards | tonumber?) // "N/A") as $shrd |
+                                (($s.number_of_replicas | tonumber?) // "N/A") as $rplc |
+                                (
+                                    $s["plugins.index_state_management.policy_id"] //
+                                    $s.plugins.index_state_management.policy_id //
+                                    "None"
+                                ) as $tPolId |
+                                ([ $allUsrIdx[] | select(
+                                    .key as $idxName |
+                                    $ptrn | any(
+                                        . as $p |
+                                        $idxName |
+                                        test("^" + (
+                                            $p |
+                                            gsub(
+                                                "(?&lt;c&gt;[\\\\.^$+(){}\\[\\]|])";
+                                                "\\\(.c)"
+                                            ) |
+                                            gsub("\\*"; ".*") |
+                                            gsub("\\?"; ".")
+                                        ) + "$")
+                                    )
+                                ) | {(.key): [
+                                    {"State": (
+                                        .value.state.name // "N/A"
+                                    )},
+                                    {"Shards": (
+                                        $iCfg[.key].shards // "N/A"
+                                    )},
+                                    {"Replicas": (
+                                        $iCfg[.key].replicas // "N/A"
+                                    )},
+                                    {"Retention Policy": (
+                                        (
+                                            .value.policy.policy_id //
+                                            .value.policy_id //
+                                            .value["index.plugins.index_state_management.policy_id"] //
+                                            .value["index.opendistro.index_state_management.policy_id"] //
+                                            "None"
+                                        ) as $iPolId |
+                                        {
+                                            "name": $iPolId,
+                                            "states": (
+                                                .value.policy.states //
+                                                $polMap[$iPolId] //
+                                                "N/A"
+                                            )
+                                        }
+                                    )}
+                                ]}]) as $mIdx |
+                                {($tName): [
+                                    {"Patterns": $ptrn},
+                                    {"Shards": $shrd},
+                                    {"Replicas": $rplc},
+                                    {"ISM Retention Policy": {
+                                        "name": $tPolId,
+                                        "states": ($polMap[$tPolId] // "N/A")
+                                    }},
+                                    {"Indexes": $mIdx}
+                                ]}
+                            )
+                        ] | add) // {}
+                    ' |
+                yq -p json -o yaml eval .
+            }
+            ;;
+          (1)
+            # Create or update ISM Retention Policy.
+            eval "$(
+                jq -r '"
+                    ismSeqNo=\(._seq_no // "")
+                    ismPriTerm=\(._primary_term // "")
+                "' 0&lt; &lt;(
+                    awscurl -X GET \
+                        "https://${_AWS__OS__FQDN}/_plugins/_ism/policies/${ismPolName}" \
+                        2&gt; /dev/null ||
+                    echo '{}'
+                )
+            )"
+            awscurl -X PUT \
+                -H 'Content-Type: application/json' \
+                -d "$(
+                    jq -cn \
+                        --arg idxPfx "${_AWS__OS__IDX__PFX}" \
+                        --arg rtnDays "${_AWS__OS__ISM__KEEP_DAYS}d" \
+                        --arg roMinSize "${_AWS__OS__ISM__RO_IDX_MIN_SIZE}" \
+                        --arg roMinDays "${_AWS__OS__ISM__RO_IDX_MIN_DAYS}d" \
+                        '{
+                            policy: {
+                                description: "Retention policy for `\($idxPfx)*` indices.",
+                                default_state: "active",
+                                ism_template: {
+                                    index_patterns: ["\($idxPfx)*"],
+                                    priority: 100
+                                },
+                                states: [{
+                                    name: "active",
+                                    actions: [{rollover: {
+                                        min_size: $roMinSize,
+                                        min_index_age: $roMinDays,
+                                        prevent_empty_rollover: true
+                                    }}],
+                                    transitions: [{
+                                        state_name: "delete",
+                                        conditions: {min_index_age: $rtnDays}
+                                    }]
+                                }, {
+                                    name: "delete",
+                                    actions: [{delete: {}}],
+                                    transitions: []
+                                }]
+                            }
+                        }'
+                )" \
+"https://${_AWS__OS__FQDN}/_plugins/_ism/policies/${ismPolName}"\
+"${ismSeqNo:+?if_seq_no=${ismSeqNo}&amp;if_primary_term=${ismPriTerm}}"
+
+            # Create or update Index Template.
+            awscurl -X PUT \
+                -H 'Content-Type: application/json' \
+                -d "$(
+                    jq -cn \
+                        --arg polName "${ismPolName}" \
+                        --arg idxPfx "${_AWS__OS__IDX__PFX}" \
+                        --argjson idxShrd "${_AWS__OS__IDX__SHARDS}" \
+                        --argjson idxRplc "${_AWS__OS__IDX__REPLS}" \
+                        '{
+                            index_patterns: ["\($idxPfx)*"],
+                            template: {
+                                settings: {
+                                    "plugins.index_state_management.policy_id": $polName,
+                                    "plugins.index_state_management.rollover_alias": $idxPfx,
+                                    number_of_shards: $idxShrd,
+                                    number_of_replicas: $idxRplc
+                                }
+                            }
+                        }'
+                )" \
+                "https://${_AWS__OS__FQDN}/_index_template/${idxTemplName}"
+
+            # Bootstrap initial numbered index and RollOver Write Alias.
+            if {
+                awscurl -X GET \
+                    "https://${_AWS__OS__FQDN}/_alias/${_AWS__OS__IDX__PFX}" \
+                    2&gt; /dev/null |
+                jq -e 'has("error")' &amp;&gt; /dev/null
+            } then
+                # Get the first free numbered index.
+                freeIdx="${_AWS__OS__IDX__PFX}-$(printf '%06d' "$(
+                    awscurl -X GET \
+                        "https://${_AWS__OS__FQDN}/_cat/indices/${_AWS__OS__IDX__PFX}-*?format=json" \
+                        2&gt; /dev/null |
+                    jq -r \
+                        --arg pfx "${_AWS__OS__IDX__PFX}" \
+                        '
+                            [
+                                .[].index |
+                                ltrimstr($pfx + "-") |
+                                select(test("^\\d{6}$")) |
+                                tonumber
+                            ] | (
+                                if (length == 0) then 0
+                                else ((sort[-1] + 1) % 1000000)
+                                end
+                            )
+                        '
+                )")"
+
+                # Check if this index exists (sequence wrapped).
+                {
+                    awscurl -X GET \
+                        "https://${_AWS__OS__FQDN}/${freeIdx}" \
+                        2&gt; /dev/null |
+                    jq -e 'has("error")' &amp;&gt; /dev/null
+                } || {
+                    echo \
+                        "ERROR: Index \`${freeIdx}\` already exists"\
+                        '(sequence wrapped). Cannot proceed.'\
+                        1&gt;&amp;2
+                    exit 1
+                }
+
+                # Check if the alias name is a real index.
+                if {
+                    awscurl -X GET \
+                        "https://${_AWS__OS__FQDN}/${_AWS__OS__IDX__PFX}" \
+                        2&gt; /dev/null |
+                    jq -e 'has("error")' &amp;&gt; /dev/null
+                } then
+                    # Create alias.
+                    awscurl -X PUT \
+                        -H 'Content-Type: application/json' \
+                        -d "$(
+                            jq -cn \
+                                --arg alias "${_AWS__OS__IDX__PFX}" \
+                                '{aliases: {($alias): {is_write_index: true}}}'
+                        )" \
+                        "https://${_AWS__OS__FQDN}/${freeIdx}"
+                else
+                    # Reindex unnumbered index to free numbered index.
+                    awscurl -X POST \
+                        -H 'Content-Type: application/json' \
+                        -d "$(
+                            jq -cn \
+                                --arg src "${_AWS__OS__IDX__PFX}" \
+                                --arg dst "${freeIdx}" \
+                                '{source: {index: $src}, dest: {index: $dst}}'
+                        )" \
+                        "https://${_AWS__OS__FQDN}/_reindex?wait_for_completion=true"
+                    awscurl -X DELETE \
+                        "https://${_AWS__OS__FQDN}/${_AWS__OS__IDX__PFX}"
+                    awscurl -X POST \
+                        -H 'Content-Type: application/json' \
+                        -d "$(
+                            jq -cn \
+                                --arg idx "${freeIdx}" \
+                                --arg alias "${_AWS__OS__IDX__PFX}" \
+                                '{actions: [{add: {
+                                    index: $idx,
+                                    alias: $alias,
+                                    is_write_index: true
+                                }}]}'
+                        )" \
+                        "https://${_AWS__OS__FQDN}/_aliases"
+                fi
+            fi
+            ;;
+        esac
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Managing Tenant
+__SHELL=0 \
+    _AWS__OS__ACTION=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__ACTION--tenant"></span> \
+    _AWS__OS__FQDN='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__FQDN"></span>' \
+    _AWS__OS__TEN__NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__TEN__NAME"></span>' \
+    _AWS__OS__TEN__DESC='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__TEN__DESC"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        case ${_AWS__OS__ACTION} in (-1|0|1);; (*)false;; esac
+
+        function awscurl () {
+            command awscurl \
+                --profile "${_AWS__PROFILE}" \
+                --region "${AWS_REGION}" \
+                --service es \
+                "$@"
+        }
+
+        case ${_AWS__OS__ACTION} in
+          (-1)
+            # Delete Tenant.
+            {
+                awscurl -X DELETE \
+                    "https://${_AWS__OS__FQDN}/_plugins/_security/api/tenants/${_AWS__OS__TEN__NAME}" ||
+                true
+            }
+            ;;
+          (0)
+            # List Tenants.
+            {
+                awscurl -X GET \
+                    "https://${_AWS__OS__FQDN}/_plugins/_security/api/tenants" |
+                jq -r 'keys[]'
+            }
+            ;;
+          (1)
+            # Create or update Tenant.
+            awscurl -X PUT \
+                -H 'Content-Type: application/json' \
+                -d "$(
+                    jq -cn \
+                        --arg desc "${_AWS__OS__TEN__DESC}" \
+                        '{description: $desc}'
+                )" \
+                "https://${_AWS__OS__FQDN}/_plugins/_security/api/tenants/${_AWS__OS__TEN__NAME}"
+            ;;
+        esac
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Managing Role
+#   _AWS__OS__IDX__PERMS supported values (ignored if `_AWS__OS__IDX__PAT` is
+#   an empty string):
+#     R/O   - Read only.
+#     W/O   - Write only.
+#     R/W   - Read and write.
+#     CRUD  - Full Index Data Access.
+#     ADM   - Full Index authority (CRUD + Index management).
+#   _AWS__OS__TEN__PERMS supported values (ignored if `_AWS__OS__TEN__PAT` is
+#   an empty string):
+#     R/O   - View Dashboards and saved objects only.
+#     R/W   - View and modify Dashboards and saved objects.
+__SHELL=0 \
+    _AWS__OS__ACTION=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__ACTION--role"></span> \
+    _AWS__OS__FQDN='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__FQDN"></span>' \
+    _AWS__OS__IDX__PAT='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__IDX__PAT"></span>' \
+    _AWS__OS__IDX__PERMS='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__IDX__PERMS"></span>' \
+    _AWS__OS__TEN__PAT='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__TEN__PAT"></span>' \
+    _AWS__OS__TEN__PERMS='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__TEN__PERMS"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset idxPerms= clsPerms= tenPerms=
+        typeset roleName=\
+"${_AWS__OS__IDX__PAT:+idx__$(
+    _AWS__OS__IDX__PAT="${_AWS__OS__IDX__PAT//\*/..all..}"
+    echo "${_AWS__OS__IDX__PAT//\?/..any..}"
+)__${_AWS__OS__IDX__PERMS/\//}}"\
+"${_AWS__OS__TEN__PAT:+${_AWS__OS__IDX__PAT:+--}ten__$(
+    _AWS__OS__TEN__PAT="${_AWS__OS__TEN__PAT//\*/..all..}"
+    echo "${_AWS__OS__TEN__PAT//\?/..any..}"
+)__${_AWS__OS__TEN__PERMS/\//}}"; [ -n "${roleName}" ]
+
+        case ${_AWS__OS__ACTION} in (-1|0|1);; (*)false;; esac
+        case ${_AWS__OS__IDX__PERMS} in
+          (R/O)
+            idxPerms='["read"]'
+            clsPerms='['\
+'"cluster_composite_ops_ro", '\
+'"cluster:monitor/main", '\
+'"cluster:monitor/health", '\
+'"cluster:monitor/state"'\
+']'
+            ;;
+          (W/O)
+            idxPerms='["write", "indices:admin/create"]'
+            clsPerms='["cluster_composite_ops", "cluster:monitor/main"]'
+            ;;
+          (R/W)
+            idxPerms='["read", "write", "indices:admin/create"]'
+            clsPerms='['\
+'"cluster_composite_ops", '\
+'"cluster:monitor/main", '\
+'"cluster:monitor/health", '\
+'"cluster:monitor/state"'\
+']'
+            ;;
+          (CRUD)
+            idxPerms='['\
+'"crud", '\
+'"indices:admin/create", '\
+'"indices:admin/*template/*", '\
+'"indices:admin/mapping*", '\
+'"indices:admin/refresh*"'\
+']'
+            clsPerms='["cluster_composite_ops", "cluster_monitor"]'
+            ;;
+          (ADM)
+            idxPerms='["indices_all"]'
+            clsPerms='["cluster_composite_ops", "cluster_monitor"]'
+            ;;
+          (*)   false;;
+        esac
+        case ${_AWS__OS__TEN__PERMS} in
+          (R/O) tenPerms='["kibana_all_read"]';;
+          (R/W) tenPerms='["kibana_all_write"]';;
+          (*)   false;;
+        esac
+
+        function awscurl () {
+            command awscurl \
+                --profile "${_AWS__PROFILE}" \
+                --region "${AWS_REGION}" \
+                --service es \
+                "$@"
+        }
+
+        case ${_AWS__OS__ACTION} in
+          (-1)
+            # Delete Role.
+            {
+                awscurl -X DELETE \
+                    "https://${_AWS__OS__FQDN}/_plugins/_security/api/roles/${roleName}" ||
+                true
+            }
+            ;;
+          (0)
+            # List Roles.
+            {
+                awscurl -X GET \
+                    "https://${_AWS__OS__FQDN}/_plugins/_security/api/roles" |
+                jq -r 'keys[] | select(
+                    startswith("idx__") or startswith("ten__")
+                )'
+            }
+            ;;
+          (1)
+            # Create or update Role.
+            awscurl -X PUT \
+                -H 'Content-Type: application/json' \
+                -d "$(
+                    jq -cn \
+                        --argjson clsPerms "${clsPerms}" \
+                        --arg idxPat "${_AWS__OS__IDX__PAT}" \
+                        --argjson idxPerms "${idxPerms}" \
+                        --arg tenPat "${_AWS__OS__TEN__PAT}" \
+                        --argjson tenPerms "${tenPerms}" \
+                        '(
+                            if ($idxPat != "") then {
+                                cluster_permissions: $clsPerms,
+                                index_permissions: [{
+                                    index_patterns: [$idxPat],
+                                    allowed_actions: $idxPerms
+                                }]
+                            } else {} end
+                        ) + (
+                            if ($tenPat != "") then {
+                                tenant_permissions: [{
+                                    tenant_patterns: [$tenPat],
+                                    allowed_actions: $tenPerms
+                                }]
+                            } else {} end
+                        )'
+                )" \
+                "https://${_AWS__OS__FQDN}/_plugins/_security/api/roles/${roleName}"
+            ;;
+        esac
+
+        case ${_AWS__OS__ACTION} in
+          (-1|1)
+            # Show Role.
+            awscurl -X GET \
+                "https://${_AWS__OS__FQDN}/_plugins/_security/api/roles/${roleName}"
+            ;;
+        esac
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Managing Service Account
+#   Role assignment is optional. Set `_AWS__OS__ROLE_NAME` to empty string to
+#       skip it.
+__SHELL=0 \
+    _AWS__OS__ACTION=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__ACTION--internal-user"></span> \
+    _AWS__OS__FQDN='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__FQDN"></span>' \
+    _AWS__OS__CRD_USR='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__CRD_USR"></span>' \
+    _AWS__OS__CRD_PWD_CHG=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__CRD_PWD_CHG"></span> \
+    _AWS__OS__ROLE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__ROLE_NAME-internal-user"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    _BW__NOTE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME"></span>' \
+    _GSM__CTR_IMG='<span style="color:red;font-weight:bold;" data-var="vEV--_GSM__CTR_IMG"></span>' \
+    _GSM__SEC_COL='<span style="color:red;font-weight:bold;" data-var="vEV--_GSM__SEC_COL"></span>' \
+    _GSM__SEC_PATH__GRP='<span style="color:red;font-weight:bold;" data-var="vEV--_GSM__SEC_PATH__GRP"></span>' \
+    _GSM__SEC_PATH__FLD__USR='<span style="color:red;font-weight:bold;" data-var="vEV--_GSM__SEC_PATH__FLD__USR"></span>' \
+    _GSM__SEC_PATH__FLD__PWD='<span style="color:red;font-weight:bold;" data-var="vEV--_GSM__SEC_PATH__FLD__PWD"></span>' \
+   x_VAULT_MOUNT='<span style="color:red;font-weight:bold;" data-var="vEV--_VAULT_MOUNT"></span>' \
+   x_VAULT_KEY_PATH='<span style="color:red;font-weight:bold;" data-var="vEV--_VAULT_KEY_PATH"></span>' \
+   x_VAULT_KEY_USR='<span style="color:red;font-weight:bold;" data-var="vEV--_VAULT_KEY_USR"></span>' \
+   x_VAULT_KEY_PWD='<span style="color:red;font-weight:bold;" data-var="vEV--_VAULT_KEY_PWD"></span>' \
+    BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}" \
+    BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)" \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+   xVAULT_ADDR='<span style="color:red;font-weight:bold;" data-var="vEV--VAULT_ADDR"></span>' \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+                echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+                exit 1
+            }
+            eval "${__shOpt}"; unset __shOpt
+        }
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset bwData= bwSubFld="cred.${_AWS__OS__CRD_USR}"
+        typeset crdUsr= crdPwd= role=
+
+        case ${_AWS__OS__ACTION} in
+            (-2|0|2)    ;;
+            (-1|1)      [ -n "${_BW__NOTE_NAME}" ];;
+            (*)         false;;
+        esac
+
+        function awscurl () {
+            command awscurl \
+                --profile "${_AWS__PROFILE}" \
+                --region "${AWS_REGION}" \
+                --service es \
+                "$@"
+        }
+
+        crdUsr="$(
+            echo -n "${_AWS__OS__CRD_USR}" |
+            python3 -c "$(cat - 0&lt;&lt;'scrEOF'
+import sys, urllib.parse
+print(urllib.parse.quote(sys.stdin.read()), end='')
+scrEOF
+            )"
+        )"
+
+        [ -z "${_BW__NOTE_NAME}" ] || {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            bwData="$(bw get item "${_BW__NOTE_NAME}")" || {
+                echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                exit 1
+            }
+            { {
+                bw encode 0&lt;&lt;&lt;"${bwData}" |
+                bw edit item "$(jq -cr '.id' 0&lt;&lt;&lt;"${bwData}")" 1&gt; /dev/null
+            } || {
+                echo "You do NOT have R/W access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                exit 1
+            }; } &amp;&amp; bw sync 1&gt; /dev/null &amp;&amp; bwData="$(bw get item "${_BW__NOTE_NAME}")"
+            eval "${__shOpt}"; unset __shOpt
+        }
+
+        case ${_AWS__OS__ACTION} in
+          (-2)
+            # Remove Role.
+            [ -n "${_AWS__OS__ROLE_NAME}" ] &amp;&amp; {
+                awscurl -X PUT \
+                    -H 'Content-Type: application/json' \
+                    -d "$(jq -c \
+                        --arg usr "${_AWS__OS__CRD_USR}" \
+                        --arg role "${_AWS__OS__ROLE_NAME}" \
+                        '{
+                            backend_roles: (.[$role].backend_roles // []),
+                            users: ((.[$role].users // []) | map(select(. != $usr)))
+                        }' \
+                    0&lt; &lt;(
+                        awscurl -X GET \
+                            "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping/${_AWS__OS__ROLE_NAME}" \
+                            2&gt; /dev/null ||
+                        echo 'null'
+                    ))" \
+                    "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping/${_AWS__OS__ROLE_NAME}"
+            }
+            ;;
+          (-1)
+            # Delete User.
+            while IFS= read -r role; do
+                awscurl -X PUT \
+                    -H 'Content-Type: application/json' \
+                    -d "$(jq -c \
+                        --arg usr "${_AWS__OS__CRD_USR}" \
+                        --arg role "${role}" \
+                        '{
+                            backend_roles: (.[$role].backend_roles // []),
+                            users: ((.[$role].users // []) | map(select(. != $usr)))
+                        }' \
+                    0&lt; &lt;(
+                        awscurl -X GET \
+                            "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping/${role}" \
+                            2&gt; /dev/null ||
+                        echo 'null'
+                    ))" \
+                    "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping/${role}"
+            done 0&lt; &lt;(
+                awscurl -X GET \
+                    "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping" |
+                jq -r \
+                    --arg usr "${_AWS__OS__CRD_USR}" \
+                    'to_entries[] | select(.value.users[]? == $usr) | .key'
+            )
+            {
+                awscurl -X DELETE \
+                    "https://${_AWS__OS__FQDN}/_plugins/_security/api/internalusers/${crdUsr}" ||
+                true
+            }
+            ;;
+          (0)
+            # List Users.
+            {
+                awscurl -X GET \
+                    "https://${_AWS__OS__FQDN}/_plugins/_security/api/internalusers" |
+                jq -r 'keys[]'
+            }
+            ;;
+          (1)
+            # Create or update User.
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            crdPwd="$( set +x
+                ((_AWS__OS__CRD_PWD_CHG)) || {
+                    crdPwd="$(jq -cr \
+                        --arg fn__c "${bwSubFld}" \
+                        '
+                            .fields[]? | select(.name == $fn__c).value |
+                            fromjson | (.pwd // "")
+                        ' \
+                    0&lt;&lt;&lt;"${bwData}")"
+                    [ -z "${crdPwd}" ] || { echo "${crdPwd}"; false; }
+                } &amp;&amp; {
+                    while (
+                        ((${#crdPwd} &lt; 32)) ||
+                        ! [[ "${crdPwd}" =~ [[:upper:]] ]] ||
+                        ! [[ "${crdPwd}" =~ [[:lower:]] ]] ||
+                        ! [[ "${crdPwd}" =~ [[:digit:]] ]] ||
+                        ! [[ "${crdPwd}" =~ [+=._-] ]]
+                    ); do
+                        crdPwd="$(
+                            openssl rand 256 | LC_ALL=c tr -dc '[:alnum:]+=._-'
+                        )"
+                        crdPwd="${crdPwd:0:32}"
+                    done
+                    echo "${crdPwd}"
+                }
+                awscurl -X PUT \
+                    -H 'Content-Type: application/json' \
+                    -d "$(jq -cn --arg pwd "${crdPwd}" '{password: $pwd}')" \
+                    "https://${_AWS__OS__FQDN}/_plugins/_security/api/internalusers/${crdUsr}" \
+                    1&gt;&amp;2
+            true )"
+            eval "${__shOpt}"; unset __shOpt
+            [ -n "${_AWS__OS__ROLE_NAME}" ] &amp;&amp; {
+                awscurl -X PUT \
+                    -H 'Content-Type: application/json' \
+                    -d "$(jq -c \
+                        --arg usr "${_AWS__OS__CRD_USR}" \
+                        --arg role "${_AWS__OS__ROLE_NAME}" \
+                        '{
+                            backend_roles: (.[$role].backend_roles // []),
+                            users: (((.[$role].users // []) + [$usr]) | unique)
+                        }' \
+                    0&lt; &lt;(
+                        awscurl -X GET \
+                            "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping/${_AWS__OS__ROLE_NAME}" \
+                            2&gt; /dev/null ||
+                        echo 'null'
+                    ))" \
+                    "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping/${_AWS__OS__ROLE_NAME}"
+            }
+            ;;
+        esac
+
+        case ${_AWS__OS__ACTION} in
+          (-2|1|2)
+            # Show User and assigned Roles.
+            awscurl -X GET \
+                "https://${_AWS__OS__FQDN}/_plugins/_security/api/internalusers/${crdUsr}"
+            {
+                awscurl -X GET \
+                    "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping" |
+                jq -r \
+                    --arg usr "${_AWS__OS__CRD_USR}" \
+                    '["Roles:"] + [
+                        to_entries[] |
+                        select(.value.users | contains([$usr])) |
+                        "    \(.key)"
+                    ] | .[]'
+            }
+            ;;
+        esac
+
+        # Update BitWarden.
+        [ -z "${_BW__NOTE_NAME}" ] || ( set +x
+            case ${_AWS__OS__ACTION} in
+              (-1)
+                bwData="$(jq -r \
+                    --arg fn__c "${bwSubFld}" \
+                    '.fields|=map(select(.name != $fn__c))' \
+                0&lt;&lt;&lt;"${bwData}")"
+                bw encode 0&lt;&lt;&lt;"${bwData}" | bw edit item "$(jq -cr '.id' 0&lt;&lt;&lt;"${bwData}")" 1&gt; /dev/null
+                ;;
+              (1)
+                bwData="$(jq -r \
+                    --arg fn__c "${bwSubFld}" \
+                    --rawfile fv__c &lt;( set +x
+                        jq -cnj \
+                            --arg usr "${_AWS__OS__CRD_USR}" \
+                            --arg pwd "${crdPwd}" \
+                            '{usr: $usr, pwd: $pwd}'
+                    true ) \
+                    '.fields|=((. // []) | (
+                        map(select(.name != $fn__c)) +
+                        [{name: $fn__c, value: $fv__c, type: 1}]
+                    ))' \
+                0&lt;&lt;&lt;"${bwData}")"
+                bw encode 0&lt;&lt;&lt;"${bwData}" | bw edit item "$(jq -cr '.id' 0&lt;&lt;&lt;"${bwData}")" 1&gt; /dev/null
+                ;;
+            esac
+        true )
+
+        # Update Google Secret Manager (GSM).
+        [ -z "${_GSM__SEC_COL}" ] || [ -z "${_GSM__SEC_PATH__GRP}" ] || [ \
+            -z "${_GSM__SEC_PATH__FLD__USR}" ] || [ -z "${_GSM__SEC_PATH__FLD__PWD}" \
+        ] || ( set +x
+            function gsm-cli () {
+                podman run --rm -i \
+                    -u 0:0 \
+                    -e CLOUDSDK_CONFIG=/gcloud \
+                    -e GOOGLE_CLOUD_QUOTA_PROJECT=openshift-ci-secrets \
+                    --env-file &lt;(echo _GSM__SEC_VAL) \
+                    -v "${HOME}/.config/gcloud:/gcloud:z" \
+                    --entrypoint bash \
+                    -- \
+                    "${_GSM__CTR_IMG}" \
+                    -c \
+                    "$@"
+            }
+            function gsm-norm-path () {
+                # Must follow encoding in
+                #   `https://github.com/openshift/ci-tools/blob/main/pkg/gsm-validation/gsm.go` (`NormalizeName()`).
+                printf '%s' "$(awk '{
+                    while (match($0, /_{2,}/)) {
+                        printf "%s", substr($0, 1, (RSTART-1))
+                        n = RLENGTH
+                        printf "--"
+                        for (i=1; i&lt;=n; i++) printf "u"
+                        printf "--"
+                        $0 = substr($0, (RSTART+RLENGTH))
+                    }
+                    printf "%s", $0
+                }' 0&lt;&lt;&lt;"${1//./--dot--}")"
+            }
+
+            typeset gsmSecLst= e=
+            typeset -i gsmSecExistUsr=0 gsmSecExistPwd=0
+            typeset -x _GSM__SEC_VAL=
+
+            typeset gsmSecPathUsr="$(
+                gsm-norm-path "${_GSM__SEC_PATH__GRP}/${_GSM__SEC_PATH__FLD__USR}"
+            )"
+            typeset gsmSecPathPwd="$(
+                gsm-norm-path "${_GSM__SEC_PATH__GRP}/${_GSM__SEC_PATH__FLD__PWD}"
+            )"
+
+            gcloud auth application-default print-access-token &amp;&gt; /dev/null || {
+                echo 'Logging in to Google Cloud...'
+                gcloud auth application-default login --no-launch-browser
+            } || {
+                echo 'You may NOT have access to Google Cloud.' 1&gt;&amp;2
+                exit 1
+            }
+            gsmSecLst="$(gsm-cli "$(cat - 0&lt;&lt;scrEOF
+python3 main.py list \
+    -c ${_GSM__SEC_COL@Q} \
+    -o json
+scrEOF
+            )")" 2&gt;/dev/null || {
+                echo \
+                    'You do NOT have access to GSM Collection'\
+                    "\`${_GSM__SEC_COL}\`."\
+                    1&gt;&amp;2
+                exit 1
+            }
+            for e in Usr Pwd; do
+                typeset -n gsmSecItemRef="gsmSecPath${e}"
+                typeset -n gsmSecFlagRef="gsmSecExist${e}"
+                gsmSecFlagRef=$(jq -r --arg p "${gsmSecItemRef}" '
+                    (index($p) // -1) + 1
+                ' 0&lt;&lt;&lt;"${gsmSecLst}")
+            done
+
+            case ${_AWS__OS__ACTION} in
+              (-1)
+                for e in Usr Pwd; do
+                    typeset -n gsmSecItemRef="gsmSecPath${e}"
+                    typeset -n gsmSecFlagRef="gsmSecExist${e}"
+                    ((gsmSecFlagRef)) &amp;&amp; {
+                        gsm-cli "$(cat - 0&lt;&lt;scrEOF
+python3 main.py delete \
+    -c ${_GSM__SEC_COL@Q} \
+    ${gsmSecItemRef@Q}
+scrEOF
+                        )" 1&gt; /dev/null
+                    } || true   # Ignore error (may not have delete permission).
+                done
+                ;;
+              (1)
+                for e in Usr Pwd; do
+                    typeset -n gsmSecItemRef="gsmSecPath${e}"
+                    typeset -n gsmSecFlagRef="gsmSecExist${e}"
+                    if [ "${e}" = 'Usr' ]; then
+                        _GSM__SEC_VAL="${_AWS__OS__CRD_USR}"
+                    else
+                        _GSM__SEC_VAL="${crdPwd}"
+                    fi
+                    {
+                        if ((gsmSecFlagRef)); then
+                            gsm-cli "$(cat - 0&lt;&lt;scrEOF
+python3 main.py update \
+    -c ${_GSM__SEC_COL@Q} \
+    --from-literal "\${_GSM__SEC_VAL}" \
+    ${gsmSecItemRef@Q}
+scrEOF
+                            )"
+                        else
+                            gsm-cli "$(cat - 0&lt;&lt;scrEOF
+python3 main.py create \
+    -c ${_GSM__SEC_COL@Q} \
+    --from-literal "\${_GSM__SEC_VAL}" \
+    ${gsmSecItemRef@Q} 0&lt;&lt;'ansEOF'
+None
+None
+None
+ansEOF
+scrEOF
+                            )"
+                        fi
+                    } 1&gt; /dev/null || {
+                        echo \
+                            'Failed to create or update GSM Secret'\
+                            "\`${gsmSecItemRef}\` in Collection \`${_GSM__SEC_COL}\`."\
+                            1&gt;&amp;2
+                        exit 1
+                    }
+                done
+                ;;
+            esac
+        true )
+
+#       # Update HashiCorp Vault.
+#       [ -z "${_VAULT_MOUNT}" ] || [ -z "${_VAULT_KEY_PATH}" ] || [ \
+#           -z "${_VAULT_KEY_USR}" ] || [ -z "${_VAULT_KEY_PWD}" \
+#       ] || ( set +x
+#           typeset vaultData=
+#
+#           vault token lookup &amp;&gt; /dev/null || {
+#               echo 'Logging in to HashiCorp Vault...'
+#               vault login 1&gt; /dev/null
+#           } || {
+#               echo "You may NOT have access to HashiCorp Vault at \`${VAULT_ADDR}\`." 1&gt;&amp;2
+#               exit 1
+#           }
+#           vaultData="$(vault kv get -mount="${_VAULT_MOUNT}" -format=json "${_VAULT_KEY_PATH}")" || {
+#               echo \
+#                   'You do NOT have access to HashiCorp Vault Secret'\
+#                   "\`${_VAULT_MOUNT}/${_VAULT_KEY_PATH}\` at \`${VAULT_ADDR}\`."\
+#                   1&gt;&amp;2
+#               exit 1
+#           }
+#
+#           case ${_AWS__OS__ACTION} in
+#             (-1)
+#               {
+#                   jq -r \
+#                       --arg ku "${_VAULT_KEY_USR}" \
+#                       --arg kp "${_VAULT_KEY_PWD}" \
+#                       '.data.data | del(.[$ku], .[$kp])' \
+#                   0&lt;&lt;&lt;"${vaultData}" |
+#                   vault kv put -mount="${_VAULT_MOUNT}" "${_VAULT_KEY_PATH}" - 1&gt; /dev/null
+#               } || true   # Ignore error (may not have delete permission).
+#               ;;
+#             (1)
+#               [ "$(jq -cr \
+#                       --arg ku "${_VAULT_KEY_USR}" \
+#                       --arg kp "${_VAULT_KEY_PWD}" \
+#                       '
+#                           if . then {
+#                               u: (.data.data[$ku] // ""),
+#                               p: (.data.data[$kp] // "")
+#                           } else {u: "", p: ""} end
+#                       ' \
+#               0&lt;&lt;&lt;"${vaultData}")" = "$(
+#                   jq -cnr \
+#                       --arg ku "${_AWS__OS__CRD_USR}" \
+#                       --arg kp "${crdPwd}" \
+#                       '{u: $ku, p: $kp}'
+#               )" ] || {
+#                   vault kv destroy -mount="${_VAULT_MOUNT}" -versions="$(
+#                       jq -r '.data.metadata.version' 0&lt;&lt;&lt;"${vaultData}"
+#                   )" "${_VAULT_KEY_PATH}" &amp;&gt; /dev/null || true    # Ignore error (may not have delete permission).
+#                   {
+#                       jq -r \
+#                           --arg ku "${_VAULT_KEY_USR}" \
+#                           --arg vu "${_AWS__OS__CRD_USR}" \
+#                           --arg kp "${_VAULT_KEY_PWD}" \
+#                           --arg vp "${crdPwd}" \
+#                           '.data.data | .[$ku]=$vu | .[$kp]=$vp' \
+#                       0&lt;&lt;&lt;"${vaultData}" |
+#                       vault kv put -mount="${_VAULT_MOUNT}" "${_VAULT_KEY_PATH}" - 1&gt; /dev/null
+#                   } || {
+#                       echo \
+#                           'You do NOT have R/W access to HashiCorp Vault secret'\
+#                           "\`${_VAULT_MOUNT}/${_VAULT_KEY_PATH}\`."\
+#                           1&gt;&amp;2
+#                       exit 1
+#                   }
+#               }
+#               ;;
+#           esac
+#       true )
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Managing SSO User
+__SHELL=0 \
+    _AWS__OS__ACTION=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__ACTION--sso-user"></span> \
+    _AWS__OS__FQDN='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__FQDN"></span>' \
+    _AWS__OS__USR_EML='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__USR_EML"></span>' \
+    _AWS__OS__ROLE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__ROLE_NAME-sso-user"></span>' \
+    _AWS__COG__IDP_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__COG__IDP_NAME"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset cogUsrPoolName="cog--${_AWS__COG__IDP_NAME}--up"
+        typeset cogUsrPoolID= crdUsr= rolesMap= e= usrEml=
+        typeset -a ssoUsrLst=()
+
+        case ${_AWS__OS__ACTION} in (-1|0|1);; (*)false;; esac
+
+        function awscurl () {
+            command awscurl \
+                --profile "${_AWS__PROFILE}" \
+                --region "${AWS_REGION}" \
+                --service es \
+                "$@"
+        }
+
+        cogUsrPoolID="$(
+            typeset _page= _cur= _id= _nextTkn=
+            while true; do
+                _page="$(
+                    aws cognito-idp list-user-pools \
+                        --max-results 60 \
+                        ${_nextTkn:+--next-token "${_nextTkn}"} \
+                        --output json
+                )"
+                _cur="$(jq -cr \
+                    --arg name "${cogUsrPoolName}" \
+                    '.UserPools[] | select(.Name == $name).Id' \
+                0&lt;&lt;&lt;"${_page}")"
+                [ -n "${_cur}" ] &amp;&amp; {
+                    [ -n "${_id}" ] || [[ "${_cur}" == *$'\n'* ]] &amp;&amp; {
+                        : "ERROR: Multiple User Pools: ${cogUsrPoolName}"
+                        exit 1
+                    }
+                    _id="${_cur}"
+                }
+                _nextTkn="$(jq -cr '(.NextToken // empty)' 0&lt;&lt;&lt;"${_page}")"
+                [ -z "${_nextTkn}" ] &amp;&amp; break
+            done
+            [ -n "${_id}" ] || { : "ERROR: User Pool not found: ${cogUsrPoolName}"; exit 1; }
+            echo "${_id}"
+        )"
+        case ${_AWS__OS__ACTION} in
+          (-1|1)
+            crdUsr="$(
+                aws cognito-idp list-users \
+                    --user-pool-id "${cogUsrPoolID}" \
+                    --filter "email = \"${_AWS__OS__USR_EML}\"" \
+                    --output text \
+                    --query 'Users[0].Username'
+            )"; [ "${crdUsr}" != "None" ]
+            crdUsr="Cognito/${cogUsrPoolID}/${crdUsr}"
+            ssoUsrLst=("${crdUsr}:${_AWS__OS__USR_EML}")
+            ;;
+          (0)
+            while IFS= read -r e; do
+                [ -z "${e}" ] || ssoUsrLst+=("${e}")
+            done 0&lt; &lt;(
+                aws cognito-idp list-users \
+                    --user-pool-id "${cogUsrPoolID}" \
+                    --output json |
+                jq -r \
+                    --arg p "${cogUsrPoolID}" \
+                    '
+                        .Users[] |
+                        "Cognito/\($p)/\(.Username):\(
+                            (
+                                .Attributes[] |
+                                select(.Name == "email")
+                            ).Value // ""
+                        )"
+                    '
+            )
+            ;;
+        esac
+
+        case ${_AWS__OS__ACTION} in
+          (-1)
+            # Remove Role.
+            awscurl -X PUT \
+                -H 'Content-Type: application/json' \
+                -d "$(jq -c \
+                    --arg usr "${crdUsr}" \
+                    --arg role "${_AWS__OS__ROLE_NAME}" \
+                    '{
+                        backend_roles: (.[$role].backend_roles // []),
+                        users: ((.[$role].users // []) | map(select(. != $usr)))
+                    }' \
+                0&lt; &lt;(
+                    awscurl -X GET \
+                        "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping/${_AWS__OS__ROLE_NAME}" \
+                        2&gt; /dev/null ||
+                    echo 'null'
+                ))" \
+                "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping/${_AWS__OS__ROLE_NAME}"
+            ;;
+          (1)
+            # Assign Role.
+            awscurl -X PUT \
+                -H 'Content-Type: application/json' \
+                -d "$(jq -c \
+                    --arg usr "${crdUsr}" \
+                    --arg role "${_AWS__OS__ROLE_NAME}" \
+                    '{
+                        backend_roles: (.[$role].backend_roles // []),
+                        users: (((.[$role].users // []) + [$usr]) | unique)
+                    }' \
+                0&lt; &lt;(
+                    awscurl -X GET \
+                        "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping/${_AWS__OS__ROLE_NAME}" \
+                        2&gt; /dev/null ||
+                    echo 'null'
+                ))" \
+                "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping/${_AWS__OS__ROLE_NAME}"
+            ;;
+        esac
+
+        # Show SSO Users and assigned Roles.
+        rolesMap="$(
+            awscurl -X GET \
+                "https://${_AWS__OS__FQDN}/_plugins/_security/api/rolesmapping"
+        )"
+        for e in "${ssoUsrLst[@]}"; do
+            [ -z "${usrEml}" ] || printf '\n'
+            crdUsr="${e%:*}"
+            usrEml="${e#*:}"
+            echo "${crdUsr}: ${usrEml}"
+            {
+                jq -r \
+                    --arg usr "${crdUsr}" \
+                    '["Roles:"] + [
+                        to_entries[] |
+                        select(.value.users | contains([$usr])) |
+                        "    \(.key)"
+                    ] | .[]' \
+                0&lt;&lt;&lt;"${rolesMap}"
+            }
+        done
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

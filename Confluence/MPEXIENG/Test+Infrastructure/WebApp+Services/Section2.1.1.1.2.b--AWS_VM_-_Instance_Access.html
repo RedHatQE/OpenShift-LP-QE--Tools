@@ -1,0 +1,58 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS VM - Instance Access</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../Scripts/js/code-widget.js"></script>
+    <script type="module" src="../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/html-include.js"></script>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/Cloud/AWS/VM_InstanceAccess.html"
+    data-mod-js="
+        CodeWidget__UsrLib_OvrCfg(html, {
+            'aws-vm--instance-access': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vEV--_AWS__NET_PFX&quot;:         &quot;lp-chaos--svc&quot;,
+                                    &quot;vEV--_AWS__ROLE_NAME_SFX&quot;:   [{&quot;val&quot;: &quot;poweruser&quot;, &quot;txt&quot;: &quot;poweruser&quot;}, [{&quot;val&quot;: &quot;readonlywithinstanceconnect&quot;, &quot;txt&quot;: &quot;readonlywithinstanceconnect&quot;}]],
+                                    &quot;vEV--AWS_ACCOUNT_ID&quot;:        [&quot;624914081466&quot;]
+                                }`
+                            },
+                        },
+                    ],
+                    'vEV--_AWS__NET_PFX': ['...PleaseSelectTeam...'],
+                    'vEV--_AWS__APP_KIND': 'web-app',
+                    'vEV--_AWS__EC2__NAME_SFX--sfx': 'host',
+                    'vEV--_AWS__EC2_DEF_USER': '',
+                    'vEV--_AWS__ROLE_NAME_SFX': 'readonlywithinstanceconnect',
+                    'vEV--AWS_REGION': 'us-west-1',
+                    'vEV--AWS_ACCOUNT_ID': [['Please select Team.']],
+                    'vEV--_AWS__SSM_STARTSES_OPTS': '()',
+                    'vEV--_AWS__SSH__OPTS': '()',
+                },
+            },
+        });
+    "
+></div>
+</body>
+</html>

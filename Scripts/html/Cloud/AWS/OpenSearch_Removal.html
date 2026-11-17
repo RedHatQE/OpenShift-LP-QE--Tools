@@ -1,0 +1,181 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS OpenSearch - Removal</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../js/global.js"></script>
+    <script type="module" src="../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<h3>Cognito User Pool App. Client Removal</h3>
+<ol>
+    <li>
+        Delete the AWS Cognito User Pool App. Client.<br/>
+        Run <strong>Cognito.md - User Pool - User Pool App. Client</strong> with:
+        <table style="margin:0.5em 0;">
+            <thead>
+                <tr><th>Variable</th>                               <th>Value</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>_AWS__COG__ACTION</code></td>         <td><code>-1</code></td></tr>
+                <tr><td><code>_AWS__COG__CLIENT_NAME</code></td>    <td><code>AmazonOpenSearchService-&lt;_AWS__OS__DOM_NAME&gt;</code></td></tr>
+            </tbody>
+        </table>
+    </li>
+</ol>
+<hr style="height:2px;border:0;border-block:1px solid CanvasText;"/>
+<h3>Domain Removal</h3>
+<div class="code-widget" id="aws-opensearch--removal--domain">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--AWS_REGION\": \"...awsRegion1...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--AWS_REGION\": \"...awsRegion2...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_AWS__OS__DOM_NAME": "...osDomName...",
+                "vEV--_AWS__ROLE_NAME_SFX": "...roleNameSfx...",
+                "vEV--AWS_REGION": "...awsRegion...",
+                "vEV--AWS_ACCOUNT_ID": [
+                    ["Please select an AWS Account."],
+                    {
+                        "val": "...awsAccID1...",
+                        "txt": "...awsAccName1..."
+                    },
+                    {
+                        "val": "...awsAccID2...",
+                        "txt": "...awsAccName2..."
+                    }
+                ]
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_AWS__OS__DOM_NAME</span>    <input type="text"          data-var="vEV--_AWS__OS__DOM_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__RESET_PROFILE</span>   <select class="cw-cls--opt" data-var="vEV--_AWS__RESET_PROFILE">
+            <option value="0"   selected="">0: Keep existing Profile.</option>
+            <option value="1"              >1: Reset Profile.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__ROLE_NAME_SFX</span>   <input type="text"          data-var="vEV--_AWS__ROLE_NAME_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_REGION</span>            <input type="text"          data-var="vEV--AWS_REGION" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_ACCOUNT_ID</span>        <select class="cw-cls--opt" data-var="vEV--AWS_ACCOUNT_ID"></select></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Removing OpenSearch Domain
+__SHELL=0 \
+    _AWS__OS__DOM_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__OS__DOM_NAME"></span>' \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span>' \
+   x_AWS__SES_TO=3600 \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euxc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset -i wInt=0 wMax=0
+
+        # Delete OpenSearch Domain.
+        {
+            aws opensearch describe-domain \
+                --domain-name "${_AWS__OS__DOM_NAME}" \
+            &amp;&gt; /dev/null &amp;&amp;
+            aws opensearch delete-domain \
+                --domain-name "${_AWS__OS__DOM_NAME}" \
+                --no-cli-pager
+        }
+
+        # Monitor OpenSearch Domain deletion.
+        (   # Isolate `SECONDS` reset.
+            SECONDS=0 wInt=60 wMax=1800     # 30 Min. Max.
+            # Domain deletion.
+            while ((SECONDS &lt; wMax)); do
+                aws opensearch describe-domain \
+                    --domain-name "${_AWS__OS__DOM_NAME}" \
+                    &amp;&gt; /dev/null &amp;&amp; sleep ${wInt} || break
+                echo "Waited ${SECONDS}/${wMax} sec.: "\
+'Deleting OpenSearch Domain...' 1&gt;&amp;2
+            done
+            ((SECONDS &gt;= wMax)) &amp;&amp; { echo 'Timed out waiting for '\
+'OpenSearch Domain deletion.' 1&gt;&amp;2; exit 2; }
+        )
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <div style="font-size:medium;" tabindex="0">
+            <p style="margin-bottom:0"><strong>Post-requisites:</strong></p>
+            <ul style="margin-top:0">
+                <li>Run <strong>Cognito.md - IAM Roles - IAM App. Servicing Role</strong> with:
+                    <table style="margin:0.5em 0;">
+                        <thead>
+                            <tr><th>Variable</th>                               <th>Value</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>_AWS__COG__ACTION</code></td>         <td><code>-1</code></td></tr>
+                            <tr><td><code>_AWS__COG__APP_PRINCIPAL</code></td>  <td><code>es.amazonaws.com</code></td></tr>
+                            <tr><td><code>_AWS__COG__APP_POL_NAME</code></td>   <td><code>AmazonOpenSearchServiceCognitoAccess</code></td></tr>
+                        </tbody>
+                    </table>
+                </li>
+                <li>Run <strong>Cognito.md - Removal</strong> to tear down remaining Cognito resources.</li>
+            </ul>
+        </div>
+    </div>
+</div>
+</body>
+</html>

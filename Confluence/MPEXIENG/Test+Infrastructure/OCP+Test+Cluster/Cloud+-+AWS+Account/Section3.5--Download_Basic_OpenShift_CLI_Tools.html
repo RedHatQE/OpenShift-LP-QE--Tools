@@ -1,0 +1,79 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Basic OpenShift CLI Tools</title>
+    <base href="{{site.url}}{{site.baseurl}}{{page.url}}" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../../Scripts/js/global.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+# Warning!!! This code snippet requires `yq`.
+KUBECONFIG='...pathToKubeConfigFile...' \
+    binDir='./' \
+    bash -uc "$(cat - 0&lt;&lt;'cmdEOF'
+        typeset apiURL= baseURL= e=
+        typeset -i i=3
+        typeset -a dlBaseURLs=() arr=()
+
+        while ((--i)); do
+            case ${i} in
+              (2)
+                e="$(oc whoami --show-console)" || continue
+                baseURL="$(echo "${e}" | sed -E 's|^[^:]+://[^.]+\.apps\.([^:]+)(:[[:digit:]]+)?$|\1|')"
+                ;;&amp;
+              (1)
+                apiURL="$(yq -e '.clusters[].cluster.server' "${KUBECONFIG}" | sed -n '1p')"
+                [ -z "${apiURL}" ] &amp;&amp; read -p 'Enter the Cluster API URL: ' apiURL
+                [ -z "${apiURL}" ] &amp;&amp; exit
+                e="${apiURL}"
+                baseURL="$(echo "${e}" | sed -E 's|^[^:]+://api\.([^:]+)(:[[:digit:]]+)?$|\1|')"
+                ;;&amp;
+              (*)
+                schemaURL="$(echo "${e}" | sed -E 's|:.*$||')"
+                for e in "${dlBaseURLs[@]}"; do
+                    [ "${e}" = "${schemaURL}|${baseURL}" ] &amp;&amp; continue 2
+                done
+                dlBaseURLs+=("${schemaURL}|${baseURL}")
+                ;;
+            esac
+        done
+
+        for e in "${dlBaseURLs}"; do
+            schemaURL="${e%%|*}"; baseURL="${e##*|}"
+            typeset -a toolArr=(
+                "(  ''  'oc'                '${schemaURL}://downloads-openshift-console.apps.${baseURL}/amd64/linux/oc.tar'                                 )"
+                "(  z   'tkn tkn-pac opc'   '${schemaURL}://tkn-cli-serve-openshift-pipelines.apps.${baseURL}/tkn/tkn-linux-amd64.tar.gz'                   )"
+                "(  z   'virtctl'           '${schemaURL}://hyperconverged-cluster-cli-download-openshift-cnv.apps.${baseURL}/amd64/linux/virtctl.tar.gz'   )"
+            )
+            for e in "${toolArr[@]}"; do
+                eval "arr=${e}"
+                eval "e=(${arr[1]})"
+                arr+=("${e[0]}")
+                curl -kfsSLI "${arr[2]}" 1&gt; /dev/null 2&gt;&amp;1 &amp;&amp;
+                curl -kfssL "${arr[2]}" | tar "${arr[0]}vx" -C "${binDir}" "${e[@]}"
+                case ${arr[3]} in
+                  (oc)  [ -e "${binDir}/oc" ] &amp;&amp; ln -sf oc "${binDir}/kubectl";;
+                esac
+            done
+        done
+
+        true
+cmdEOF
+    )"
+</pre>
+    </div>
+</div>
+</body>
+</html>

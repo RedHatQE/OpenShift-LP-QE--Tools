@@ -1,0 +1,111 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CI Operator Emulator - Main</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/html-include.js"></script>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/OCP/CI--CI-Operator--01-Operation/Tips-a-Trick/CI-Operator_Emulator.html"
+></div>
+<hr style="border:3px solid CanvasText;"/>
+<div style="font-family:monospace;font-size:large;max-height:20em;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;margin:0;color:black;background-color:cyan;">
+================================================================================
+The CI Operator Job `pull-ci-RedHatQE-interop-testing-master-ciOpEmul--preTest-run-prior-steps` is ready at:
+    '/ws/local/repo/openshift/release/pr-000/src/ci-operator/config/RedHatQE/interop-testing/RedHatQE-interop-testing-master__ciOpEmul--preTest.yaml'
+The CI Operator Job `pull-ci-RedHatQE-interop-testing-master-ciOpEmul--imgRetr-img-retr` is ready at:
+    '/ws/local/repo/openshift/release/pr-000/src/ci-operator/config/RedHatQE/interop-testing/RedHatQE-interop-testing-master__ciOpEmul--imgRetr.yaml'
+Execute:
+    make -C '/ws/local/repo/openshift/release/pr-000/src'/ -j 1 ci-operator-config update; echo $?
+Commit the new and modified files, then push that into a (dummy) WIP/Draft PR.
+Rehearse the Jobs:
+    /pj-rehearse pull-ci-RedHatQE-interop-testing-master-ciOpEmul--preTest-run-prior-steps
+    /pj-rehearse pull-ci-RedHatQE-interop-testing-master-ciOpEmul--imgRetr-img-retr
+IMPORTANT!!!
+  - This new file is NOT meant to be merged!!! So please do NOT forget to
+    remove that CI Configuration file before final merge!!!
+  - Some actions below can ONLY be done while the trailing Stub Step Pod is
+    still running. Once the Job is terminated, it is no longer possible to
+    execute the action and the corresponding Job must be rehearsed again.
+Actions:
+ 1. Run Pre-Test Job to execute all Steps prior to the target Step.
+    Once the Pre-Test Job is running, if a CUT (Cluster Under Test) has been
+    provisioned and/or reaches the trailing Stub Step:
+     a. Synchronize CI Test Environment to local.
+             ci--sync--tst-env &lt;dummyPRnum&gt;
+        IMPORTANT!!
+          - NEED the trailing Stub Step to be running.
+        NOTE:
+          - (Optional) Only needed when test assets cannot be provided
+            manually:
+              - CUT credentials needed by `ci--start--ctr` to connect to CUT.
+              - Exact `oc` binary used by the target Step.
+              - Credentials or shared files required by the Step Script.
+     b. Check, reset, or stop the trailing Stub Step execution.
+            ci--wait--test [&lt;timeOutInMin&gt;]
+        IMPORTANT!!
+          - NEED the trailing Stub Step to be running.
+        NOTE:
+          - The Stub Step will hold the test for 4H by default. Use this
+            command to reset the wait time (omit argument or set to a negative
+            value to check remaining time, setting it to `0` terminates the
+            test).
+     c. Pull the target Step Container Image.
+            ci--pull--ctr-img 0
+        NOTE:
+          - (Optional) The Stub Step trailing this Job uses the target Step
+            Container. Hence, rehearsing the Image Retrieval Job can be
+            avoided. However, this Stub Step is NOT configurable like the Step
+            in the Image Retrieval Job.
+          - Time limit: 30 min. after Job completion. Once NameSpace is
+            deleted, the image cannot be pulled and the Job must be rehearsed
+            again.
+ 2. Run Image Retrieval Job, if the Pre-Test Job was not run or the target Step
+    Container Image was not retrieved before the Pre-Test Job completed.
+    Once the Image Retrieval Job reaches its Test Step execution:
+     a. Pull the target Step Container Image.
+            ci--pull--ctr-img
+        NOTE:
+          - Time limit: 30 min. after Job completion. Once NameSpace is
+            deleted, the image cannot be pulled and the Job must be rehearsed
+            again.
+ 3. Run target Step locally.
+    Once the target Step Container Image is downloaded successfully, the Test
+    Container can be started and the Step Script will be available under
+    `/ws/step/` directory inside the Container:
+        ci--start--ctr
+    NOTE:
+        User may add additional settings, to be sourced at the start of Test
+        Container Interactive Session, in:
+            '/ws/local/repo/openshift/release/pr-000/cfg/env--ctr'
+<span style="color:red;font-weight:bold;">To print this message again, execute:</span>
+    <span style="color:red;font-weight:bold;">ci--to-do</span>
+================================================================================
+
+Do NOT forget to exit this interactive session, after you are done!!!
+</pre>
+<pre style="font-size:medium;margin:0;">
+[user@host /ws/local/repo/openshift/release/pr-000]$ [CI Operator Emulator] ls
+</pre>
+<pre style="font-size:medium;margin:0;color:black;background-color:cyan;">
+artifacts/  cfg/  fs-root/  src/  ws-own/
+</pre>
+    </div>
+</div>
+</body>
+</html>

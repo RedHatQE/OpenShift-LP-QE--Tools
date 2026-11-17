@@ -1,0 +1,92 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Deployment Monitoring</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../js/global.js"></script>
+    <script type="module" src="../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget">
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw--code-block" style="font-size:medium;">
+# Monitor the MCP Deployment.
+( set -euo pipefail; shopt -s inherit_errexit
+    function CheckMCPstatus () {
+        typeset poolName="${1}"; (($#)) &amp;&amp; shift
+        typeset poolSign="${1}"; (($#)) &amp;&amp; shift
+        typeset mcpAction= mcpType= mcpCurState=
+        typeset -i i=2 s=0
+
+        while ((i--)); do
+            case ${i} in
+              (1)   mcpAction=start     mcpType=Updated     ;;
+              (0)   mcpAction=finish    mcpType=Updating    ;;
+            esac
+
+            echo -n $'\n'"Waiting for MCP ${poolName} pool to ${mcpAction} updating${poolSign}${poolSign}${poolSign}"
+            while true; do
+                while true; do
+                    read -rt 5 mcpCurState; s=$?
+                    if {
+                        ((s &gt; 128)) ||
+                        { ((! s)) &amp;&amp; [ "${mcpCurState}" != False ]; }
+                    }; then
+                        echo -n "${poolSign}"
+                    else
+                        kill $! 2&gt; /dev/null
+                        ((s)) &amp;&amp; break || break 2
+                    fi
+                done 0&lt; &lt;(
+                    oc get "MachineConfigPool/${poolName}" \
+                        -o jsonpath='{.status.conditions[?(@.type == "'"${mcpType}"'")].status}' --watch
+                )
+            done
+        done
+        echo
+
+        true
+    }
+
+    CheckMCPstatus worker ':' &amp;
+    sleep 3
+    CheckMCPstatus master '.'
+    wait
+
+    oc get MachineConfigPools
+true ); echo $?
+</pre>
+        </div>
+    </div>
+</div>
+<hr style="border:1px solid CanvasText;"/>
+<div style="font-family:monospace;font-size:large;max-height:20em;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;color:black;background-color:cyan;">
+Waiting for MCP worker pool to start updating:::
+Waiting for MCP worker pool to finish updating::::
+Waiting for MCP master pool to start updating...
+Waiting for MCP master pool to finish updating....:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.::.::.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:..:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:..:.:.::.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.:.::.:
+.............................................................................................................
+NAME     CONFIG                                             UPDATED   UPDATING   DEGRADED   MACHINECOUNT   READYMACHINECOUNT   UPDATEDMACHINECOUNT   DEGRADEDMACHINECOUNT   AGE
+master   rendered-master-cdf02353950debc6453cdaab371cd2bd   True      False      False      3              3                   3                     0                      45h
+worker   rendered-worker-5d56a47ed76566546619fd571c9bc1d0   True      False      False      3              3                   3                     0                      45h
+</pre>
+    </div>
+</div>
+</body>
+</html>

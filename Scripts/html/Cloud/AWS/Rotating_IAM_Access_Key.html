@@ -1,0 +1,420 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rotating IAM Access Key</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../js/global.js"></script>
+    <script type="module" src="../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="aws--iam-access-key--rotation">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__AIM_USR_NAME\": \"...awsAIMusrName1...\", \"vEV--_BW__NOTE_NAME\": \"...bwNoteName1...\", \"vEV--_GSM__SEC_COL\": \"...gsmSecCol1...\", \"vEV--_VAULT_KEY_SFX\": \"...vaultKeySfx1...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_AWS__AIM_USR_NAME\": \"...awsAIMusrName2...\", \"vEV--_BW__NOTE_NAME\": \"...bwNoteName2...\", \"vEV--_GSM__SEC_COL\": \"...gsmSecCol2...\", \"vEV--_VAULT_KEY_SFX\": \"...vaultKeySfx2...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_JOB__MIN_DAYS": "3",
+                "vEV--_AWS__SELF_PROV": "1",
+                "vEV--_AWS__AIM_USR_NAME": "...awsAIMusrName...",
+                "vEV--_BW__NOTE_NAME": "...bwNoteName...",
+                "vEV--_GSM__SEC_COL": "...gsmSecCol...",
+                "vEV--_VAULT_KEY_SFX": "...vaultKeySfx...",
+                "vEV--AWS_REGION": "...awsRegion...",
+                "vEV--AWS_ACCOUNT_ID": [
+                    ["Please select an AWS Account."],
+                    {
+                        "val": "...awsAccID1...",
+                        "txt": "...awsAccName1..."
+                    },
+                    {
+                        "val": "...awsAccID2...",
+                        "txt": "...awsAccName2..."
+                    }
+                ]
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_JOB__MIN_DAYS</span>       <input type="text"          data-var="vEV--_JOB__MIN_DAYS" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__SELF_PROV</span>      <input type="text"          data-var="vEV--_AWS__SELF_PROV" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__AIM_USR_NAME</span>   <input type="text"          data-var="vEV--_AWS__AIM_USR_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_BW__NOTE_NAME</span>       <input type="text"          data-var="vEV--_BW__NOTE_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">_GSM__SEC_COL</span>        <input type="text"          data-var="vEV--_GSM__SEC_COL" value="" /></label>
+<!--    <label><span class="cw-cls--label-text">_VAULT_KEY_SFX</span>       <input type="text"          data-var="vEV--_VAULT_KEY_SFX" value="" /></label>   -->
+        <label><span class="cw-cls--label-text">AWS_REGION</span>           <input type="text"          data-var="vEV--AWS_REGION" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_ACCOUNT_ID</span>       <select class="cw-cls--opt" data-var="vEV--AWS_ACCOUNT_ID"></select></label>
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+__SHELL=0 \
+    _JOB__MIN_DAYS='<span style="color:red;font-weight:bold;" data-var="vEV--_JOB__MIN_DAYS"></span>' \
+    _AWS__SELF_PROV='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__SELF_PROV"></span>' \
+    _AWS__RESET_PROFILE=0 \
+    _AWS__PROFILE=saml \
+   x_AWS__SES_TO=3600 \
+    _AWS__AIM_USR_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__AIM_USR_NAME"></span>' \
+    _BW__NOTE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME"></span>' \
+    _GSM__CTR_IMG='quay.io/openshift/ci-public:ci_secret-manager_latest' \
+    _GSM__SEC_COL='<span style="color:red;font-weight:bold;" data-var="vEV--_GSM__SEC_COL"></span>' \
+   x_VAULT_MOUNT=kv \
+   x_VAULT_KEY_SFX='<span style="color:red;font-weight:bold;" data-var="vEV--_VAULT_KEY_SFX"></span>' \
+    BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}" \
+    BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)" \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+   xVAULT_ADDR='https://vault.ci.openshift.org' \
+    bash -uc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+                echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+                exit 1
+            }
+            typeset -x bwData="$(bw get item "${_BW__NOTE_NAME}")"
+            [ -z "${bwData}" ] &amp;&amp; {
+                echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                exit 1
+            }
+            eval "${__shOpt}"; unset __shOpt
+        }
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this `DEBUG` session!!!
+
+        typeset e= keyDate=1970-01-01
+        typeset +x bwData
+
+        (
+            eval "$(jq -r '.fields[]? | select(.name == "metadata.keyDate") | .value' 0&lt;&lt;&lt;"${bwData}")"
+            e="$(($(date -u +%s) - $(date -d "${keyDate}" +%s) + (6*60*60)))"   # Allow 6 h earlier as threshold.
+            ((e &lt; (_JOB__MIN_DAYS*24*60*60))) &amp;&amp; echo "Do not need to generate new Access Key as it is only $(
+                python3 -c 'import sys, datetime; print(datetime.timedelta(seconds=int(sys.argv[1])).days)' "${e}"
+            ) days old."
+        ) || {
+            {
+                typeset __shOpt="$(shopt -po xtrace)"; set +x
+                # Bash parsing error for `[ ... != ... ]` expression, when
+                #   there are several multi-lines nested command substitutions
+                #   in an interactive session. Need to assign to var. first.
+                typeset oldVal="$(jq -cr '
+                    (.fields[]? | select(.name == "metadata.keyDate")).value
+                ' 0&lt;&lt;&lt;"${bwData}")"
+                typeset newVal="$(jq -r '
+                    (.fields[]? | select(.name == "metadata.keyDate")).value|=(
+                        if (. | test(" # rwTest (0|1)$")) then
+                            . | sub("(?&lt;bit&gt;\\d)$"; (
+                                if (.bit == "1") then "0" else "1" end
+                            ))
+                        else
+                            . + " # rwTest 0"
+                        end
+                    )
+                ' 0&lt;&lt;&lt;"${bwData}" | bw encode | bw edit item "$(
+                    jq -cr '.id' 0&lt;&lt;&lt;"${bwData}"
+                )" | jq -cr '
+                    (.fields[]? | select(.name == "metadata.keyDate")).value
+                ')"
+                { [ "${oldVal}" != "${newVal}" ] || {
+                    echo "You do NOT have R/W access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                    exit 1
+                }; } &amp;&amp; bw sync 1&gt; /dev/null &amp;&amp; bwData="$(bw get item "${_BW__NOTE_NAME}")"
+                eval "${__shOpt}"; unset __shOpt
+            }
+
+            # AWS Authentication.
+            if ((_AWS__SELF_PROV)); then
+                eval "$(jq -r '.notes' 0&lt;&lt;&lt;"${bwData}")"
+            else
+                ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                    # Clean up the AWS CLI profile.
+                    sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                    sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+                }
+                klist -s || kinit
+                aws-saml.py \
+                    --region "${AWS_REGION}" \
+                    --target-profile "${_AWS__PROFILE}" \
+                    --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX:=admin}" \
+                    ${_AWS__SES_TO:+--session-duration "${_AWS__SES_TO}"}
+                function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+                export -f aws
+            fi
+
+            # Delete stale Access Keys.
+            for e in $(
+                aws iam list-access-keys --user-name "${_AWS__AIM_USR_NAME}" |
+                jq -r \
+                    --arg curKeyId "$(
+                        eval "$(jq -r '.notes' 0&lt;&lt;&lt;"${bwData}")"
+                        echo "${AWS_ACCESS_KEY_ID}"
+                    )" \
+                    '.AccessKeyMetadata[] | select(.AccessKeyId != $curKeyId) | .AccessKeyId'
+            ); do aws iam delete-access-key --user-name "${_AWS__AIM_USR_NAME}" --access-key-id "${e}"; done
+            # Generate new Access Key and update BitWarden Note.
+            {
+                typeset __shOpt="$(shopt -po xtrace)"; set +x
+                bwData="$(jq -r \
+                    --arg n "$(
+                        eval "$(
+                            aws iam create-access-key --user-name "${_AWS__AIM_USR_NAME}" |
+                            jq -r '.AccessKey | "
+                                '"export AWS_ACCESS_KEY_ID='\\(.AccessKeyId)' AWS_SECRET_ACCESS_KEY='\\(.SecretAccessKey)'"'
+                            "'
+                        )"
+                        typeset -p AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+                    )" \
+                    --rawfile fv__m &lt;( set +x
+                        printf '%s' "$(
+                            typeset keyDate="$(date -u +'%Y-%m-%d %H:%M:%S %Z')"
+                            typeset -p keyDate
+                        )"
+                    true ) '
+                        .notes=($n + "\n") |
+                        (.fields[]? | select(.name == "metadata.keyDate")).value=$fv__m
+                    ' \
+                0&lt;&lt;&lt;"${bwData}")"
+                bw encode 0&lt;&lt;&lt;"${bwData}" | bw edit item "$(jq -cr '.id' 0&lt;&lt;&lt;"${bwData}")" 1&gt; /dev/null
+                eval "${__shOpt}"; unset __shOpt
+            }
+        }
+
+        # Update Google Secret Manager (GSM).
+        ( set +x; set -o pipefail
+            function gsm-cli () {
+                # This function need to be updated per
+                #   `https://github.com/openshift/release/blob/main/hack/secret-manager.sh`.
+                # The original script can only work in interactive session.
+
+                podman run --rm -i \
+                    -u 0:0 \
+                    -p 127.0.0.1:8085:8085 \
+                    -e SM_AUTH_DIR=/auth \
+                    -e SM_BROWSER_REQUEST=/browser/url \
+                    -e SM_CALLBACK_HOST=0.0.0.0 \
+                    -e CLOUDSDK_CONFIG=/gcloud \
+                    -e GOOGLE_CLOUD_QUOTA_PROJECT=openshift-ci-secrets \
+                    --env-file &lt;(echo _AWS__CFG) \
+                    -v "${ssoAuth}:/auth:z" \
+                    -v "${ssoInfo}:/browser:z" \
+                    -v "${HOME}/.config/gcloud:/gcloud:z" \
+                    --entrypoint bash \
+                    -- \
+                    "${_GSM__CTR_IMG}" \
+                    -c \
+                    "$@"
+            }
+            function gsm-norm-path () {
+                # Must follow encoding in
+                #   `https://github.com/openshift/ci-tools/blob/main/pkg/gsm-validation/gsm.go` (`NormalizeName()`).
+                printf '%s' "$(awk '{
+                    while (match($0, /_{2,}/)) {
+                        printf "%s", substr($0, 1, (RSTART-1))
+                        n = RLENGTH
+                        printf "--"
+                        for (i=1; i&lt;=n; i++) printf "u"
+                        printf "--"
+                        $0 = substr($0, (RSTART+RLENGTH))
+                    }
+                    printf "%s", $0
+                }' 0&lt;&lt;&lt;"${1//./--dot--}")"
+            }
+            function sso-cleanup() {
+                typeset ssoRoot="${1:?}"; (($#)) && shift
+                typeset -i ssoPID="${1:?}"; (($#)) && shift
+                if ((ssoPID)); then
+                    kill "${ssoPID}" 2&gt; /dev/null || true
+                    wait "${ssoPID}" 2&gt; /dev/null || true
+                fi
+                rm -rf "${ssoRoot}/"
+            }
+
+            typeset ssoRoot="$(mktemp -d /tmp/gsm-cli.XXXXXX)"
+            typeset ssoAuth="${ssoRoot}/auth" ssoInfo="${ssoRoot}/browser"
+            typeset -i ssoPID=0
+            trap 'sso-cleanup "${ssoRoot}" "${ssoPID}"' EXIT
+            mkdir -p "${ssoAuth}" "${ssoInfo}"
+            (
+                typeset url=
+                while true; do
+                    if [[ -f "${ssoInfo}/url" ]]; then
+                        url="$(0&lt; "${ssoInfo}/url")"
+                        rm -f "${ssoInfo}/url"
+                        case ${url} in
+                            (https://idp.ci.openshift.org/auth\?*)
+                            printf \
+                                '%s%s%s\n' \
+                                'Open URL `' \
+                                "${url}" \
+                                '` in a browser on this machine.' \
+                                1&gt;&amp;2
+                            ;;
+                        esac
+                    fi
+                    sleep 1
+                done
+            ) &amp; ssoPID=$!
+
+            typeset gsmSecPath="$(gsm-norm-path 'aws/.awscred')"
+            typeset -i gsmSecExist=0
+            eval "$(jq -r '.notes' 0&lt;&lt;&lt;"${bwData}")"
+            typeset -x _AWS__CFG="$(cat - 0&lt;&lt;crdEOF
+[default]
+aws_access_key_id = ${AWS_ACCESS_KEY_ID}
+aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
+crdEOF
+)"$'\n'
+
+            gcloud auth application-default print-access-token &amp;&gt; /dev/null || {
+                echo 'Logging in to Google Cloud...'
+                gcloud auth application-default login --no-launch-browser
+            } || {
+                echo 'You may NOT have access to Google Cloud.' 1&gt;&amp;2
+                exit 1
+            }
+            gsmSecExist=$(gsm-cli "$(cat - 0&lt;&lt;scrEOF
+python3 main.py list \
+    -c ${_GSM__SEC_COL@Q} \
+    -o json
+scrEOF
+            )" | jq -r --arg p "${gsmSecPath}" '
+                (index($p) // -1) + 1
+            ') 2&gt;/dev/null || {
+                echo \
+                    'You do NOT have access to GSM Secret'\
+                    "\`${gsmSecPath}\` in Collection \`${_GSM__SEC_COL}\`."\
+                    1&gt;&amp;2
+                exit 1
+            }
+
+            echo \
+                'Creating or updating GSM Secret'\
+                "\`${gsmSecPath}\` in Collection \`${_GSM__SEC_COL}\`."
+            {
+                if ((gsmSecExist)); then
+                    gsm-cli "$(cat - 0&lt;&lt;scrEOF
+python3 main.py update \
+    -c ${_GSM__SEC_COL@Q} \
+    --from-literal "\${_AWS__CFG}" \
+    ${gsmSecPath@Q}
+scrEOF
+                    )"
+                else
+                    gsm-cli "$(cat - 0&lt;&lt;scrEOF
+python3 main.py create \
+    -c ${_GSM__SEC_COL@Q} \
+    --from-literal "\${_AWS__CFG}" \
+    ${gsmSecPath@Q} 0&lt;&lt;'ansEOF'
+None
+None
+None
+ansEOF
+scrEOF
+                    )"
+                fi
+            } 1&gt; /dev/null || {
+                echo \
+                    'Failed to create or update GSM Secret'\
+                    "\`${gsmSecPath}\` in Collection \`${_GSM__SEC_COL}\`."\
+                    1&gt;&amp;2
+                exit 1
+            }
+        true )
+
+#       # Update HashiCorp Vault.
+#       ( set +x
+#           typeset vaultData= awsCfg=
+#
+#           vault token lookup &amp;&gt; /dev/null || {
+#               echo 'Logging in to HashiCorp Vault...'
+#               vault login 1&gt; /dev/null
+#           } || {
+#               echo "You may NOT have access to HashiCorp Vault at \`${VAULT_ADDR}\`." 1&gt;&amp;2
+#               exit 1
+#           }
+#           eval "$(jq -r '.notes' 0&lt;&lt;&lt;"${bwData}")"
+#           vaultData="$(vault kv get -mount="${_VAULT_MOUNT}" -format=json "selfservice/${_VAULT_KEY_SFX}")" || {
+#               echo \
+#                   "You do NOT have access to HashiCorp Vault Secret"\
+#                   "\`${_VAULT_MOUNT}/selfservice/${_VAULT_KEY_SFX}\` at \`${VAULT_ADDR}\`."\
+#                   1&gt;&amp;2
+#               exit 1
+#           }
+#           e="$(jq -r '"\(.data.data.".awscred")."' 0&lt;&lt;&lt;"${vaultData}")"
+#           awsCfg="$(gawk -F '\\s*=\\s*' '
+#               BEGIN{c=2}
+#               (c){
+#                   if ($1 == "aws_access_key_id") {
+#                       c--
+#                       $0=gensub(/(^[^=]*=\s*)\S*/,"\\1" ENVIRON["AWS_ACCESS_KEY_ID"],1)
+#                   } else if ($1 == "aws_secret_access_key") {
+#                       c--
+#                       $0=gensub(/(^[^=]*=\s*)\S*/,"\\1" ENVIRON["AWS_SECRET_ACCESS_KEY"],1)
+#                   }
+#               }
+#               {print}
+#           ' 0&lt;&lt;&lt;"${e}")"
+#           [ "${awsCfg}" = "${e}" ] || {
+#               echo \
+#                   "Updating HashiCorp Vault Secret"\
+#                   "\`${_VAULT_MOUNT}/selfservice/${_VAULT_KEY_SFX}\` at \`${VAULT_ADDR}\`."
+#               vault kv destroy -mount="${_VAULT_MOUNT}" -versions="$(
+#                   jq -r '.data.metadata.version' 0&lt;&lt;&lt;"${vaultData}"
+#               )" "selfservice/${_VAULT_KEY_SFX}" &amp;&gt; /dev/null # Ignore error as we may not have permission to delete.
+#               {
+#                   jq -r --rawfile fv__c &lt;(set +x; printf '%s' "${awsCfg%.}") '
+#                       .data.data | .".awscred"=$fv__c
+#                   ' 0&lt;&lt;&lt;"${vaultData}" |
+#                   vault kv put -mount="${_VAULT_MOUNT}" "selfservice/${_VAULT_KEY_SFX}" - 1&gt; /dev/null
+#               } || {
+#                   echo \
+#                       "You do NOT have R/W access to HashiCorp Vault Secret"\
+#                       "\`${_VAULT_MOUNT}/selfservice/${_VAULT_KEY_SFX}\` at \`${VAULT_ADDR}\`."\
+#                       1&gt;&amp;2
+#                   exit 1
+#               }
+#           }
+#       true )
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

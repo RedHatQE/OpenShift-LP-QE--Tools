@@ -1,0 +1,78 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CI Operator Emulator - Container Image</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;margin:0;">
+[user@host /ws/local/repo/openshift/release/pr-000]$ [CI Operator Emulator] ci--pull--ctr-img
+</pre>
+<pre style="font-size:medium;margin:0;color:black;background-color:cyan;">
+Make sure the Image Retrieval Job is running:
+    (`/pj-rehearse pull-ci-RedHatQE-interop-testing-master-imgRetr-img-retr`)?
+Press any key to continue or `Ctrl-C` to cancel...
+----------------------------------------
+Please login to the executing CI Operator Build Server's Web Console
+(Job `pull-ci-RedHatQE-interop-testing-master-imgRetr-img-retr`)
+and get the CLI Login Command, `oc login ...`.
+Exit this Interactive Session, when the login is successfully completed, to
+continue (Exit Status 255 will cancel the Container Image pull attempt).
+----------------------------------------
+</pre>
+<pre style="font-size:medium;margin:0;">
+[user@host /ws/local/repo/openshift/release/pr-000]$ [CI Operator Build Cluster Login] oc login --token=*** --server=https://api.build03.ci.devcluster.openshift.com:6443
+</pre>
+<pre style="font-size:medium;margin:0;color:black;background-color:cyan;">
+Logged into "https://api.build03.ci.devcluster.openshift.com:6443" as "etirtara" using the token provided.
+
+You have access to the following projects and can switch between them with 'oc project &lt;projectname&gt;':
+
+  * ci-op-mxltz5fk
+    openshift-virtualization-os-images
+
+Using project "ci-op-mxltz5fk".
+</pre>
+<pre style="font-size:medium;margin:0;">
+[user@host /ws/local/repo/openshift/release/pr-000]$ [CI Operator Build Cluster Login] exit
+</pre>
+<pre style="font-size:medium;margin:0;color:black;background-color:cyan;">
+exit
+info: Using registry public hostname registry.build03.ci.openshift.org
+Saved credentials for registry.build03.ci.openshift.org into /run/user/1000000/containers/auth.json
+Trying to pull registry.build03.ci.openshift.org/ci-op-mxltz5fk/pipeline:openshift-virtualization-tests...
+Getting image source signatures
+Copying blob e12861970085 done   |
+Copying blob 152fd99998e3 done   |
+Copying blob ac44c3a5c3ef done   |
+Copying blob a8ada89a248f done   |
+Copying blob eface4b27d0c done   |
+Copying blob e262d6e15821 done   |
+Copying blob 2024a130f27d done   |
+Copying config 65679209bc done   |
+Writing manifest to image destination
+65679209bc2c88a6faca2d4c709945b4c23039c22b1a18128b16710e709dd860
+----------------------------------------
+The Test Container can be started and the Step Script will be available under
+`/ws/step/` directory inside the Container:
+    ci--start--ctr
+----------------------------------------
+</pre>
+    </div>
+</div>
+</body>
+</html>

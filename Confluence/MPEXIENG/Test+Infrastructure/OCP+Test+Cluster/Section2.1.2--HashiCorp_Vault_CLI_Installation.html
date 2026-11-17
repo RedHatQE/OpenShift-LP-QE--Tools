@@ -1,0 +1,51 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HashiCorp Vault CLI Installation</title>
+    <base href="{{site.url}}{{site.baseurl}}{{page.url}}" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../../Scripts/js/global.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<div style="font-family:monospace;font-size:large;line-height:normal;overflow:auto;white-space:nowrap;">
+    <div style="float:left;min-width:100%;" tabindex="0">
+<pre style="font-size:medium;">
+(
+    osName="$(cat /etc/os-release | sed -nE '/^ID=/{s/^ID="([^"]+)"/\1/p;q}')"
+    case ${osName} in
+      (centos|rhel)
+        dnf config-manager --add-repo 'https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo'
+        osMjrVer="$(awk -F'[=".]' '/^VERSION_ID=/{print $3}' /etc/os-release)"
+        case ${osMjrVer} in
+          (10)
+            dnf config-manager --set-disabled hashicorp
+            dnf --releasever=9 install -y --enablerepo=hashicorp vault
+            ;;
+          (*)
+            dnf install -y vault
+            ;;
+        esac
+        ;;
+      (fedora)
+        dnf config-manager --add-repo 'https://rpm.releases.hashicorp.com/fedora/hashicorp.repo'
+        dnf install -y vault
+        ;;
+      (*)
+        echo "Linux Distribution \`${osName}\` is not currently supported."
+        ;;
+    esac
+)
+</pre>
+    </div>
+</div>
+</body>
+</html>

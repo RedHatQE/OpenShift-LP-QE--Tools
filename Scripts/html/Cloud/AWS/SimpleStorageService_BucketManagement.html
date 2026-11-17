@@ -1,0 +1,631 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS S3 - Bucket Management</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <link rel="stylesheet" href="../../../css/code-widget.css">
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../js/global.js"></script>
+    <script type="module" src="../../../js/code-widget.js"></script>
+</head>
+<body>
+<link rel="stylesheet" href="{{site.url}}{{site.baseurl}}/Scripts/css/code-widget.css">
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<div class="code-widget" id="aws-s3--bucket-mgmt">
+    <script type="application/json" class="cw-cls--config">
+        {
+            "def": {
+                "vGrp-EV--Team": [
+                    ["Please select a Team."],
+                    {
+                        "val": "...teamID1...",
+                        "txt": "...teamName1...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_BW__NOTE_NAME\": \"...bwNoteName1...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID1...\", \"vEV--_GSM__SEC_COL\": \"...gsmSecCol1...\", \"vEV--_GSM__SEC_PATH__GRP\": \"...gsmSecPathGrp1...\", \"vEV--_VAULT_KEY_PATH\": \"...vaultKeyPath1...\"}"
+                        }
+                    },
+                    {
+                        "val": "...teamID2...",
+                        "txt": "...teamName2...",
+                        "attr": {
+                            "data-grp-opts-val": "{\"vEV--_BW__NOTE_NAME\": \"...bwNoteName2...\", \"vEV--AWS_ACCOUNT_ID\": \"...awsAccID2...\", \"vEV--_GSM__SEC_COL\": \"...gsmSecCol2...\", \"vEV--_GSM__SEC_PATH__GRP\": \"...gsmSecPathGrp2...\", \"vEV--_VAULT_KEY_PATH\": \"...vaultKeyPath2...\"}"
+                        }
+                    }
+                ],
+                "vEV--_AWS__S3__BUCKET_NAME__PFX": "..s3BucketNamePfx...",
+                "vEV--_AWS__ROLE_NAME_SFX": "...roleNameSfx...",
+                "vEV--_BW__NOTE_NAME": "...bwNoteName...",
+                "vEV--AWS_REGION": "...awsRegion...",
+                "vEV--AWS_ACCOUNT_ID": [
+                    ["Please select an AWS Account."],
+                    {
+                        "val": "...awsAccID1...",
+                        "txt": "...awsAccName1..."
+                    },
+                    {
+                        "val": "...awsAccID2...",
+                        "txt": "...awsAccName2..."
+                    }
+                ],
+                "vEV--_AWS__S3__BUCKET_ACL__IAM_USR__PFX": "...s3BucketACLiamUsrPfx...",
+                "vEV--_GSM__CTR_IMG": "...gsmCtrImg...",
+                "vEV--_GSM__SEC_COL": "...gsmSecCol...",
+                "vEV--_GSM__SEC_PATH__GRP": "...gsmSecPathGrp...",
+                "vEV--_VAULT_MOUNT": "...vaultMount...",
+                "vEV--_VAULT_KEY_PATH": "...vaultKeyPath...",
+                "vEV--VAULT_ADDR": "...vaultAddr..."
+            }
+        }
+    </script>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Team</p>
+        <label><span class="cw-cls--label-text">Team Name</span>    <select class="cw-cls--grp-opts"    data-var="vGrp-EV--Team"></select></label>
+    </div>
+    <div class="cw-cls--inputs">
+        <p class="cw-cls--title">Environment Variables</p>
+        <label><span class="cw-cls--label-text">_AWS__S3__BUCKET_NAME__PFX</span>           <input type="text"          data-var="vEV--_AWS__S3__BUCKET_NAME__PFX" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__RESET_PROFILE</span>                  <select class="cw-cls--opt" data-var="vEV--_AWS__RESET_PROFILE">
+            <option value="0"   selected="">0: Keep existing Profile.</option>
+            <option value="1"              >1: Reset Profile.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__S3__PUB_ACCESS</span>                 <select class="cw-cls--opt" data-var="vEV--_AWS__S3__PUB_ACCESS">
+            <option value="0"   selected="">0: Private (block public access).</option>
+            <option value="1"              >1: Public (allow public access).</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_AWS__ROLE_NAME_SFX</span>                  <input type="text"          data-var="vEV--_AWS__ROLE_NAME_SFX" value="" /></label>
+        <label><span class="cw-cls--label-text">_BW__NOTE_NAME</span>                       <input type="text"          data-var="vEV--_BW__NOTE_NAME" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_REGION</span>                           <input type="text"          data-var="vEV--AWS_REGION" value="" /></label>
+        <label><span class="cw-cls--label-text">AWS_ACCOUNT_ID</span>                       <select class="cw-cls--opt" data-var="vEV--AWS_ACCOUNT_ID"></select></label>
+        <hr style="border:1px solid CanvasText;"/>
+        <p style="font-weight:bold;margin: 0 0 0 1em;">Bucket Policy</p>
+        <label><span class="cw-cls--label-text">_AWS__S3__BUCKET_ACL__IAM_USR__PFX</span>   <input type="text"          data-var="vEV--_AWS__S3__BUCKET_ACL__IAM_USR__PFX" value="" /></label>
+        <label><span class="cw-cls--label-text">_AWS__IAM__ACC_KEY__NEW</span>              <select class="cw-cls--opt" data-var="vEV--_AWS__IAM__ACC_KEY__NEW">
+            <option value="0"   selected="">0: Keep existing IAM Access Key.</option>
+            <option value="1"              >1: Rotate IAM Access Key.</option>
+        </select></label>
+        <label><span class="cw-cls--label-text">_GSM__CTR_IMG</span>                        <input type="text"          data-var="vEV--_GSM__CTR_IMG" value="" /></label>
+        <label><span class="cw-cls--label-text">_GSM__SEC_COL</span>                        <input type="text"          data-var="vEV--_GSM__SEC_COL" value="" /></label>
+        <label><span class="cw-cls--label-text">_GSM__SEC_PATH__GRP</span>                  <input type="text"          data-var="vEV--_GSM__SEC_PATH__GRP" value="" /></label>
+<!--    <label><span class="cw-cls--label-text">_VAULT_MOUNT</span>                         <input type="text"          data-var="vEV--_VAULT_MOUNT" value="" /></label>     -->
+<!--    <label><span class="cw-cls--label-text">_VAULT_KEY_PATH</span>                      <input type="text"          data-var="vEV--_VAULT_KEY_PATH" value="" /></label>  -->
+<!--    <label><span class="cw-cls--label-text">VAULT_ADDR</span>                           <input type="text"          data-var="vEV--VAULT_ADDR" value="" /></label>       -->
+    </div>
+    <div style="font-family:monospace;font-size:large;max-height:40em;line-height:normal;overflow:auto;white-space:nowrap;">
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Creating a Bucket
+__SHELL=0 \
+    _AWS__S3__BUCKET_NAME__PFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__S3__BUCKET_NAME__PFX"></span>' \
+    _AWS__S3__PUB_ACCESS=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__S3__PUB_ACCESS"></span> \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span> \
+   x_AWS__SES_TO=3600 \
+    _BW__NOTE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME"></span>' \
+    BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}" \
+    BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)" \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${x_AWS__SES_TO:+--session-duration "${x_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+                echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+                exit 1
+            }
+            eval "${__shOpt}"; unset __shOpt
+        }
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this \`DEBUG\` session!!!
+
+        typeset bwData= note=
+        typeset s3BucketName="${_AWS__S3__BUCKET_NAME__PFX}--${AWS_REGION}"
+
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            bwData="$(bw get item "${_BW__NOTE_NAME}")" || {
+                echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                exit 1
+            }
+            { {
+                bw encode 0&lt;&lt;&lt;"${bwData}" |
+                bw edit item "$(jq -cr '.id' 0&lt;&lt;&lt;"${bwData}")" 1&gt; /dev/null
+            } || {
+                echo "You do NOT have R/W access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                exit 1
+            }; } &amp;&amp; bw sync 1&gt; /dev/null &amp;&amp; bwData="$(bw get item "${_BW__NOTE_NAME}")"
+            eval "${__shOpt}"; unset __shOpt
+        }
+
+        # Create bucket.
+        aws s3api head-bucket \
+            --region "${AWS_REGION}" \
+            --bucket "${s3BucketName}" \
+            1&gt; /dev/null 2&gt;&amp;1 || {
+            if [ "${AWS_REGION}" = "us-east-1" ]; then
+                aws s3api create-bucket \
+                    --region "${AWS_REGION}" \
+                    --bucket "${s3BucketName}" \
+                    --no-cli-pager
+            else
+                aws s3api create-bucket \
+                    --region "${AWS_REGION}" \
+                    --bucket "${s3BucketName}" \
+                    --create-bucket-configuration "LocationConstraint=${AWS_REGION}" \
+                    --no-cli-pager
+            fi
+        }
+
+        # Block all public access as default policy.
+        aws s3api put-public-access-block \
+            --region "${AWS_REGION}" \
+            --bucket "${s3BucketName}" \
+            --public-access-block-configuration \
+'BlockPublicAcls=true,'\
+'IgnorePublicAcls=true,'\
+"BlockPublicPolicy=$( ((_AWS__S3__PUB_ACCESS)) &amp;&amp; echo false || echo true ),"\
+"RestrictPublicBuckets=$( ((_AWS__S3__PUB_ACCESS)) &amp;&amp; echo false || echo true )" \
+            --no-cli-pager
+
+        note="$(
+            jq -cn \
+                --arg awsRegion "${AWS_REGION}" \
+                --arg s3URL "s3://${s3BucketName}/" \
+                --arg httpPathURL  "https://s3.${AWS_REGION}.amazonaws.com/${s3BucketName}/" \
+                --arg httpVhostURL "https://${s3BucketName}.s3.${AWS_REGION}.amazonaws.com/" \
+                '{
+                    awsRegions: {
+                        $awsRegion: {
+                            URLs: {
+                                S3: $s3URL,
+                                HTTP: {
+                                    PathStyle: $httpPathURL,
+                                    VirtualHostedStyle: $httpVhostURL
+                                }
+                            }
+                        }
+                    }
+                }' |
+            yq -p json -o yaml eval .
+        )"
+
+        # Update BitWarden Note.
+        bwData="$(jq -r \
+            --rawfile note &lt;(
+                yq eval-all '. as $item ireduce ({}; . * $item)' \
+                    &lt;(jq -r '.notes // ""' 0&lt;&lt;&lt;"${bwData}") \
+                    &lt;(echo "${note}")
+            ) \
+            '.notes=$note' \
+        0&lt;&lt;&lt;"${bwData}")"
+        bw encode 0&lt;&lt;&lt;"${bwData}" | bw edit item "$(jq -cr '.id' 0&lt;&lt;&lt;"${bwData}")" 1&gt; /dev/null
+
+        cat - 0&lt;&lt;txtEOF
+--------------------------------------------------------------------------------
+Bucket Created
+--------------------------------------------------------------------------------
+Bucket: ${s3BucketName}
+Region: ${AWS_REGION}
+URLs:
+  S3:   s3://${s3BucketName}/
+  HTTP:
+    PathStyle:          https://s3.${AWS_REGION}.amazonaws.com/${s3BucketName}/
+    VirtualHostedStyle: https://${s3BucketName}.s3.${AWS_REGION}.amazonaws.com/
+--------------------------------------------------------------------------------
+txtEOF
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+        <hr style="border:1px solid CanvasText;"/>
+        <div style="float:left;min-width:100%;" tabindex="0">
+<pre class="cw-cls--code-block" style="font-size:medium;">
+##  Applying a Bucket Policy
+__SHELL=0 \
+    _AWS__S3__BUCKET_NAME__PFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__S3__BUCKET_NAME__PFX"></span>' \
+    _AWS__S3__BUCKET_ACL__IAM_USR__PFX='<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__S3__BUCKET_ACL__IAM_USR__PFX"></span>' \
+    _AWS__S3__PUB_ACCESS=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__S3__PUB_ACCESS"></span> \
+    _AWS__IAM__ACC_KEY__NEW=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__IAM__ACC_KEY__NEW"></span> \
+    _AWS__RESET_PROFILE=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__RESET_PROFILE"></span> \
+    _AWS__PROFILE=ocp \
+    _AWS__ROLE_NAME_SFX=<span style="color:red;font-weight:bold;" data-var="vEV--_AWS__ROLE_NAME_SFX"></span> \
+   x_AWS__SES_TO=3600 \
+    _BW__NOTE_NAME='<span style="color:red;font-weight:bold;" data-var="vEV--_BW__NOTE_NAME"></span>' \
+    _GSM__CTR_IMG='<span style="color:red;font-weight:bold;" data-var="vEV--_GSM__CTR_IMG"></span>' \
+    _GSM__SEC_COL='<span style="color:red;font-weight:bold;" data-var="vEV--_GSM__SEC_COL"></span>' \
+    _GSM__SEC_PATH__GRP='<span style="color:red;font-weight:bold;" data-var="vEV--_GSM__SEC_PATH__GRP"></span>' \
+   x_VAULT_MOUNT='<span style="color:red;font-weight:bold;" data-var="vEV--_VAULT_MOUNT"></span>' \
+   x_VAULT_KEY_PATH='<span style="color:red;font-weight:bold;" data-var="vEV--_VAULT_KEY_PATH"></span>' \
+    BW_SESSION="${BW_SESSION:+$([ -f "${BW_SESSION}" ] &amp;&amp; cat "${BW_SESSION}" || echo "${BW_SESSION}")}" \
+    BW_SESSION="$((bw status | grep -q '"status":"unlocked"') &amp;&amp; echo "${BW_SESSION}" || bw unlock --raw || bw login --raw)" \
+    AWS_REGION='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_REGION"></span>' \
+    AWS_ACCOUNT_ID='<span style="color:red;font-weight:bold;" data-var="vEV--AWS_ACCOUNT_ID"></span>' \
+    AWS_CONFIG_FILE="${HOME}/.aws/config" \
+    AWS_SHARED_CREDENTIALS_FILE="${HOME}/.aws/credentials" \
+   xVAULT_ADDR='<span style="color:red;font-weight:bold;" data-var="vEV--VAULT_ADDR"></span>' \
+    bash -o pipefail -O inherit_errexit -euc "$(cat - 0&lt;&lt;'cmdEOF'
+        {
+            ((_AWS__RESET_PROFILE)) &amp;&amp; {
+                # Clean up the AWS CLI profile.
+                sed -i "/^\\[profile ${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_CONFIG_FILE}"
+                sed -i "/^\\[${_AWS__PROFILE}\\]/,/^\\[/ {/^\\[profile ${_AWS__PROFILE}\\]/{d;b};/^\\[/"\!"d}" "${AWS_SHARED_CREDENTIALS_FILE}"
+            }
+            klist -s || kinit
+            aws-saml.py \
+                --region "${AWS_REGION}" \
+                --target-profile "${_AWS__PROFILE}" \
+                --target-role "${AWS_ACCOUNT_ID}-${_AWS__ROLE_NAME_SFX}" \
+                ${x_AWS__SES_TO:+--session-duration "${x_AWS__SES_TO}"}
+            function aws () { command aws --profile "${_AWS__PROFILE}" "$@"; }
+            export -f aws
+            aws configure list --no-cli-pager
+            aws sts get-caller-identity --no-cli-pager
+        } 1&gt;&amp;2
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            [ -n "${BW_SESSION}" ] &amp;&amp; bw sync || {
+                echo 'You do NOT have an active and sync:ed BitWarden Session!!!' 1&gt;&amp;2
+                exit 1
+            }
+            eval "${__shOpt}"; unset __shOpt
+        }
+        ((__SHELL)) &amp;&amp; PROMPT_COMMAND='PS1="${PS1%\[DEBUG\] }[DEBUG] "' exec "${SHELL}" # Do NOT forget to exit this \`DEBUG\` session!!!
+
+        typeset bwData= bwSubFld=
+        typeset s3BucketName="${_AWS__S3__BUCKET_NAME__PFX}--${AWS_REGION}"
+        typeset e1= e2=
+        typeset -a iamUsrArr=()
+
+        {
+            typeset __shOpt="$(shopt -po xtrace)"; set +x
+            bwData="$(bw get item "${_BW__NOTE_NAME}")" || {
+                echo "You may NOT have access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                exit 1
+            }
+            { {
+                bw encode 0&lt;&lt;&lt;"${bwData}" |
+                bw edit item "$(jq -cr '.id' 0&lt;&lt;&lt;"${bwData}")" 1&gt; /dev/null
+            } || {
+                echo "You do NOT have R/W access to BitWarden Note \`${_BW__NOTE_NAME}\`." 1&gt;&amp;2
+                exit 1
+            }; } &amp;&amp; bw sync 1&gt; /dev/null &amp;&amp; bwData="$(bw get item "${_BW__NOTE_NAME}")"
+            eval "${__shOpt}"; unset __shOpt
+        }
+
+        # IAM Users for S3 ACL.
+        for e1 in "${_AWS__S3__BUCKET_ACL__IAM_USR__PFX}"--r{o,w}; do
+            ((_AWS__S3__PUB_ACCESS)) &amp;&amp; [[ "${e1}" == *--ro ]] &amp;&amp; continue
+            bwSubFld="cred.${e1}"
+            iamUsrArr+=("${e1}")
+
+            # Create IAM User.
+            aws iam get-user \
+                --user-name "${e1}" \
+                --output text \
+                --query 'User.Arn' \
+                --no-cli-pager 2&gt; /dev/null ||
+            aws iam create-user \
+                --user-name "${e1}" \
+                --tags "$(
+                    jq -cn \
+                        --arg name "${e1}" \
+                        '[{"Key": "Name", "Value": $name}]'
+                )" \
+                --no-cli-pager
+
+            # Rotate IAM Access Key.
+            ((_AWS__IAM__ACC_KEY__NEW)) &amp;&amp; {
+                typeset __shOpt="$(shopt -po xtrace)"; set +x
+                # Delete stale Access Keys.
+                for e2 in $(
+                    aws iam list-access-keys --user-name "${e1}" |
+                    jq -r \
+                        --arg curKeyId "$(jq -r \
+                            --arg fn__c "${bwSubFld}" \
+                            '(.fields[]? | select(.name == $fn__c).value | fromjson.AccKeyId) // ""' \
+                        0&lt;&lt;&lt;"${bwData}")" \
+                        '.AccessKeyMetadata[] | select(.AccessKeyId != $curKeyId) | .AccessKeyId'
+                ); do aws iam delete-access-key --user-name "${e1}" --access-key-id "${e2}"; done
+                # Generate new Access Key.
+                bwData="$(jq -r \
+                    --arg fn__c "${bwSubFld}" \
+                    --rawfile fv__c &lt;( set +x
+                        aws iam create-access-key --user-name "${e1}" |
+                        jq -cj '.AccessKey | {
+                            AccKeyId: .AccessKeyId,
+                            AccKeySecret: .SecretAccessKey
+                        }'
+                    true ) \
+                    '.fields|=((. // []) | (
+                        map(select(.name != $fn__c)) +
+                        [{name: $fn__c, value: $fv__c, type: 1}]
+                    ))' \
+                0&lt;&lt;&lt;"${bwData}")"
+                eval "${__shOpt}"; unset __shOpt
+            }
+
+            # Configure AWS CLI profile.
+            ( set +x
+                typeset awsProfile="usr.${e1}"
+                aws configure set aws_access_key_id \
+                    "$(jq -r --arg fn__c "${bwSubFld}" \
+                        '.fields[]? | select(.name == $fn__c).value | fromjson.AccKeyId' \
+                    0&lt;&lt;&lt;"${bwData}")" \
+                    --profile "${awsProfile}"
+                aws configure set aws_secret_access_key \
+                    "$(jq -r --arg fn__c "${bwSubFld}" \
+                        '.fields[]? | select(.name == $fn__c).value | fromjson.AccKeySecret' \
+                    0&lt;&lt;&lt;"${bwData}")" \
+                    --profile "${awsProfile}"
+            )
+        done
+
+        ((_AWS__IAM__ACC_KEY__NEW)) &amp;&amp; {
+            # Update BitWarden Note.
+            {
+                typeset __shOpt="$(shopt -po xtrace)"; set +x
+                bwData="$(jq -r \
+                    --rawfile fv__m &lt;( set +x
+                        printf '%s' "$(
+                            typeset keyDate="$(date -u +"%Y-%m-%d %H:%M:%S %Z")"
+                            typeset -p keyDate
+                        )"
+                    true ) '
+                        (.fields[]? | select(.name == "metadata.keyDate")).value=$fv__m
+                    ' \
+                0&lt;&lt;&lt;"${bwData}")"
+                bw encode 0&lt;&lt;&lt;"${bwData}" | bw edit item "$(jq -cr '.id' 0&lt;&lt;&lt;"${bwData}")" 1&gt; /dev/null
+                eval "${__shOpt}"; unset __shOpt
+            }
+
+            # Update Google Secret Manager (GSM).
+            [ -z "${_GSM__SEC_COL}" ] || [ -z "${_GSM__SEC_PATH__GRP}" ] || ( set +x
+                function gsm-cli () {
+                    podman run --rm -i \
+                        -u 0:0 \
+                        -e CLOUDSDK_CONFIG=/gcloud \
+                        -e GOOGLE_CLOUD_QUOTA_PROJECT=openshift-ci-secrets \
+                        --env-file &lt;(echo _GSM__SEC_VAL) \
+                        -v "${HOME}/.config/gcloud:/gcloud:z" \
+                        --entrypoint bash \
+                        -- \
+                        "${_GSM__CTR_IMG}" \
+                        -c \
+                        "$@"
+                }
+                function gsm-norm-path () {
+                    # Must follow encoding in
+                    #   `https://github.com/openshift/ci-tools/blob/main/pkg/gsm-validation/gsm.go` (`NormalizeName()`).
+                    printf '%s' "$(awk '{
+                        while (match($0, /_{2,}/)) {
+                            printf "%s", substr($0, 1, (RSTART-1))
+                            n = RLENGTH
+                            printf "--"
+                            for (i=1; i&lt;=n; i++) printf "u"
+                            printf "--"
+                            $0 = substr($0, (RSTART+RLENGTH))
+                        }
+                        printf "%s", $0
+                    }' 0&lt;&lt;&lt;"${1//./--dot--}")"
+                }
+
+                typeset gsmSecLst= secPath=
+                typeset -x _GSM__SEC_VAL=
+
+                gcloud auth application-default print-access-token &amp;&gt; /dev/null || {
+                    echo 'Logging in to Google Cloud...'
+                    gcloud auth application-default login --no-launch-browser
+                } || {
+                    echo 'You may NOT have access to Google Cloud.' 1&gt;&amp;2
+                    exit 1
+                }
+                gsmSecLst="$(gsm-cli "$(cat - 0&lt;&lt;scrEOF
+python3 main.py list \
+    -c ${_GSM__SEC_COL@Q} \
+    -o json
+scrEOF
+                )")" 2&gt;/dev/null || {
+                    echo \
+                        'You do NOT have access to GSM Collection'\
+                        "\`${_GSM__SEC_COL}\`."\
+                        1&gt;&amp;2
+                    exit 1
+                }
+
+                for e1 in "${iamUsrArr[@]}"; do
+                    for e2 in AccKeyId AccKeySecret; do
+                        secPath="$(
+                            gsm-norm-path "${_GSM__SEC_PATH__GRP}/AWS__S3__${e1}__${e2}"
+                        )"
+                        _GSM__SEC_VAL="$(jq -r --arg fn__c "cred.${e1}" --arg k "${e2}" '
+                            .fields[]? | select(.name == $fn__c).value | fromjson[$k]
+                        ' 0&lt;&lt;&lt;"${bwData}")"
+                        {
+                            if (($(jq -r --arg p "${secPath}" '
+                                (index($p) // -1) + 1
+                            ' 0&lt;&lt;&lt;"${gsmSecLst}"))); then
+                                gsm-cli "$(cat - 0&lt;&lt;scrEOF
+python3 main.py update \
+    -c ${_GSM__SEC_COL@Q} \
+    --from-literal "\${_GSM__SEC_VAL}" \
+    ${secPath@Q}
+scrEOF
+                                )"
+                            else
+                                gsm-cli "$(cat - 0&lt;&lt;scrEOF
+python3 main.py create \
+    -c ${_GSM__SEC_COL@Q} \
+    --from-literal "\${_GSM__SEC_VAL}" \
+    ${secPath@Q} 0&lt;&lt;'ansEOF'
+None
+None
+None
+ansEOF
+scrEOF
+                                )"
+                            fi
+                        } 1&gt; /dev/null || {
+                            echo \
+                                'Failed to create or update GSM Secret'\
+                                "\`${secPath}\` in Collection \`${_GSM__SEC_COL}\`."\
+                                1&gt;&amp;2
+                            exit 1
+                        }
+                    done
+                done
+            true )
+
+#           # Update HashiCorp Vault.
+#           [ -z "${_VAULT_MOUNT}" ] || [ -z "${_VAULT_KEY_PATH}" ] || ( set +x
+#               typeset vaultData=
+#
+#               vault token lookup &amp;&gt; /dev/null || {
+#                   echo 'Logging in to HashiCorp Vault...'
+#                   vault login 1&gt; /dev/null
+#               } || {
+#                   echo "You may NOT have access to HashiCorp Vault at \`${VAULT_ADDR}\`." 1&gt;&amp;2
+#                   exit 1
+#               }
+#
+#               for e1 in "${iamUsrArr[@]}"; do
+#                   vaultData="$(vault kv get -mount="${_VAULT_MOUNT}" -format=json "${_VAULT_KEY_PATH}")" || {
+#                       echo \
+#                           'You do NOT have access to HashiCorp Vault Secret'\
+#                           "\`${_VAULT_MOUNT}/${_VAULT_KEY_PATH}\` at \`${VAULT_ADDR}\`."\
+#                           1&gt;&amp;2
+#                       exit 1
+#                   }
+#
+#                   [ "$(jq -cr \
+#                           --arg ki "AWS__S3__${e1}__AccKeyId" \
+#                           --arg ks "AWS__S3__${e1}__AccKeySecret" \
+#                           '
+#                               if . then {
+#                                   u: (.data.data[$ki] // ""),
+#                                   p: (.data.data[$ks] // "")
+#                               } else {u: "", p: ""} end
+#                           ' \
+#                   0&lt;&lt;&lt;"${vaultData}")" = "$(
+#                       jq -cnr \
+#                           --arg ki "$(jq -r --arg fn__c "cred.${e1}" \
+#                               '.fields[]? | select(.name == $fn__c).value | fromjson.AccKeyId' \
+#                           0&lt;&lt;&lt;"${bwData}")" \
+#                           --arg ks "$(jq -r --arg fn__c "cred.${e1}" \
+#                               '.fields[]? | select(.name == $fn__c).value | fromjson.AccKeySecret' \
+#                           0&lt;&lt;&lt;"${bwData}")" \
+#                           '{u: $ki, p: $ks}'
+#                   )" ] || {
+#                       vault kv destroy -mount="${_VAULT_MOUNT}" -versions="$(
+#                           jq -r '.data.metadata.version' 0&lt;&lt;&lt;"${vaultData}"
+#                       )" "${_VAULT_KEY_PATH}" &amp;&gt; /dev/null || true    # Ignore error (may not have delete permission).
+#                       {
+#                           jq -r \
+#                               --arg ki "AWS__S3__${e1}__AccKeyId" \
+#                               --arg vi "$(jq -r --arg fn__c "cred.${e1}" \
+#                                   '.fields[]? | select(.name == $fn__c).value | fromjson.AccKeyId' \
+#                               0&lt;&lt;&lt;"${bwData}")" \
+#                               --arg ks "AWS__S3__${e1}__AccKeySecret" \
+#                               --arg vs "$(jq -r --arg fn__c "cred.${e1}" \
+#                                   '.fields[]? | select(.name == $fn__c).value | fromjson.AccKeySecret' \
+#                               0&lt;&lt;&lt;"${bwData}")" \
+#                               '.data.data | .[$ki]=$vi | .[$ks]=$vs' \
+#                           0&lt;&lt;&lt;"${vaultData}" |
+#                           vault kv put -mount="${_VAULT_MOUNT}" "${_VAULT_KEY_PATH}" - 1&gt; /dev/null
+#                       } || {
+#                           echo \
+#                               'You do NOT have R/W access to HashiCorp Vault secret'\
+#                               "\`${_VAULT_MOUNT}/${_VAULT_KEY_PATH}\`."\
+#                               1&gt;&amp;2
+#                           exit 1
+#                       }
+#                   }
+#               done
+#           true )
+        }
+
+        aws s3api put-bucket-policy \
+            --region "${AWS_REGION}" \
+            --bucket "${s3BucketName}" \
+            --policy "$(
+                jq -cn \
+                    --arg bucket "${s3BucketName}" \
+                    --arg roUsr "arn:aws:iam::${AWS_ACCOUNT_ID}:user/${iamUsrArr[0]}" \
+                    --arg rwUsr "arn:aws:iam::${AWS_ACCOUNT_ID}:user/${iamUsrArr[-1]}" \
+                    --argjson pubAccess "$(
+                        ((_AWS__S3__PUB_ACCESS)) &amp;&amp; echo true || echo false
+                    )" \
+                    '{
+                        Version: "2012-10-17",
+                        Statement: [
+                            {
+                                Effect: "Allow",
+                                Principal: {AWS: (if $pubAccess then
+                                    [$rwUsr]
+                                else
+                                    [$roUsr, $rwUsr]
+                                end)},
+                                Action: "s3:ListBucket",
+                                Resource: ("arn:aws:s3:::" + $bucket)
+                            },
+                            {
+                                Effect: "Allow",
+                                Principal: (if $pubAccess then
+                                    "*"
+                                else
+                                    {AWS: $roUsr}
+                                end),
+                                Action: "s3:GetObject",
+                                Resource: ("arn:aws:s3:::" + $bucket + "/*")
+                            },
+                            {
+                                Effect: "Allow",
+                                Principal: {AWS: $rwUsr},
+                                Action: [
+                                    "s3:GetObject", "s3:PutObject", "s3:DeleteObject",
+                                    "s3:GetObjectTagging", "s3:PutObjectTagging"
+                                ],
+                                Resource: ("arn:aws:s3:::" + $bucket + "/*")
+                            }
+                        ]
+                    }'
+            )" \
+            --no-cli-pager
+
+        true
+cmdEOF
+    )"; echo $?
+</pre>
+        </div>
+    </div>
+</div>
+</body>
+</html>

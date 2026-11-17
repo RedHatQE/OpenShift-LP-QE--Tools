@@ -1,0 +1,52 @@
+---
+---
+{%- include jekyll/url.var -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grafana - Operational Tasks</title>
+    <base href="{{site.url}}{{site.baseurl}}{{url_parentPath}}/" />
+    <style>
+        :root {color-scheme: light dark;}
+        body {background-color: Canvas; color: CanvasText;}
+    </style>
+    <script type="module" src="../../../../Scripts/js/global.js"></script>
+    <script type="module" src="../../../../Scripts/js/code-widget.js"></script>
+    <script type="module" src="../../../../Scripts/js/html-include.js"></script>
+</head>
+<body>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/global.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/code-widget.js"></script>
+<script type="module" src="{{site.url}}{{site.baseurl}}/Scripts/js/html-include.js"></script>
+<div
+    data-html-include="{{site.url}}{{site.baseurl}}/Scripts/html/WebApp/Grafana/Operational_Tasks/Operational_Tasks.html"
+    data-mod-js="
+        CodeWidget__UsrLib_OvrCfg(html, {% raw %}{
+            'grafana--oper-tasks': {
+                def: {
+                    'vGrp-EV--Team': [
+                        ['Please select a Team.'],
+                        {
+                            val: 'rh-hp-mpex-ieng',
+                            txt: 'Chaos &amp; G11n (rh-hp-mpex-ieng)',
+                            attr: {
+                                'data-grp-opts-val': `{
+                                    &quot;vSV--apiBaseURL&quot;:    &quot;https://grafana.lp-chaos--svc--web-app.chaos.lp.devcluster.openshift.com/api&quot;
+                                }`
+                            },
+                        },
+                    ],
+                    'vSV--apiBaseURL': ['...PleaseSelectTeam...'],
+                },
+                set: {
+                    'vEV--_GF__DS__CFG': '{\n    export _GF__DS__GIT_URL=&quot;${_GF__DS__GIT_URL:-}&quot;\n    export _GF__DS__GIT_BR=&quot;${_GF__DS__GIT_BR:-}&quot;\n    export _GF__DS__GIT_WT=&quot;${_GF__DS__GIT_WT:-}&quot;\n    export _GF__DS__CFG=&quot;$(eval &quot;$(\n            cat - 0&lt;&lt;\'scrEOF\'\n        export _BW__NOTE_NAME=\'note.Grafana--Chaos&amp;G11N\'\n        export _BW__NOTE_SUB_FLD=\'datasource.hp--mpex--ieng\'\n        export BW_SESSION=&quot;${BW_SESSION:+$([ -f &quot;${BW_SESSION}&quot; ] &amp;&amp; cat &quot;${BW_SESSION}&quot; || echo &quot;${BW_SESSION}&quot;)}&quot;\n        export BW_SESSION=&quot;$((bw status | grep -q \'&quot;status&quot;:&quot;unlocked&quot;\') &amp;&amp; echo &quot;${BW_SESSION}&quot; || bw unlock --raw || bw login --raw)&quot;\n        {\n            typeset __shOpt=&quot;$(shopt -po xtrace)&quot;; set +x\n            [ -n &quot;${BW_SESSION}&quot; ] &amp;&amp; bw sync || {\n                echo \'You do NOT have an active and sync:ed BitWarden Session!!!\' 1&gt;&amp;2\n                exit 1\n            }\n            eval &quot;$(\n                typeset bwData=\n                bwData=&quot;$(bw get item &quot;${_BW__NOTE_NAME}&quot;)&quot; || {\n                    echo &quot;You may NOT have access to BitWarden Note \\`${_BW__NOTE_NAME}\\`.&quot; 1&gt;&amp;2\n                    echo false; exit 1\n                }\n                jq -r \\\n                    --arg fn__c &quot;${_BW__NOTE_SUB_FLD}&quot; \\\n                    \'\n                        .fields[]? | select(.name == $fn__c).value |\n                        fromjson | .shellEnv\n                    \' \\\n                0&lt;&lt;&lt;&quot;${bwData}&quot;\n            )&quot;\n            eval &quot;${__shOpt}&quot;; unset __shOpt\n        } 1&gt;&amp;2\n        typeset gitURL=&quot;${_GF__DS__GIT_URL:-git@github.com:krkn-chaos/visualize.git}&quot;\n        typeset gitBr=&quot;${_GF__DS__GIT_BR:-main}&quot;\n        typeset gitWT=&quot;${_GF__DS__GIT_WT:-}&quot;\n        typeset wsDir=\n        { [ -n &quot;${gitWT}&quot; ] &amp;&amp; [ -d &quot;${gitWT}/&quot; ]; } || {\n            wsDir=&quot;$(mktemp -d /tmp/gf--ds-import.XXXXXX)&quot;\n            trap &quot;rm -rf ${wsDir@Q}/&quot; EXIT\n            gitWT=&quot;${wsDir}/visualize&quot;\n            (\n                cd &quot;${wsDir}&quot;\n                git clone \\\n                    --depth 1 --single-branch --no-tags \\\n                    --branch &quot;${gitBr}&quot; &quot;${gitURL}&quot; \\\n                    &quot;${gitWT}/&quot;\n            )\n        }\n        {\n            cat - 0&lt;&lt;\'cfgEOF\'\nshellVars:\n  orgID: 1\nprovCfg:\n---\ncfgEOF\n            yq eval \'\n                select(\n                    (.kind == &quot;ConfigMap&quot;) and\n                    (.data.&quot;ocp-prometheus.yml&quot; != null)\n                ) |\n                .data.&quot;ocp-prometheus.yml&quot;\n            \' &quot;${gitWT}/krkn-visualize/templates/krkn-visualize.yaml.template&quot; |\n            eval &quot;$(cat 0&lt;&lt;subEOF\neval &quot;envsubst \'&quot; \\\\\\$\\\\{{$(IFS=, eval \'echo &quot;${!ES_*}&quot;\')}\\\\} &quot;\'&quot;\nsubEOF\n            )&quot;\n        } | yq -o json eval-all \'\n            select(di == 1).datasources|=map(\n                select(.type != &quot;prometheus&quot;) |\n                .jsonData.flavor=&quot;opensearch&quot; |\n                .database|=sub(&quot;\\*&quot;; &quot;&quot;) |\n                .jsonData.database|=sub(&quot;\\*&quot;; &quot;&quot;)\n            ) |\n            select(di == 1) as $provCfg |\n            select (di == 0) |\n            .provCfg=$provCfg\n        \' | jq -c .\nscrEOF\n    )&quot;)&quot;\n}',
+                    'vEV--_GF__DB__CFG': '{\n    export _GF__DB__GIT_WT=&quot;${_GF__DB__GIT_WT:-}&quot;\n    export _GF__DB__GIT_BR=&quot;${_GF__DB__GIT_BR:-}&quot;\n    export _GF__DB__CFG=&quot;$(cat - 0&lt;&lt;\'cfgEOF\' | yq -o json e . | jq -c .\nshellVars:\n  orgID: 1\ndbCfg:\n  - dbPath:\n      name: /Chaos/Generic\n    dbGetter: |\n      typeset gitURL=&quot;${_GF__DB__GIT_URL:-git@github.com:krkn-chaos/visualize.git}&quot;\n      typeset gitBr=&quot;${_GF__DB__GIT_BR:-main}&quot;\n      typeset gitWT=&quot;${_GF__DB__GIT_WT:-}&quot;\n      typeset wsDir=\n      { [ -n &quot;${gitWT}&quot; ] &amp;&amp; [ -d &quot;${gitWT}/&quot; ]; } || {\n        wsDir=&quot;$(mktemp -d /tmp/gf--db-import.XXXXXX)&quot;\n        trap &quot;rm -rf ${wsDir@Q}/&quot; EXIT\n        gitWT=&quot;${wsDir}/visualize&quot;\n        (\n          cd &quot;${wsDir}&quot;\n          git clone \\\n            --depth 1 --single-branch --no-tags \\\n            --branch &quot;${gitBr}&quot; \\\n            &quot;${gitURL}&quot; &quot;${gitWT}/&quot;\n          make -C &quot;${gitWT}/&quot;\n        )\n      }\n      find &quot;${gitWT}/rendered/&quot; -type f -name \'*.json\' -exec cat \'{}\' \\; |\n        jq -s . 1&gt;&amp;3\ncfgEOF\n    )&quot;\n}',
+                },
+            },
+        }{% endraw %});
+    "
+></div>
+</body>
+</html>
