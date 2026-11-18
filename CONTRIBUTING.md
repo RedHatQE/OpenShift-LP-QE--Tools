@@ -3,7 +3,7 @@
 Read [`README.md`](README.md), if not yet been read, to understand the repository structure and conventions before contributing.
 
 For all coding standards (regardless of language), follow the
-[Best Practices](https://edttjredhat.github.io/RHP-Wiki/Confluence/MPEXIENG/Test+Infrastructure/Best+Practises/Section0--Best_Practices.html).
+[Best Practices](https://redhatqe.github.io/OpenShift-LP-QE--Tools/Confluence/MPEXIENG/Test+Infrastructure/Best+Practises/Section0--Best_Practices.html).
 
 ## Pull Requests
 All changes must go through a Pull Request.
@@ -15,7 +15,7 @@ merging.
 
 ### Workflow
 Follow the rebasing and squashing workflow described in the
-[Best Practices — GitHub section](https://edttjredhat.github.io/RHP-Wiki/Confluence/MPEXIENG/Test+Infrastructure/Best+Practises/Section0--Best_Practices.html).
+[Best Practices — GitHub section](https://redhatqe.github.io/OpenShift-LP-QE--Tools/Confluence/MPEXIENG/Test+Infrastructure/Best+Practises/Section0--Best_Practices.html).
 
 
 ## AI Agents
